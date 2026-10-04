@@ -42,7 +42,9 @@ impl Slug {
                 out.push('-');
             }
         }
-        let mut out = out.trim_end_matches('-').chars().take(40).collect::<String>();
+        // Truncate first, then trim: a cut can land right after a hyphen.
+        let truncated: String = out.chars().take(40).collect();
+        let mut out = truncated.trim_end_matches('-').to_string();
         while out.len() < 3 {
             out.push('x');
         }
@@ -102,7 +104,15 @@ mod tests {
         }
     }
 
+    #[test]
+    fn suggest_regression_truncation_after_hyphen() {
+        // Found by proptest: 40-char cut ending in '-' produced an invalid slug.
+        let s = Slug::suggest("a\0aa¡a A¡a a¡0\u{b}00A A¡A¡A\u{b}AAA¡a Aa¡A¡a¡A A");
+        assert!(Slug::parse(&s).is_ok(), "{s}");
+    }
+
     proptest! {
+        #![proptest_config(ProptestConfig::with_cases(2000))]
         #[test]
         fn suggested_slugs_are_valid(name in ".{0,100}") {
             let s = Slug::suggest(&name);

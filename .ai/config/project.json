@@ -53,7 +53,7 @@
       {
         "id": "rust-clippy",
         "stage": "lint",
-        "cmd": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cmd": "SQLX_OFFLINE=true cargo clippy --workspace --all-targets -- -D warnings",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -63,9 +63,36 @@
         "timeout_s": 1800
       },
       {
+        "id": "sqlx-offline-fresh",
+        "stage": "lint",
+        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo sqlx prepare --workspace --check",
+        "cwd": "backend",
+        "requires": [
+          "cargo",
+          "cargo-sqlx"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1800,
+        "note": "Fails if .sqlx query metadata is stale relative to the schema/queries. Needs PostgreSQL (./dev up)."
+      },
+      {
         "id": "rust-test",
+        "stage": "integration",
+        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo test --workspace",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 2400,
+        "note": "Unit, PostgreSQL integration (fresh database per test) and full-stack auth/authz security tests. Needs PostgreSQL (./dev up)."
+      },
+      {
+        "id": "rust-test-cedar",
         "stage": "unit",
-        "cmd": "cargo test --workspace",
+        "cmd": "cargo test -p app-authz --features cedar",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -73,7 +100,7 @@
         "source": "user",
         "confirmed": true,
         "timeout_s": 1800,
-        "note": "Unit + in-process integration tests; tests needing services are gated by env (see docs/development/testing.md)."
+        "note": "Cedar engine conformance + RBAC/Cedar differential property test."
       }
     ]
   },

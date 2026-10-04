@@ -6,7 +6,8 @@
   "acceptance_criteria": [
     "Cache integration tests pass against Redis and Dragonfly",
     "Redis outage degrades to uncached operation (test)",
-    "Cached-read benchmark recorded"
+    "Cached-read benchmark recorded",
+    "Redis session cache (if enabled) falls back to PostgreSQL on Redis outage without failing open (moved from T-0019)"
   ],
   "non_goals": [],
   "dependencies": [
