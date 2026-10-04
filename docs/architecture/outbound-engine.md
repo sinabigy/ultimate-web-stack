@@ -122,10 +122,10 @@ retries immediately, up to 20 times.
 - **Rate-limited provider (500 req/s)**:
   - Before the controller fixes, the engine averaged 163 useful req/s.
   - It now runs at a steady 496–500 req/s, after about 3 learning pauses at startup.
-  - The naive client completes about 12% of its work and ~99% of the requests it sends are rejected.
+  - The naive client completes about 9% of its work and ~99.5% of the requests it sends are rejected.
 - **Overloaded provider (capacity about 1,600 req/s)**:
   - The engine completes 100% of the work at about 1,560 req/s, with 0.2% waste.
-  - The naive client completes about 24%, with about 99% waste.
+  - The naive client completes about 22%, with about 99% waste.
 - **Outage (2 s of 503s under 400 req/s open-loop load)**:
   - The engine sends 0.48× the offered load to the dead provider; the naive client sends 21×.
   - The engine recovers about 0.46 s after the provider does.

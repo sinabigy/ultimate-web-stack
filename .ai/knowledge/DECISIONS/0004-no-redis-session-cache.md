@@ -17,20 +17,21 @@ Together they require that revocation (logout, logout-all, suspension, admin rev
 effect on the next request. Redis must never be the only source of session truth.
 
 ## Evidence
-All numbers come from `benchmarks/results/20261004T114357Z-23e824900844.json`, recorded on an
+All numbers come from `benchmarks/baseline.json`
+(= `results/20261004T121126Z-4ec088c960a7.json`, median of 3 runs per point), recorded on an
 Apple M5 host, with PostgreSQL 18 and Redis 8 in a 2-CPU VM and a release build.
 
 | measurement | value |
 |---|---|
-| `session_auth_lookup` alone, pool 32, 64 workers | 7,038 ops/s; p50 8.5 ms, of which 7.0 ms is pool wait |
-| `GET /api/v1/account/profile` (session + 1 query) | 4,252 req/s, p50 14.3 ms |
-| `GET /api/v1/session` (session + 2 queries) | 2,828 req/s, p50 21.6 ms |
-| `GET /api/v1/orgs/{slug}/runs` (session + membership + list) | 2,377 req/s, p50 25.8 ms |
-| `/bench/db` (1 query, no auth) | 9,563 req/s |
-| cached read via Redis vs in-process memory | 60,397 vs 129,336 req/s |
+| `session_auth_lookup` alone, pool 32, 64 workers | 8,111 ops/s; p50 7.6 ms, of which 6.3 ms is pool wait |
+| `GET /api/v1/account/profile` (session + 1 query) | 5,682 req/s, p50 10.9 ms |
+| `GET /api/v1/session` (session + 2 queries) | 3,636 req/s, p50 17.0 ms |
+| `GET /api/v1/orgs/{slug}/runs` (session + membership + list) | 2,903 req/s, p50 21.3 ms |
+| `/bench/db` (1 query, no auth) | 9,496 req/s |
+| cached read via Redis vs in-process memory | 57,131 vs 125,457 req/s |
 
 Throughput falls roughly in proportion to the number of database round trips per request:
-4,252 req/s at 2 trips and 2,828 req/s at 3. The session lookup is one of those 2–3 trips, and is
+5,682 req/s at 2 trips and 3,636 req/s at 3. The session lookup is one of those 2–3 trips, and is
 neither the most expensive nor the dominant one. Removing it with a Redis cache would raise
 these endpoints' ceiling by at most about one third. In exchange it would add a second
 network hop per request, a second consistency domain, and a revocation-staleness window.

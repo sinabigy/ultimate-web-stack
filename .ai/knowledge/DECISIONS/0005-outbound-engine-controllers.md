@@ -26,18 +26,19 @@ Details of the design are in `docs/architecture/outbound-engine.md`.
   a naive client.
 
 ## Evidence
-`benchmarks/results/20261004T114357Z-23e824900844.json` and the trace runs described in commit
-d06ac75 "Engine: fix rate controller dynamics found by benchmark traces".
+`benchmarks/baseline.json` (= `results/20261004T121126Z-4ec088c960a7.json`) and the trace runs
+described in commit d06ac75 "Engine: fix rate controller dynamics found by benchmark traces".
 
 - **Before** the separation and the dynamics fixes, against a 500 req/s provider, the engine
   completed all work at 163 useful req/s. Traces showed:
   - the concurrency limit collapsed to 1–2;
   - the cap jumped after pauses;
   - a cap of 1,000+ coexisted with 44 req/s actually sent.
-- **After**: a steady 496–500 req/s (99–100% of the limit) and 1.8% waste over a 7,500-item run,
-  including learning pauses. The naive client completes 9.9% of the work with 99.5% waste.
-- **Overload** (capacity ≈1,600 req/s): the engine completes 100% of the work at 1,562 req/s with
-  0.2% waste. The naive client completes 26.1% with 98.6% waste.
+- **After**: a steady 496–500 req/s (99–100% of the limit, from the trace). Over a 7,500-item run
+  that includes the learning pauses: 378 useful req/s, 100% completed, 1.9% waste. The naive
+  client completes 9.3% of the work with 99.5% waste.
+- **Overload** (capacity ≈1,600 req/s): the engine completes 100% of the work at 1,561 req/s with
+  0.2% waste. The naive client completes 22% with 98.8% waste.
 - **Outage**: the engine sends 0.48× the offered load to the dead provider and recovers 0.46 s
   after the provider does. The naive client sends 21×.
 - Regression test: `learned_rate_converges_near_the_provider_limit` (≥85% of the limit at steady
@@ -56,7 +57,7 @@ d06ac75 "Engine: fix rate controller dynamics found by benchmark traces".
 - Controller state is per process. Instances that share one provider quota each learn
   separately: configure a per-instance `requests_per_second`, or use the shared Redis GCRA limiter.
 - Fail-fast while the breaker is open loses requests that a brute-force client would complete
-  at recovery (1,416 vs 1,600 in the outage scenario). Durable callers (the job queue) retry later.
+  at recovery (1,415 vs 1,600 in the outage scenario). Durable callers (the job queue) retry later.
 
 ## Reversal conditions
 - If providers in use send rate-limit headers (`x-ratelimit-*`, IETF `RateLimit`), add header
