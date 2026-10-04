@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""ai-validate: run the project's canonical validation commands and report pass/fail/skip.
+
+  python3 tools/ai-validate [--stage S ...] [--only ID ...] [--keep-going] [--strict] [--json] [--report FILE]
+  python3 tools/ai-validate --list
+
+Runs only `confirmed: true` commands from .ai/config/project.json → validation.commands, in file
+order (narrowest first is the author's job). ai-check always runs first. Unconfirmed commands are
+evidence, never instructions, so they are listed but never executed.
+
+A command whose `requires` executables are not on PATH is reported SKIP, never PASS. Skips do not
+change the exit code unless --strict. Any FAIL exits 1. Output is bounded: only the tail of a
+failing command's output is shown.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _ailib as L  # noqa: E402
+
+TAIL_LINES = 40
+
+
+def _run_check(root: Path) -> dict:
+    t0 = time.monotonic()
+    r = subprocess.run([sys.executable, str(L.TOOLS_DIR / "ai-check"), "--root", str(root)],
+                       capture_output=True, text=True)
+    out = (r.stdout + r.stderr).strip().splitlines()
+    return {"id": "ai-check", "stage": "other", "cmd": "python3 tools/ai-check",
+            "status": "pass" if r.returncode == 0 else "fail", "seconds": round(time.monotonic() - t0, 2),
+            "tail": out[-TAIL_LINES:] if r.returncode else out[-1:]}
+
+
+def run_command(root: Path, c: dict) -> dict:
+    res = {"id": c["id"], "stage": c["stage"], "cmd": c["cmd"]}
+    missing = [x for x in c.get("requires", []) if shutil.which(x) is None]
+    if missing:
+        return dict(res, status="skip", reason="missing on PATH: " + ", ".join(missing), seconds=0.0)
+    try:
+        cwd = L.safe_path(root, c.get("cwd") or ".")
+    except ValueError as e:
+        return dict(res, status="fail", reason=str(e), seconds=0.0)
+    t0 = time.monotonic()
+    try:
+        r = subprocess.run(c["cmd"], shell=True, cwd=cwd, capture_output=True, text=True,
+                           timeout=c.get("timeout_s"))
+        code, out = r.returncode, (r.stdout + r.stderr)
+    except subprocess.TimeoutExpired as e:
+        partial = e.stdout.decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
+        code, out = None, f"{partial}\ntimed out after {c.get('timeout_s')}s"
+    res.update(seconds=round(time.monotonic() - t0, 2), exit_code=code)
+    res["status"] = "pass" if code == 0 else "fail"
+    if res["status"] == "fail":
+        res["tail"] = out.strip().splitlines()[-TAIL_LINES:]
+    return res
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root")
+    ap.add_argument("--stage", action="append", default=[], help="only commands in this stage (repeatable)")
+    ap.add_argument("--only", action="append", default=[], help="only the command with this id (repeatable)")
+    ap.add_argument("--keep-going", action="store_true", help="continue after a failure")
+    ap.add_argument("--strict", action="store_true", help="skipped commands also fail")
+    ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--report", help="also write the JSON report to this file")
+    ap.add_argument("--list", action="store_true", help="list commands without running them")
+    a = ap.parse_args(argv)
+    root = L.find_root(a.root)
+    cmds = L.load_json(root / ".ai/config/project.json").get("validation", {}).get("commands", [])
+    unconfirmed = [c["id"] for c in cmds if not c.get("confirmed")]
+    selected = [c for c in cmds if c.get("confirmed")
+                and (not a.stage or c["stage"] in a.stage) and (not a.only or c["id"] in a.only)]
+    if a.only and not selected:
+        print(f"ai-validate: no confirmed command matches --only {a.only}", file=sys.stderr)
+        return 2
+
+    if a.list:
+        for c in cmds:
+            flag = "confirmed" if c.get("confirmed") else "UNCONFIRMED (not run)"
+            req = f" requires={','.join(c['requires'])}" if c.get("requires") else ""
+            print(f"{c['id']:<28} {c['stage']:<12} {flag}{req}\n    {c['cmd']}")
+        return 0
+
+    results = [_run_check(root)]
+    if not a.json:
+        print(f"[{results[0]['status'].upper():4}] ai-check")
+    stopped = results[0]["status"] == "fail" and not a.keep_going
+    for c in ([] if stopped else selected):
+        if not a.json:
+            print(f"[....] {c['id']}", end="\r", flush=True)
+        r = run_command(root, c)
+        results.append(r)
+        if not a.json:
+            extra = f" ({r['reason']})" if r.get("reason") else ""
+            print(f"[{r['status'].upper():4}] {r['id']:<28} {r['seconds']:>7.1f}s{extra}")
+            for ln in r.get("tail", []):
+                print(f"       | {ln}")
+        if r["status"] == "fail" and not a.keep_going:
+            stopped = True
+            break
+
+    counts = {s: sum(1 for r in results if r["status"] == s) for s in ("pass", "fail", "skip")}
+    not_run = [c["id"] for c in selected if c["id"] not in {r["id"] for r in results}]
+    ok = counts["fail"] == 0 and not not_run and (not a.strict or counts["skip"] == 0)
+    report = {"ok": ok, "generated_at": L.now_iso(), "counts": counts, "not_run": not_run,
+              "unconfirmed_not_run": unconfirmed, "results": results}
+    head, dirty = L.git_head(root)
+    report["git"] = {"head": head, "dirty": dirty}
+    if a.report:
+        out = Path(a.report)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if a.json:
+        print(json.dumps(report, indent=2))
+    else:
+        if not_run:
+            print(f"not run (stopped after failure): {', '.join(not_run)}")
+        if unconfirmed:
+            print(f"unconfirmed (never run): {', '.join(unconfirmed)}")
+        print(f"ai-validate: {'OK' if ok else 'FAILED'} — {counts['pass']} pass, {counts['fail']} fail, "
+              f"{counts['skip']} skip")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

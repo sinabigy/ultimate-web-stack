@@ -1,0 +1,345 @@
+#!/usr/bin/env python3
+"""ai-check: verify that the repository's canonical AI project state is complete and consistent.
+
+Exit code 1 on any canonical FAIL. WARN/INFO never change the exit code.
+Problems under .ai/runtime/ (local, non-authoritative) are reported separately and only
+affect the exit code with --strict-runtime.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _ailib as L  # noqa: E402
+
+CONFIGS = {"project": "project", "capabilities": "capabilities", "routing": "routing",
+           "context": "context", "budgets": "budgets"}
+SCHEMAS = ["project", "capabilities", "routing", "context", "budgets", "task", "current-task",
+           "roadmap", "result", "usage", "runtime-registry"]
+KNOWLEDGE = ["ARCHITECTURE.md", "CONVENTIONS.md", "CONSTRAINTS.md", "LESSONS.md", "KNOWN_ISSUES.md"]
+SHIM_POINTERS = ["AI_PROTOCOL.md", ".ai/state/CURRENT_TASK.json"]
+SECRET_PATTERNS = [
+    re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----"),
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"),
+]
+PROTOCOL_CHAR_WARN = 10000  # ~2,500 tokens
+
+
+class Report:
+    def __init__(self):
+        self.fails, self.warns, self.infos, self.runtime = [], [], [], []
+
+    def fail(self, m): self.fails.append(m)
+    def warn(self, m): self.warns.append(m)
+    def info(self, m): self.infos.append(m)
+
+
+def _json(root: Path, rel: str, rep: Report, sink=None):
+    p = root / rel
+    sink = sink or rep.fail
+    if not p.is_file():
+        sink(f"missing: {rel}")
+        return None
+    try:
+        return L.load_json(p)
+    except (ValueError, OSError) as e:
+        sink(f"{rel}: not valid JSON ({e})")
+        return None
+
+
+def _validate(rep: Report, rel: str, data, schema, sink=None):
+    sink = sink or rep.fail
+    v = L.validate(data, schema)
+    for e in v.errors:
+        sink(f"{rel}: {e}")
+    for u in v.unchecked:
+        rep.warn(f"{rel}: {u}")
+    return v.ok
+
+
+def check(root: Path) -> Report:
+    rep = Report()
+    if not (root / "AI_PROTOCOL.md").is_file():
+        rep.fail("missing: AI_PROTOCOL.md")
+    elif len((root / "AI_PROTOCOL.md").read_text(encoding="utf-8")) > PROTOCOL_CHAR_WARN:
+        rep.warn("AI_PROTOCOL.md exceeds the hot-path size target; move detail to docs/protocol/")
+
+    schemas = {}
+    for name in SCHEMAS:
+        s = _json(root, f".ai/schemas/{name}.schema.json", rep)
+        if s is not None:
+            schemas[name] = s
+    cfg = {}
+    for key, sname in CONFIGS.items():
+        rel = f".ai/config/{key}.json"
+        data = _json(root, rel, rep)
+        if data is not None and sname in schemas:
+            _validate(rep, rel, data, schemas[sname])
+            cfg[key] = data
+    for k in KNOWLEDGE:
+        if not (root / ".ai/knowledge" / k).is_file():
+            rep.fail(f"missing: .ai/knowledge/{k}")
+    if not (root / ".ai/state/STATUS.md").is_file():
+        rep.fail("missing: .ai/state/STATUS.md")
+
+    project = cfg.get("project", {})
+    caps = cfg.get("capabilities", {})
+    routing = cfg.get("routing", {})
+    state = project.get("instance", {}).get("state")
+
+    # ---- capability / routing coherence (structure enforces vendor-independence; this checks vocab)
+    classes = caps.get("classes", {})
+    tiers = {t.get("tier") for t in caps.get("tiers", [])}
+    core = set(caps.get("core_capabilities", {}))
+    known_ns = set(caps.get("known_namespaces", []))
+    preserved = set()
+
+    def note_caps(where, ids):
+        for c in ids:
+            ns = c.split(".", 1)[0]
+            if ns == "core" and c not in core:
+                rep.warn(f"{where}: '{c}' is not in the core vocabulary (typo?)")
+            elif ns != "core":
+                preserved.add(c)
+
+    for name, route in routing.get("task_classes", {}).items():
+        where = f"routing.task_classes.{name}"
+        if route.get("min_tier") not in tiers:
+            rep.fail(f"{where}: min_tier {route.get('min_tier')} is not a defined tier")
+        for field, vocab in (("reasoning_class", "reasoning"), ("context_class", "context"),
+                             ("latency_class", "latency"), ("max_cost_class", "cost")):
+            if field in route and route[field] not in classes.get(vocab, []):
+                rep.warn(f"{where}.{field}: '{route[field]}' not in capabilities.classes.{vocab}")
+        note_caps(where, route.get("required_capabilities", []) + route.get("preferred_capabilities", []))
+    if routing and routing.get("default_class") not in routing.get("task_classes", {}):
+        rep.fail("routing.default_class does not name a task class")
+
+    # ---- tasks
+    ids: dict[str, str] = {}
+    task_status: dict[str, str] = {}
+    active = []
+    for status, p in L.task_files(root):
+        rel = p.relative_to(root).as_posix()
+        data = _json(root, rel, rep)
+        if data is None or "task" not in schemas:
+            continue
+        _validate(rep, rel, data, schemas["task"])
+        tid = data.get("id", "?")
+        if tid in ids:
+            rep.fail(f"duplicate task id {tid}: {ids[tid]} and {rel}")
+        ids[tid] = rel
+        task_status[tid] = data.get("status")
+        if not p.name.startswith(f"{tid}-") and p.name != f"{tid}.json":
+            rep.fail(f"{rel}: filename does not start with its id {tid}")
+        if data.get("status") != status:
+            rep.fail(f"{rel}: status '{data.get('status')}' does not match directory '{status}'")
+        if status == "active":
+            active.append(tid)
+        if data.get("task_class") and routing and data["task_class"] not in routing.get("task_classes", {}):
+            rep.fail(f"{rel}: task_class '{data['task_class']}' is not defined in routing.json")
+        note_caps(rel, data.get("required_capabilities", []))
+    for tid, rel in ids.items():
+        for dep in (L.load_json(root / rel).get("dependencies") or []):
+            if dep not in ids:
+                rep.warn(f"{rel}: dependency {dep} does not exist")
+    if len(active) > 1 and not project.get("policies", {}).get("allow_parallel_active", False):
+        rep.fail(f"more than one active task ({', '.join(active)}) but policies.allow_parallel_active is false")
+    if state == "template" and ids:
+        rep.warn("template instance contains task packets; templates must not carry project state")
+
+    # ---- CURRENT_TASK pointer integrity
+    cur = _json(root, ".ai/state/CURRENT_TASK.json", rep)
+    if cur is not None and "current-task" in schemas and _validate(rep, ".ai/state/CURRENT_TASK.json", cur, schemas["current-task"]):
+        tid, path = cur.get("task_id"), cur.get("path")
+        if tid is None:
+            if path is not None:
+                rep.fail("CURRENT_TASK: path is set but task_id is null")
+            if active:
+                rep.warn(f"CURRENT_TASK is empty while {', '.join(active)} is active")
+        elif tid not in ids:
+            rep.fail(f"CURRENT_TASK points to missing task {tid}")
+        elif task_status.get(tid) != "active":
+            rep.fail(f"CURRENT_TASK points to {tid} whose status is '{task_status.get(tid)}' (must be active)")
+        elif path != ids[tid]:
+            rep.fail(f"CURRENT_TASK path '{path}' does not match the task file '{ids[tid]}'")
+
+    road = _json(root, ".ai/state/ROADMAP.json", rep)
+    if road is not None and "roadmap" in schemas and _validate(rep, ".ai/state/ROADMAP.json", road, schemas["roadmap"]):
+        for m in road.get("milestones", []):
+            for tid in m.get("tasks", []):
+                if tid not in ids:
+                    rep.warn(f"ROADMAP {m.get('id')}: task {tid} does not exist")
+
+    # ---- task templates must instantiate into valid tasks
+    for tp in sorted((root / ".ai/templates").glob("*.task.json")):
+        rel = tp.relative_to(root).as_posix()
+        data = _json(root, rel, rep)
+        if data is not None and "task" in schemas:
+            probe = dict(data, task_schema_version=1, id="T-0000", status="queue",
+                         history=[{"at": L.now_iso(), "event": "created"}])
+            _validate(rep, rel + " (instantiated)", probe, schemas["task"])
+
+    # ---- result packets
+    for rp in sorted((root / ".ai/context/summaries").glob("*.result.json")):
+        rel = rp.relative_to(root).as_posix()
+        data = _json(root, rel, rep)
+        if data is not None and "result" in schemas:
+            _validate(rep, rel, data, schemas["result"])
+
+    # ---- shims: adapters that must point at canonical state and not compete with it
+    proto_lines = set()
+    if (root / "AI_PROTOCOL.md").is_file():
+        proto_lines = {ln.strip() for ln in (root / "AI_PROTOCOL.md").read_text(encoding="utf-8").splitlines()
+                       if len(ln.strip()) >= 40}
+    max_lines = project.get("policies", {}).get("max_shim_lines_warning", 40)
+    for shim in project.get("shims", []):
+        try:
+            sp = L.safe_path(root, shim)
+        except ValueError as e:
+            rep.fail(f"shim {shim}: {e}")
+            continue
+        if not sp.is_file():
+            rep.fail(f"shim listed in project.json is missing: {shim}")
+            continue
+        text = sp.read_text(encoding="utf-8", errors="replace")
+        for ptr in SHIM_POINTERS:
+            if ptr not in text:
+                rep.fail(f"shim {shim} does not point to {ptr}")
+        n = len(text.splitlines())
+        if n > max_lines:
+            rep.warn(f"shim {shim} has {n} lines (> {max_lines}); keep shims as thin adapters")
+        dup = sum(1 for ln in text.splitlines() if ln.strip() in proto_lines)
+        if dup >= 3:
+            rep.warn(f"shim {shim} repeats {dup} lines of AI_PROTOCOL.md; point to it instead of copying")
+
+    # ---- secrets must never enter canonical state
+    scan = [root / "AI_PROTOCOL.md"] + [root / s for s in project.get("shims", [])]
+    for p in (root / ".ai").rglob("*"):
+        rp = p.relative_to(root).as_posix()
+        if p.is_file() and not rp.startswith((".ai/runtime/", ".ai/map/")) and p.stat().st_size < 2_000_000:
+            scan.append(p)
+    for p in scan:
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for pat in SECRET_PATTERNS:
+            if pat.search(text):
+                rep.fail(f"possible secret in canonical file {p.relative_to(root).as_posix()} (pattern {pat.pattern[:24]}…)")
+                break
+
+    # ---- runtime dir must be ignored by VCS
+    ignored = None
+    if L.have_git(root):
+        r = L.run(["git", "check-ignore", "-q", ".ai/runtime/available-models.json"], root)
+        ignored = bool(r and r.returncode == 0)
+    else:
+        gi = root / ".gitignore"
+        lines = {ln.strip() for ln in gi.read_text(encoding="utf-8").splitlines()} if gi.is_file() else set()
+        ignored = bool(lines & {".ai/runtime/", ".ai/runtime/*", ".ai/runtime", "/.ai/runtime/*", "/.ai/runtime/"})
+    if not ignored:
+        rep.fail(".ai/runtime/ is not ignored by .gitignore (runtime/provider data must stay local)")
+
+    # ---- generated map freshness (warn only; maps are evidence, not truth)
+    ctx = cfg.get("context", {})
+    repo_map = root / ".ai/map/repo.json"
+    if state == "initialized":
+        if not repo_map.is_file():
+            rep.warn("repository map missing: run `python3 tools/ai-map`")
+        elif ctx.get("map", {}).get("stale_warning", True):
+            try:
+                meta = L.load_json(repo_map).get("meta", {})
+                listing = L.list_files(root, ctx.get("map", {}))
+                head, _ = L.git_head(root)
+                if meta.get("mapper_version") != L.MAPPER_VERSION:
+                    rep.warn("repository map was produced by a different mapper version: rerun tools/ai-map")
+                elif meta.get("fingerprint") != L.fingerprint(listing["files"]) or (head and meta.get("git_head") != head):
+                    rep.warn(f"repository map is stale (generated {meta.get('generated_at')}): rerun tools/ai-map")
+            except (ValueError, OSError):
+                rep.warn("repository map unreadable: rerun tools/ai-map")
+
+    # ---- architecture state must describe the repository, not an aspiration
+    arch = project.get("architecture") or {}
+    for name, mod in (arch.get("modules") or {}).items():
+        if not isinstance(mod, dict):
+            continue
+        for rel in (mod.get("paths") or []) if mod.get("enabled") else []:
+            try:
+                if not L.safe_path(root, rel).exists():
+                    rep.warn(f"architecture.modules.{name} is enabled but its path is missing: {rel}")
+            except ValueError as e:
+                rep.fail(f"architecture.modules.{name}.paths: {e}")
+        for rel in mod.get("evidence") or []:
+            try:
+                if not L.safe_path(root, rel).exists():
+                    rep.warn(f"architecture.modules.{name}: evidence file is missing: {rel}")
+            except ValueError as e:
+                rep.fail(f"architecture.modules.{name}.evidence: {e}")
+    for rel in arch.get("knowledge") or []:
+        try:
+            if not L.safe_path(root, rel).exists():
+                rep.warn(f"architecture.knowledge entry is missing: {rel}")
+        except ValueError as e:
+            rep.fail(f"architecture.knowledge: {e}")
+
+    # ---- instance-level guidance
+    if state == "template":
+        rep.info("uninitialized template: run `python3 tools/ai-init --name \"Project\"` after copying")
+    elif state == "initialized":
+        if not project.get("objective", "").strip():
+            rep.warn("project objective is not set (the discovery task establishes it with the user)")
+        cmds = project.get("validation", {}).get("commands", [])
+        if not any(c.get("confirmed") for c in cmds):
+            rep.warn("no confirmed validation commands; inferred ones are unconfirmed evidence")
+    if preserved:
+        rep.info("non-core capabilities preserved: " + ", ".join(sorted(preserved)))
+
+    # ---- runtime (local, optional, non-authoritative)
+    rt = root / ".ai/runtime"
+    reg = rt / "available-models.json"
+    if reg.is_file() and "runtime-registry" in schemas:
+        data = _json(root, ".ai/runtime/available-models.json", rep, sink=rep.runtime.append)
+        if data is not None:
+            _validate(rep, ".ai/runtime/available-models.json", data, schemas["runtime-registry"], sink=rep.runtime.append)
+    usage = rt / "usage.jsonl"
+    if usage.is_file() and "usage" in schemas:
+        for i, line in enumerate(usage.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                _validate(rep, f".ai/runtime/usage.jsonl:{i}", json.loads(line), schemas["usage"], sink=rep.runtime.append)
+            except ValueError as e:
+                rep.runtime.append(f".ai/runtime/usage.jsonl:{i}: not valid JSON ({e})")
+    return rep
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root")
+    ap.add_argument("--strict-runtime", action="store_true", help="runtime problems also fail the check")
+    ap.add_argument("--json", action="store_true", help="machine-readable output")
+    a = ap.parse_args(argv)
+    root = L.find_root(a.root)
+    rep = check(root)
+    failed = bool(rep.fails) or (a.strict_runtime and bool(rep.runtime))
+    level = L.validation_level()
+    if a.json:
+        print(json.dumps({"ok": not failed, "validation_level": level, "fail": rep.fails, "warn": rep.warns,
+                          "info": rep.infos, "runtime": rep.runtime}, indent=2))
+    else:
+        for tag, items in (("FAIL", rep.fails), ("WARN", rep.warns), ("INFO", rep.infos), ("RUNTIME", rep.runtime)):
+            for m in items:
+                print(f"{tag}: {m}")
+        print(f"ai-check: {'FAILED' if failed else 'OK'} — {len(rep.fails)} fail, {len(rep.warns)} warn, "
+              f"{len(rep.runtime)} runtime; validation_level: {level}")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

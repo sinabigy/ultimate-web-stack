@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""ai-init: initialize a copied template, or retrofit the protocol into an existing repository.
+
+  python3 tools/ai-init [--name "Project"] [--objective "..."]          # in a copied template
+  python3 /path/to/template/tools/ai-init --target /path/to/repo [...]  # retrofit an existing repo
+
+Behaviour:
+- Never overwrites existing files. --force only refreshes protocol-owned files (AI_PROTOCOL.md,
+  docs/protocol/, tools/, .ai/schemas/, .ai/templates/, shims); project config, state, knowledge and
+  tasks are never overwritten.
+- Detects new vs existing repository, the project name, languages, manifests and build systems.
+- Inferred validation commands are recorded with provenance and confirmed=false. They are never run.
+- Resets template state, instantiates the project-discovery task, maps the repo, runs ai-check.
+- Idempotent: re-running on an initialized repository only refreshes the map and runs ai-check.
+"""
+from __future__ import annotations
+
+import argparse
+import importlib.machinery
+import importlib.util
+import shutil
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _ailib as L  # noqa: E402
+
+README_MARKER = "<!-- ai-project-template:readme -->"
+PROTOCOL_OWNED = ("AI_PROTOCOL.md", "docs/protocol/", "tools/", ".ai/schemas/", ".ai/templates/")
+TEMPLATE_ONLY = ("tools/tests/",)  # self-tests of the pristine template; never copied into projects
+STRUCTURE_DOCS = (".ai/context/summaries/README.md",)  # explains an otherwise-empty project folder
+NEVER_COPY = (".ai/runtime/", ".ai/map/", ".ai/tasks/", ".ai/context/summaries/", ".ai/config/project.json",
+              ".ai/state/")
+SHIM_SNIPPET = ("This repository uses a portable AI protocol. Read, in order:\n"
+                "1. AI_PROTOCOL.md\n2. .ai/config/project.json\n"
+                "3. .ai/state/CURRENT_TASK.json (and the task file it points to)\n")
+
+
+def _tool(name: str):
+    """Import a sibling tool script (no .py extension) as a module."""
+    path = L.TOOLS_DIR / name
+    loader = importlib.machinery.SourceFileLoader(name.replace("-", "_"), str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def _template_files(src: Path) -> list[str]:
+    out = []
+    for p in sorted(src.rglob("*")):
+        if not p.is_file() or "__pycache__" in p.parts or ".git" in p.relative_to(src).parts[:1]:
+            continue
+        rel = p.relative_to(src).as_posix()
+        if rel.startswith(TEMPLATE_ONLY):
+            continue
+        # structure markers ship everywhere; project data (tasks, results, maps, runtime) never does
+        keep_marker = p.name == ".gitkeep" or rel in STRUCTURE_DOCS
+        if rel in ("AGENTS.md", "CLAUDE.md", "GEMINI.md") or rel.startswith(PROTOCOL_OWNED) \
+                or (rel.startswith(".ai/") and (keep_marker or not rel.startswith(NEVER_COPY))):
+            out.append(rel)
+    return out
+
+
+def _merge_gitignore(src: Path, dst: Path, log: list[str]) -> None:
+    want = [ln for ln in (src / ".gitignore").read_text(encoding="utf-8").splitlines() if ln.strip()]
+    gi = dst / ".gitignore"
+    have = gi.read_text(encoding="utf-8").splitlines() if gi.is_file() else []
+    missing = [ln for ln in want if ln not in have and not ln.startswith("#")]
+    if missing:
+        text = "\n".join(have).rstrip("\n")
+        text += ("\n\n" if text else "") + "# --- ai-project-template ---\n" + "\n".join(missing) + "\n"
+        gi.write_text(text, encoding="utf-8")
+        log.append(f".gitignore: added {len(missing)} line(s)")
+
+
+def retrofit(src: Path, dst: Path, force: bool, log: list[str]) -> list[str]:
+    """Copy protocol files into dst without overwriting. Returns shims that must not be listed."""
+    if L.load_json(src / ".ai/config/project.json")["instance"]["state"] != "template":
+        raise SystemExit("ai-init: the source is an initialized project, not a pristine template; refusing to "
+                         "copy its project state into another repository")
+    dst.mkdir(parents=True, exist_ok=True)
+    skipped, bad_shims = 0, []
+    for rel in _template_files(src):
+        target = L.safe_path(dst, rel)
+        is_shim = rel in ("AGENTS.md", "CLAUDE.md", "GEMINI.md")
+        if target.exists():
+            if force and (rel.startswith(PROTOCOL_OWNED) or is_shim):
+                shutil.copy2(src / rel, target)
+                log.append(f"refreshed (--force): {rel}")
+            else:
+                skipped += 1
+                if is_shim:
+                    text = target.read_text(encoding="utf-8", errors="replace")
+                    if "AI_PROTOCOL.md" not in text or ".ai/state/CURRENT_TASK.json" not in text:
+                        bad_shims.append(rel)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src / rel, target)
+    # canonical project config and state are written fresh, never copied
+    for rel in (".ai/config/project.json", ".ai/state/CURRENT_TASK.json", ".ai/state/ROADMAP.json", ".ai/state/STATUS.md"):
+        target = L.safe_path(dst, rel)
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src / rel, target)
+    _merge_gitignore(src, dst, log)
+    log.append(f"retrofit: kept {skipped} existing file(s) untouched")
+    for s in bad_shims:
+        log.append(f"WARNING: existing {s} does not point to the protocol; left unchanged and not listed as a shim. "
+                   f"Add this to it, then add it to project.json 'shims':\n{SHIM_SNIPPET}")
+    return bad_shims
+
+
+def _detect_name(root: Path) -> str:
+    if L.have_git(root):
+        r = L.run(["git", "remote", "get-url", "origin"], root)
+        if r and r.returncode == 0 and r.stdout.strip():
+            base = r.stdout.strip().rstrip("/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+            return base[:-4] if base.endswith(".git") else base
+    return root.name
+
+
+def _has_project_content(root: Path) -> bool:
+    ctx = L.load_json(root / ".ai/config/context.json")
+    template_owned = {"README.md", ".gitignore", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "AI_PROTOCOL.md"}
+    for rel, _, _ in L.list_files(root, ctx.get("map", {}))["files"]:
+        if rel in template_owned or rel.startswith(("tools/", "docs/protocol/")):
+            continue
+        return True
+    return False
+
+
+def initialize(root: Path, name: str | None, objective: str | None, origin: str | None,
+               exclude_shims: list[str], log: list[str]) -> None:
+    project = L.load_json(root / ".ai/config/project.json")
+    if project["instance"]["state"] == "initialized":
+        log.append("already initialized: refreshing the map only (no state was changed)")
+        _tool("ai-map").main(["--root", str(root), "--quiet"])
+        return
+    if origin is None:
+        origin = "retrofit" if _has_project_content(root) else "greenfield"
+    name = name or _detect_name(root)
+
+    mapper = _tool("ai-map")
+    mapper.main(["--root", str(root), "--quiet"])
+    repo = L.load_json(root / ".ai/map/repo.json")
+
+    project["name"] = name
+    project["objective"] = objective or ""
+    project["instance"] = {"state": "initialized", "origin": origin, "initialized_at": L.now_iso(),
+                           "template_version": L.TEMPLATE_VERSION}
+    project["stack"] = {"languages": list(repo["summary"]["languages"]),
+                        "package_managers": repo["package_managers"], "build_systems": repo["build_systems"],
+                        "frameworks": [], "detected_by": f"ai-map {L.MAPPER_VERSION} (evidence; review in T-0001)"}
+    project["paths"]["source"] = [d for d in repo["source_dirs"] if d != "."][:5]
+    project["paths"]["tests"] = repo["test_paths"][:10]
+    confirmed = [c for c in project["validation"]["commands"] if c.get("confirmed")]
+    project["validation"]["commands"] = confirmed + [c for c in repo["validation_candidates"]
+                                                     if c["id"] not in {x["id"] for x in confirmed}]
+    project["shims"] = [s for s in project["shims"] if s not in exclude_shims]
+    L.dump_json(root, ".ai/config/project.json", project)
+    log.append(f"project.json: name={name!r}, origin={origin}, languages={project['stack']['languages'][:4]}, "
+               f"{len(repo['validation_candidates'])} unconfirmed validation candidate(s)")
+
+    tmpl = (root / ".ai/templates/STATUS.md").read_text(encoding="utf-8")
+    L.safe_path(root, ".ai/state/STATUS.md").write_text(
+        tmpl.replace("{{name}}", name).replace("{{date}}", L.now_iso()[:10]), encoding="utf-8")
+
+    tasks = _tool("ai-task")
+    existing = [L.load_json(p) for _, p in L.task_files(root)]
+    disc = next((t for t in existing if t.get("template") == "project-discovery"), None)
+    if disc is None:
+        disc = tasks.create(root, {}, "project-discovery")
+        log.append(f"created {disc['id']} (project discovery) in .ai/tasks/queue/")
+    L.dump_json(root, ".ai/state/CURRENT_TASK.json", {
+        "current_task_schema_version": 1, "task_id": None, "path": None,
+        "next_step": f"Start the discovery task: python3 tools/ai-task start {disc['id']}", "updated_at": L.now_iso()})
+    L.dump_json(root, ".ai/state/ROADMAP.json", {"roadmap_schema_version": 1, "milestones": [
+        {"id": "M0", "title": "Project discovery", "goal": "Confirmed objective, map and runnable validation.",
+         "status": "planned", "tasks": [disc["id"]]}]})
+
+    readme = root / "README.md"
+    if not readme.exists() or README_MARKER in readme.read_text(encoding="utf-8", errors="replace"):
+        text = (root / ".ai/templates/README.project.md").read_text(encoding="utf-8").replace("{{name}}", name)
+        readme.write_text(text, encoding="utf-8")
+        log.append("README.md: written from .ai/templates/README.project.md")
+    mapper.main(["--root", str(root), "--quiet"])  # refresh after writing files
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--name")
+    ap.add_argument("--objective", help="only if stated by the user; never invented")
+    ap.add_argument("--target", help="retrofit into this existing directory instead of initializing in place")
+    ap.add_argument("--force", action="store_true", help="refresh protocol-owned files during retrofit")
+    ap.add_argument("--no-check", action="store_true")
+    a = ap.parse_args(argv)
+    log: list[str] = []
+    src = L.TEMPLATE_ROOT
+    if a.target and Path(a.target).resolve() != src:
+        root = Path(a.target).resolve()
+        bad = retrofit(src, root, a.force, log)
+        initialize(root, a.name, a.objective, None, bad, log)
+    else:
+        root = src
+        initialize(root, a.name, a.objective, None, [], log)
+    for line in log:
+        print(f"ai-init: {line}")
+    if a.no_check:
+        return 0
+    return _tool("ai-check").main(["--root", str(root)])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/usage.schema.json",
+  "title": "Optional usage/efficiency record (one JSON object per line in .ai/runtime/usage.jsonl)",
+  "type": "object",
+  "required": [
+    "usage_schema_version",
+    "task_id",
+    "tier",
+    "tool_calls",
+    "retries",
+    "success",
+    "recorded_at"
+  ],
+  "properties": {
+    "usage_schema_version": {
+      "const": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^T-[0-9]{4,}$"
+    },
+    "tier": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "provider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "context_tokens": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "cached_tokens": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "cost_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "tool_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retries": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "subagents": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "duration_s": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "validation_passed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "recorded_at": {
+      "type": "string"
+    }
+  }
+}

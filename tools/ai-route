@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""ai-route: derive a task's capability requirements and (optionally) match registered workers.
+
+Read-only. Canonical inputs: the task packet, .ai/config/routing.json, .ai/config/capabilities.json.
+Optional input: .ai/runtime/available-models.json (local, non-authoritative). Without a registry
+the requirements are still produced. This tool matches; it does not call any model or provider.
+
+Matching rule: a worker qualifies when it has every required capability, max_tier >= min_tier, and
+its reasoning/context classes are at least the required ones. Qualified workers are ordered
+cheapest-first by cost class, then latency class (lowest sufficient capability first).
+Unknown capabilities and fields are preserved and simply compared as strings.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _ailib as L  # noqa: E402
+
+
+class RouteError(Exception):
+    pass
+
+
+def requirements(root: Path, task: dict) -> dict:
+    routing = L.load_json(root / ".ai/config/routing.json")
+    route = routing["task_classes"].get(task.get("task_class") or routing["default_class"])
+    if route is None:
+        raise RouteError(f"task_class '{task.get('task_class')}' is not defined in routing.json")
+    min_tier = max(route["min_tier"], routing.get("risk_min_tier", {}).get(task.get("risk"), 0))
+    req = list(dict.fromkeys(route.get("required_capabilities", []) + task.get("required_capabilities", [])))
+    return {"task_id": task.get("id"), "task_class": task.get("task_class"), "min_tier": min_tier,
+            "required_capabilities": req, "preferred_capabilities": route.get("preferred_capabilities", []),
+            "reasoning_class": route.get("reasoning_class"), "context_class": route.get("context_class"),
+            "latency_class": route.get("latency_class"), "max_cost_class": route.get("max_cost_class"),
+            "tools_required": route.get("tools_required", []), "model_required": min_tier > 0}
+
+
+def _rank(order: list[str], value):
+    return order.index(value) if value in order else None
+
+
+def match(root: Path, req: dict, registry: dict) -> dict:
+    classes = L.load_json(root / ".ai/config/capabilities.json")["classes"]
+    ok, rejected = [], []
+    for m in registry.get("models", []):
+        why = []
+        missing = [c for c in req["required_capabilities"] if c not in m.get("capabilities", [])]
+        if missing:
+            why.append("missing " + ", ".join(missing))
+        if m.get("max_tier", 0) < req["min_tier"]:
+            why.append(f"max_tier {m.get('max_tier')} < {req['min_tier']}")
+        for field, vocab in (("reasoning_class", "reasoning"), ("context_class", "context")):
+            need = req.get(field)
+            if need:
+                have, want = _rank(classes[vocab], m.get(field)), _rank(classes[vocab], need)
+                if have is None:
+                    why.append(f"{field} '{m.get(field)}' unknown/unrankable")
+                elif want is not None and have < want:
+                    why.append(f"{field} {m.get(field)} < {need}")
+        if req.get("max_cost_class"):
+            have, cap = _rank(classes["cost"], m.get("cost_class")), _rank(classes["cost"], req["max_cost_class"])
+            if have is not None and cap is not None and have > cap:
+                why.append(f"cost_class {m.get('cost_class')} > {req['max_cost_class']}")
+        (rejected if why else ok).append({"id": m.get("id"), "provider": m.get("provider"), "why_not": why} if why else m)
+    big = 99
+    ok.sort(key=lambda m: (_rank(classes["cost"], m.get("cost_class")) if _rank(classes["cost"], m.get("cost_class")) is not None else big,
+                           _rank(classes["latency"], m.get("latency_class")) if _rank(classes["latency"], m.get("latency_class")) is not None else big,
+                           -len(set(req["preferred_capabilities"]) & set(m.get("capabilities", []))), str(m.get("id"))))
+    return {"candidates": [{"id": m.get("id"), "provider": m.get("provider"), "cost_class": m.get("cost_class"),
+                            "latency_class": m.get("latency_class")} for m in ok], "rejected": rejected}
+
+
+def route(root: Path, task_id: str) -> dict:
+    task = None
+    for _, p in L.task_files(root):
+        d = L.load_json(p)
+        if d.get("id") == task_id:
+            task = d
+            break
+    if task is None:
+        raise RouteError(f"task not found: {task_id}")
+    req = requirements(root, task)
+    out = {"requirements": req}
+    if not req["model_required"]:
+        out["registry"] = "not needed: tier 0 (deterministic tools suffice)"
+        return out
+    reg_path = root / ".ai/runtime/available-models.json"
+    if not reg_path.is_file():
+        out["registry"] = "no registry: requirements only (see docs/protocol/adapters.md)"
+        return out
+    try:
+        registry = L.load_json(reg_path)
+    except ValueError as e:
+        raise RouteError(f".ai/runtime/available-models.json is not valid JSON ({e}); fix or delete it")
+    v = L.validate(registry, L.load_schema(root, "runtime-registry"))
+    if not v.ok:
+        raise RouteError("runtime registry is malformed; fix or delete it:\n  " + "\n  ".join(v.errors))
+    out["registry"] = ".ai/runtime/available-models.json (local, non-authoritative)"
+    out.update(match(root, req, registry))
+    return out
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("task_id")
+    ap.add_argument("--root")
+    a = ap.parse_args(argv)
+    try:
+        print(json.dumps(route(L.find_root(a.root), a.task_id), indent=2))
+    except (RouteError, KeyError, ValueError) as e:
+        print(f"ai-route: {e}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

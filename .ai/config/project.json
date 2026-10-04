@@ -1,0 +1,38 @@
+{
+  "project_schema_version": 1,
+  "ai_protocol_version": "1.1.0",
+  "name": "ultimate-web-stack-blueprint",
+  "objective": "A reusable, evidence-driven web application blueprint (SolidJS + TypeScript frontend, Rust/Axum/Tokio backend, PostgreSQL via SQLx) with progressively activated profiles (cache, messaging, analytics, gateway, specialised runtimes), its own benchmark suite, and a generator that creates new projects compatible with ai-project-template.",
+  "instance": {
+    "state": "initialized",
+    "origin": "greenfield",
+    "initialized_at": "2026-10-04T07:53:18Z",
+    "template_version": "1.1.0"
+  },
+  "stack": {
+    "languages": [],
+    "package_managers": [],
+    "build_systems": [],
+    "frameworks": [],
+    "detected_by": "ai-map 1.1.0 (evidence; review in T-0001)"
+  },
+  "paths": {
+    "source": [],
+    "tests": [],
+    "docs": [
+      "docs"
+    ]
+  },
+  "validation": {
+    "commands": []
+  },
+  "shims": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md"
+  ],
+  "policies": {
+    "allow_parallel_active": false,
+    "max_shim_lines_warning": 40
+  }
+}

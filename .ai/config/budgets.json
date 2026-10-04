@@ -1,0 +1,72 @@
+{
+  "budgets_schema_version": 1,
+  "objective": "Maximise verified useful progress per unit of total cost. Token count is one dimension, not the goal.",
+  "dimensions": {
+    "context_tokens": "Input/context consumed across the task.",
+    "output_tokens": "Generated output across the task.",
+    "cost_usd": "Monetary cost when known.",
+    "tool_calls": "Tool invocations.",
+    "retries": "Repeated attempts at the same step.",
+    "subagents": "Delegated workers spawned.",
+    "human_interventions": "Times a human had to unblock or correct.",
+    "validation_runs": "Expensive validation runs (narrow checks are cheap and not counted).",
+    "latency_class": "Expected wall-clock class (see capabilities.classes.latency)."
+  },
+  "classes": {
+    "low": {
+      "context_tokens": 30000,
+      "output_tokens": 8000,
+      "cost_usd": null,
+      "tool_calls": 25,
+      "retries": 2,
+      "subagents": 0,
+      "human_interventions": 0,
+      "validation_runs": 2,
+      "latency_class": "interactive"
+    },
+    "medium": {
+      "context_tokens": 120000,
+      "output_tokens": 30000,
+      "cost_usd": null,
+      "tool_calls": 80,
+      "retries": 3,
+      "subagents": 1,
+      "human_interventions": 1,
+      "validation_runs": 4,
+      "latency_class": "normal"
+    },
+    "high": {
+      "context_tokens": 400000,
+      "output_tokens": 80000,
+      "cost_usd": null,
+      "tool_calls": 200,
+      "retries": 4,
+      "subagents": 3,
+      "human_interventions": 2,
+      "validation_runs": 8,
+      "latency_class": "normal"
+    },
+    "critical": {
+      "context_tokens": null,
+      "output_tokens": null,
+      "cost_usd": null,
+      "tool_calls": null,
+      "retries": 4,
+      "subagents": null,
+      "human_interventions": null,
+      "validation_runs": null,
+      "latency_class": "batch"
+    }
+  },
+  "stop_and_diagnose": [
+    "any dimension exceeds its budget",
+    "the repository is being reread without a concrete reason",
+    "retrieval keeps missing the relevant code",
+    "context is dominated by logs or unrelated files",
+    "the same approach failed twice",
+    "tier appears wrong for the task",
+    "subagents are not reducing total cost",
+    "requirements are unclear",
+    "the task should be decomposed"
+  ]
+}

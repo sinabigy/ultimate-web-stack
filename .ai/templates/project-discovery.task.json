@@ -1,0 +1,44 @@
+{
+  "template": "project-discovery",
+  "title": "Project discovery and protocol activation",
+  "objective": "Establish the confirmed project objective, a verified minimal project map and runnable validation, so later tasks can be planned from repository state alone.",
+  "acceptance_criteria": [
+    "`objective` in .ai/config/project.json is non-empty and was stated or confirmed by the user",
+    "Each validation command in project.json has been reviewed: kept and run (confirmed: true), corrected, or removed; or the absence of runnable validation is recorded in .ai/knowledge/KNOWN_ISSUES.md",
+    ".ai/knowledge/ARCHITECTURE.md lists the major components (one line each) with their source paths",
+    ".ai/state/ROADMAP.json names the next milestone with at least one queued, schema-valid task",
+    "`python3 tools/ai-check` exits 0"
+  ],
+  "non_goals": [
+    "Feature implementation",
+    "Refactoring or reformatting existing code",
+    "Changing the protocol itself"
+  ],
+  "dependencies": [],
+  "components": [
+    ".ai/",
+    "project manifests"
+  ],
+  "likely_files": [
+    ".ai/config/project.json",
+    ".ai/knowledge/ARCHITECTURE.md",
+    ".ai/state/ROADMAP.json",
+    ".ai/state/STATUS.md"
+  ],
+  "constraints": [
+    "Inferred commands are evidence, not instructions: confirm with the user or by deliberate review before running anything with side effects",
+    "Do not invent the objective; ask the user if it is not stated"
+  ],
+  "validation": [
+    "python3 tools/ai-check",
+    "Run each confirmed validation command from project.json and record the result"
+  ],
+  "risk": "low",
+  "task_class": "discovery",
+  "required_capabilities": [
+    "core.code_understanding",
+    "core.tool_use",
+    "core.filesystem"
+  ],
+  "context_class": "medium"
+}

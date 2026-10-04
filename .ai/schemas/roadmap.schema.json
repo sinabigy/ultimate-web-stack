@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/roadmap.schema.json",
+  "title": "Roadmap: ordered milestones referencing task ids",
+  "type": "object",
+  "required": [
+    "roadmap_schema_version",
+    "milestones"
+  ],
+  "properties": {
+    "roadmap_schema_version": {
+      "const": 1
+    },
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "tasks"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^M[0-9]+$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "goal": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "in_progress",
+              "done"
+            ]
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^T-[0-9]{4,}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

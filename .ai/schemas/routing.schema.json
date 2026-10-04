@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/routing.schema.json",
+  "title": "Capability-based routing (canonical, vendor-free)",
+  "type": "object",
+  "required": [
+    "routing_schema_version",
+    "default_class",
+    "task_classes",
+    "risk_min_tier",
+    "escalation"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "routing_schema_version": {
+      "const": 1
+    },
+    "default_class": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "task_classes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/route"
+      }
+    },
+    "risk_min_tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "low": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "medium": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "high": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_similar_attempts",
+        "triggers"
+      ],
+      "properties": {
+        "max_similar_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "before_escalating": {
+          "type": "string"
+        }
+      }
+    },
+    "de_escalation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "min_tier",
+        "required_capabilities"
+      ],
+      "description": "A route may only state requirements. There is deliberately no field for a model or provider.",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "min_tier": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reasoning_class": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "context_class": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "latency_class": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "max_cost_class": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+            "description": "Namespaced capability id, e.g. core.tool_use, future.native_repo_reasoning, vendor.x. Unknown namespaces are valid and must be preserved."
+          },
+          "uniqueItems": true
+        },
+        "preferred_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+            "description": "Namespaced capability id, e.g. core.tool_use, future.native_repo_reasoning, vendor.x. Unknown namespaces are valid and must be preserved."
+          },
+          "uniqueItems": true
+        },
+        "tools_required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,349 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/project.schema.json",
+  "title": "Project configuration (canonical)",
+  "type": "object",
+  "required": [
+    "project_schema_version",
+    "ai_protocol_version",
+    "name",
+    "objective",
+    "instance",
+    "stack",
+    "paths",
+    "validation",
+    "shims",
+    "policies"
+  ],
+  "properties": {
+    "project_schema_version": {
+      "const": 1
+    },
+    "ai_protocol_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Set by the user. Empty until confirmed; never invented."
+    },
+    "instance": {
+      "type": "object",
+      "required": [
+        "state",
+        "template_version"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "template",
+            "initialized"
+          ]
+        },
+        "origin": {
+          "enum": [
+            "greenfield",
+            "retrofit",
+            null
+          ]
+        },
+        "initialized_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "template_version": {
+          "type": "string"
+        }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "package_managers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "build_systems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "frameworks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "detected_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "docs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": [
+        "commands"
+      ],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/command"
+          }
+        }
+      }
+    },
+    "shims": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?![/\\\\])(?!.*(^|/)\\.\\.(/|$)).+$",
+        "description": "Repo-relative path; no absolute paths or '..'."
+      },
+      "uniqueItems": true
+    },
+    "policies": {
+      "type": "object",
+      "properties": {
+        "allow_parallel_active": {
+          "type": "boolean"
+        },
+        "max_shim_lines_warning": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "architecture": {
+      "type": "object",
+      "description": "Optional machine-readable architecture state. The single source of truth for what the system is built from and which optional modules are enabled. Prose reasoning lives in .ai/knowledge/ and ADRs.",
+      "required": [
+        "components"
+      ],
+      "properties": {
+        "origin": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Provenance when generated from a blueprint or scaffold.",
+          "required": [
+            "name",
+            "version"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "generated_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "profile": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "Named architecture profile, e.g. core, performance, distributed."
+        },
+        "components": {
+          "type": "object",
+          "description": "Role \u2192 technology id, e.g. {\"frontend\": \"solidjs\", \"backend\": \"rust-axum\"}.",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "modules": {
+          "type": "object",
+          "description": "Optional capability \u2192 state. Disabled modules are recorded so a worker knows they exist and why they are off.",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/module"
+          }
+        },
+        "deployment": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "string",
+              "minLength": 1
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "knowledge": {
+          "type": "array",
+          "description": "Repo-relative knowledge entry points for architecture questions.",
+          "items": {
+            "$ref": "#/$defs/relpath"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "command": {
+      "type": "object",
+      "required": [
+        "id",
+        "stage",
+        "cmd",
+        "source",
+        "confirmed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "enum": [
+            "format",
+            "lint",
+            "typecheck",
+            "unit",
+            "integration",
+            "e2e",
+            "build",
+            "other"
+          ]
+        },
+        "cmd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provenance, e.g. package.json, pyproject.toml, Makefile, conventional-default, user."
+        },
+        "confirmed": {
+          "type": "boolean",
+          "description": "Only confirmed commands are canonical validation."
+        },
+        "note": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "#/$defs/relpath",
+          "description": "Working directory, relative to the repository root. Default: root."
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Executables that must be on PATH. ai-validate reports the command as skipped (never passed) when one is missing."
+        },
+        "timeout_s": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "relpath": {
+      "type": "string",
+      "pattern": "^(?![/\\\\])(?!.*(^|/)\\.\\.(/|$)).+$",
+      "description": "Repo-relative path; no absolute paths or '..'."
+    },
+    "module": {
+      "type": "object",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "adapter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relpath"
+          },
+          "uniqueItems": true,
+          "description": "Where the module lives; ai-check warns if an enabled module's paths are missing."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why it is enabled or disabled (evidence, requirement or default)."
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relpath"
+          },
+          "description": "Benchmark results, ADRs or other files that justify the state."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# --- ai-project-template ---
+.ai/runtime/*
+!.ai/runtime/.gitkeep
+.ai/map/*.json
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.template
+*.pem
+*.key
+__pycache__/
+.DS_Store
+Thumbs.db

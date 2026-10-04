@@ -1,0 +1,360 @@
+#!/usr/bin/env python3
+"""ai-map: write a bounded, provenance-stamped repository map to .ai/map/.
+
+Outputs (generated, gitignored, never a source of truth):
+  repo.json          structure summary, manifests, stack hints, validation candidates
+  dependencies.json  dependencies declared in manifests
+  symbols.json       only when Universal Ctags is available
+
+Reads file metadata first and reads content only for manifests (size-capped).
+"""
+from __future__ import annotations
+
+import argparse
+import configparser
+import fnmatch
+import json
+import re
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _ailib as L  # noqa: E402
+
+LANG = {
+    ".py": "Python", ".js": "JavaScript", ".mjs": "JavaScript", ".cjs": "JavaScript", ".jsx": "JavaScript",
+    ".ts": "TypeScript", ".tsx": "TypeScript", ".go": "Go", ".rs": "Rust", ".java": "Java", ".kt": "Kotlin",
+    ".kts": "Kotlin", ".swift": "Swift", ".c": "C", ".h": "C/C++", ".cc": "C++", ".cpp": "C++", ".hpp": "C++",
+    ".cs": "C#", ".rb": "Ruby", ".php": "PHP", ".scala": "Scala", ".dart": "Dart", ".ex": "Elixir",
+    ".exs": "Elixir", ".sh": "Shell", ".bash": "Shell", ".zsh": "Shell", ".sql": "SQL", ".html": "HTML",
+    ".css": "CSS", ".scss": "CSS", ".vue": "Vue", ".svelte": "Svelte", ".lua": "Lua", ".r": "R",
+    ".gd": "GDScript", ".zig": "Zig", ".ml": "OCaml", ".hs": "Haskell", ".clj": "Clojure",
+}
+DOC_DATA = {".md": "Markdown", ".json": "JSON", ".yaml": "YAML", ".yml": "YAML", ".toml": "TOML"}
+
+# manifest filename -> (kind, package_manager or None, build_system or None)
+MANIFESTS = {
+    "package.json": ("node", None, None), "pyproject.toml": ("python", None, None),
+    "setup.py": ("python", "pip", "setuptools"), "setup.cfg": ("python", "pip", "setuptools"),
+    "Cargo.toml": ("rust", "cargo", "cargo"), "go.mod": ("go", "go modules", "go"),
+    "pom.xml": ("java", "maven", "maven"), "build.gradle": ("jvm", "gradle", "gradle"),
+    "build.gradle.kts": ("jvm", "gradle", "gradle"), "Gemfile": ("ruby", "bundler", None),
+    "composer.json": ("php", "composer", None), "CMakeLists.txt": ("c/c++", None, "cmake"),
+    "Makefile": ("make", None, "make"), "Dockerfile": ("container", None, "docker"),
+    "docker-compose.yml": ("container", None, "docker compose"), "compose.yaml": ("container", None, "docker compose"),
+    "deno.json": ("deno", "deno", "deno"), "mix.exs": ("elixir", "mix", "mix"),
+    "Package.swift": ("swift", "swiftpm", "swiftpm"), "pubspec.yaml": ("dart", "pub", None),
+    "project.godot": ("godot", None, "godot"),
+}
+LOCKFILES = {"pnpm-lock.yaml": "pnpm", "yarn.lock": "yarn", "package-lock.json": "npm", "bun.lockb": "bun",
+             "bun.lock": "bun", "poetry.lock": "poetry", "uv.lock": "uv", "Pipfile.lock": "pipenv"}
+ENTRY_NAMES = {"main.py", "__main__.py", "app.py", "manage.py", "cli.py", "server.py", "main.go", "main.rs",
+               "index.js", "index.ts", "index.tsx", "main.js", "main.ts", "main.tsx", "server.js", "server.ts",
+               "Program.cs", "App.tsx", "App.vue"}
+TEST_FILE = re.compile(r"(^test_.*\.py$|_test\.py$|_test\.go$|\.(test|spec)\.[jt]sx?$|Test\.java$|_spec\.rb$)")
+TEST_DIRS = {"test", "tests", "__tests__", "spec", "e2e"}
+# PEP 517 build-backend module prefix -> build system name (recorded as metadata; never executed)
+BUILD_BACKENDS = {"hatchling": "hatchling", "setuptools": "setuptools", "poetry.core": "poetry-core",
+                  "poetry": "poetry", "flit_core": "flit", "pdm.backend": "pdm", "pdm.pep517": "pdm",
+                  "maturin": "maturin", "scikit_build_core": "scikit-build-core", "mesonpy": "meson-python",
+                  "uv_build": "uv", "whey": "whey", "sipbuild": "sip"}
+SCRIPT_STAGE = {"test": "unit", "test:unit": "unit", "lint": "lint", "typecheck": "typecheck",
+                "type-check": "typecheck", "tsc": "typecheck", "build": "build", "format": "format",
+                "fmt": "format", "e2e": "e2e", "test:e2e": "e2e", "test:integration": "integration", "check": "other"}
+
+
+def read_capped(root: Path, rel: str, cap: int) -> str | None:
+    p = root / rel
+    try:
+        if p.stat().st_size > cap:
+            return None
+        return p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def build_backend(text: str, tomllib) -> str | None:
+    """The [build-system] build-backend declared in a pyproject.toml, if any."""
+    if tomllib is not None:
+        try:
+            backend = tomllib.loads(text).get("build-system", {}).get("build-backend")
+            return backend if isinstance(backend, str) else None
+        except Exception:
+            return None
+    section = None  # without tomllib: scan only the [build-system] table for a simple string value
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and not stripped.startswith("[["):
+            section = stripped.strip("[] ")
+        elif section == "build-system":
+            m = re.match(r"build-backend\s*=\s*[\"']([^\"']+)[\"']", stripped)
+            if m:
+                return m.group(1)
+    return None
+
+
+def _pyproject_testpaths(text: str, tomllib) -> tuple[bool, list[str] | None]:
+    """(has [tool.pytest.ini_options], testpaths or None)."""
+    if tomllib is not None:
+        try:
+            ini = tomllib.loads(text).get("tool", {}).get("pytest", {}).get("ini_options")
+        except Exception:
+            return False, None
+        if not isinstance(ini, dict):
+            return False, None
+        tp = ini.get("testpaths")
+        return True, ([tp] if isinstance(tp, str) else [str(x) for x in tp] if isinstance(tp, list) else None)
+    body, inside, found = [], False, False  # without tomllib: scan only the [tool.pytest.ini_options] table
+    for line in text.splitlines():
+        if re.match(r"^\s*\[\[?[^\[\]]+\]\]?\s*$", line):  # a table or array-of-tables header
+            inside = line.strip() == "[tool.pytest.ini_options]"
+            found = found or inside
+            continue
+        if inside:
+            body.append(line)
+    if not found:
+        return False, None
+    m = re.search(r"^\s*testpaths\s*=\s*(\[.*?\]|\"[^\"]*\"|'[^']*')", "\n".join(body), re.M | re.S)
+    return True, (re.findall(r"[\"']([^\"']+)[\"']", m.group(1)) if m else None)
+
+
+def pytest_testpaths(root: Path, top_level: set[str], tomllib, cap: int) -> tuple[list[str] | None, str | None]:
+    """Declared pytest testpaths, from the config file pytest itself would pick (pytest.ini, then
+    pyproject.toml, tox.ini, setup.cfg). Returns (paths or None, provenance or None). Read, never run."""
+    for name in ("pytest.ini", "pyproject.toml", "tox.ini", "setup.cfg"):
+        if name not in top_level:
+            continue
+        text = read_capped(root, name, cap)
+        if text is None:
+            continue
+        if name == "pyproject.toml":
+            has, raw = _pyproject_testpaths(text, tomllib)
+            if not has:
+                continue
+            where = "pyproject.toml [tool.pytest.ini_options]"
+        else:
+            cp = configparser.ConfigParser(interpolation=None)
+            try:
+                cp.read_string(text)
+            except configparser.Error:
+                continue
+            sect = "tool:pytest" if name == "setup.cfg" else "pytest"
+            if not cp.has_section(sect):
+                continue
+            value = cp.get(sect, "testpaths", fallback=None)
+            raw = value.split() if value else None
+            where = f"{name} [{sect}]"
+        if not raw:
+            return None, f"{where} (no testpaths declared)"
+        paths = []
+        for tp in raw:
+            tp = tp.strip().rstrip("/")
+            tp = tp[2:] if tp.startswith("./") else tp
+            if tp and tp not in paths:
+                paths.append(tp)
+        return paths, f"{where} testpaths"
+    return None, None
+
+
+def _under(rel: str, testpaths: list[str]) -> bool:
+    return any(rel == tp or rel.startswith(tp + "/") or fnmatch.fnmatch(rel, tp) or fnmatch.fnmatch(rel, tp + "/*")
+               for tp in testpaths)
+
+
+def build_system_name(backend: str) -> str:
+    for prefix, name in BUILD_BACKENDS.items():
+        if backend == prefix or backend.startswith(prefix + "."):
+            return name
+    return backend
+
+
+def build(root: Path) -> dict:
+    ctx = L.load_json(root / ".ai/config/context.json") if (root / ".ai/config/context.json").is_file() else {}
+    map_cfg = ctx.get("map", {})
+    cap = int(map_cfg.get("max_manifest_bytes", 262144))
+    listing = L.list_files(root, map_cfg)
+    files = listing["files"]
+    head, dirty = L.git_head(root)
+    tomllib = L.tomllib_module()
+    unavailable = [name for name, ok in (("git", L.have_git(root)), ("ctags", L.have_ctags()),
+                                         ("tomllib", tomllib is not None)) if not ok]
+
+    langs, data_langs, dirs, source_dirs = Counter(), Counter(), Counter(), Counter()
+    binary = 0
+    manifests, entry_points, test_dirs = [], [], set()
+    pms, builds = set(), set()
+    top_level = {rel for rel, _, _ in files if "/" not in rel}
+    testpaths, test_cfg_source = pytest_testpaths(root, top_level, tomllib, cap)
+    for rel, size, _ in files:
+        parts = rel.split("/")
+        name = parts[-1]
+        ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
+        if ext in L.BINARY_EXT:
+            binary += 1
+            continue
+        if testpaths is not None and ext == ".py":
+            is_test = _under(rel, testpaths)  # declared pytest config beats filename heuristics
+        else:
+            is_test = bool(TEST_FILE.search(name)) or any(p in TEST_DIRS for p in parts[:-1])
+        if ext in LANG:
+            langs[LANG[ext]] += 1
+            top = parts[0] if len(parts) > 1 else "."
+            dirs[top] += 1
+            if not is_test:
+                source_dirs[top] += 1
+        elif ext in DOC_DATA:
+            data_langs[DOC_DATA[ext]] += 1
+        if name in MANIFESTS and len(parts) <= 3:
+            kind, pm, bs = MANIFESTS[name]
+            manifests.append({"path": rel, "kind": kind})
+            if pm:
+                pms.add(pm)
+            if bs:
+                builds.add(bs)
+        if name in LOCKFILES and len(parts) <= 3:
+            pms.add(LOCKFILES[name])
+        if name in ENTRY_NAMES and len(parts) <= 4 and len(entry_points) < 30:
+            entry_points.append(rel)
+        if is_test and testpaths is not None and ext == ".py":
+            test_dirs.add(next(tp for tp in testpaths if _under(rel, [tp])))
+        elif is_test:
+            idx = next((i for i, p in enumerate(parts[:-1]) if p in TEST_DIRS), None)
+            test_dirs.add("/".join(parts[: idx + 1]) if idx is not None else "/".join(parts[:-1]) or ".")
+
+    deps, candidates, backends = {}, [], []
+    root_names = {rel for rel, _, _ in files if "/" not in rel}
+
+    def cand(stage, cmd, source):
+        cid = f"{stage}:{cmd}"
+        if not any(c["id"] == cid for c in candidates):
+            candidates.append({"id": cid, "stage": stage, "cmd": cmd, "source": source, "confirmed": False})
+
+    for m in manifests:
+        rel = m["path"]
+        name = rel.rsplit("/", 1)[-1]
+        text = read_capped(root, rel, cap)
+        if text is None:
+            continue
+        if name == "package.json":
+            try:
+                pkg = json.loads(text)
+            except ValueError:
+                continue
+            deps[rel] = {"dependencies": pkg.get("dependencies", {}), "dev_dependencies": pkg.get("devDependencies", {})}
+            if rel == "package.json":
+                pm = next((LOCKFILES[n] for n in ("pnpm-lock.yaml", "yarn.lock", "bun.lockb", "bun.lock") if n in root_names), "npm")
+                for script in (pkg.get("scripts") or {}):
+                    if script in SCRIPT_STAGE:
+                        cand(SCRIPT_STAGE[script], f"{pm} run {script}", "package.json")
+        elif name in ("pyproject.toml", "Cargo.toml") and tomllib is not None:
+            try:
+                data = tomllib.loads(text)
+            except Exception:
+                continue
+            if name == "pyproject.toml":
+                proj = data.get("project", {})
+                deps[rel] = {"dependencies": proj.get("dependencies", []),
+                             "optional_dependencies": proj.get("optional-dependencies", {})}
+            else:
+                deps[rel] = {"dependencies": data.get("dependencies", {}), "dev_dependencies": data.get("dev-dependencies", {})}
+        elif name == "go.mod":
+            deps[rel] = {"dependencies": re.findall(r"^\s*([\w./-]+\.[\w./-]+)\s+v[\w.+-]+", text, re.M)}
+        if name == "pyproject.toml":
+            backend = build_backend(text, tomllib)
+            if backend:
+                bs = build_system_name(backend)
+                builds.add(bs)
+                backends.append({"path": rel, "backend": backend, "build_system": bs,
+                                 "source": f"{rel} [build-system]"})
+        if rel == "pyproject.toml":
+            if "[tool.pytest" in text:
+                cand("unit", "python -m pytest", "pyproject.toml")
+            if "[tool.ruff" in text:
+                cand("lint", "ruff check .", "pyproject.toml")
+            if "[tool.mypy" in text:
+                cand("typecheck", "mypy .", "pyproject.toml")
+        elif rel == "Cargo.toml":
+            for stage, cmd in (("build", "cargo build"), ("unit", "cargo test"), ("lint", "cargo clippy")):
+                cand(stage, cmd, "Cargo.toml")
+        elif rel == "go.mod":
+            for stage, cmd in (("build", "go build ./..."), ("unit", "go test ./..."), ("lint", "go vet ./...")):
+                cand(stage, cmd, "go.mod")
+        elif rel == "Makefile":
+            for target in re.findall(r"^(test|lint|check|build|typecheck|fmt|format):", text, re.M):
+                cand({"test": "unit", "fmt": "format"}.get(target, target if target in ("lint", "build", "typecheck", "format") else "other"),
+                     f"make {target}", "Makefile")
+    for rel in sorted(root_names):
+        if rel.startswith("requirements") and rel.endswith(".txt"):
+            text = read_capped(root, rel, cap) or ""
+            deps[rel] = {"dependencies": [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith(("#", "-"))]}
+    if langs.get("Python") and any(d.split("/")[-1] in ("tests", "test") for d in test_dirs) \
+            and not any(c["cmd"] == "python -m pytest" for c in candidates):
+        cand("unit", "python -m unittest discover", "conventional-default")
+
+    meta = {
+        "mapper_version": L.MAPPER_VERSION, "generated_at": L.now_iso(), "root": str(root),
+        "git_head": head, "dirty": dirty, "fingerprint": L.fingerprint(files),
+        "method": listing["method"], "truncated": listing["truncated"], "unavailable": unavailable,
+        "note": "Generated evidence, not a source of truth. Regenerate with tools/ai-map.",
+    }
+    repo = {
+        "meta": meta,
+        "summary": {"files": len(files), "bytes": sum(s for _, s, _ in files), "binary_files": binary,
+                    "languages": dict(langs.most_common()), "docs_and_data": dict(data_langs.most_common())},
+        "code_dirs": dict(dirs.most_common(15)),
+        "source_dirs": dict(source_dirs.most_common(15)),
+        "manifests": manifests[:50],
+        "package_managers": sorted(pms), "build_systems": sorted(builds), "build_backends": backends,
+        "entry_points": entry_points, "test_paths": sorted(test_dirs)[:20],
+        "test_config": {"testpaths": testpaths, "source": test_cfg_source},
+        "validation_candidates": candidates,
+    }
+    return {"repo": repo, "deps": {"meta": meta, "manifests": deps}, "files": files, "unavailable": unavailable}
+
+
+def symbols(root: Path, files, meta) -> dict | None:
+    if not L.have_ctags():
+        return None
+    code = "\n".join(rel for rel, _, _ in files if ("." + rel.rsplit(".", 1)[-1].lower()) in LANG)
+    try:
+        r = subprocess.run(["ctags", "-L", "-", "--output-format=json", "--fields=+n", "-f", "-"],
+                           cwd=root, input=code, capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    out = []
+    for line in r.stdout.splitlines()[:50000]:
+        try:
+            t = json.loads(line)
+        except ValueError:
+            continue
+        if t.get("_type") == "tag":
+            out.append({"name": t.get("name"), "kind": t.get("kind"), "path": t.get("path"), "line": t.get("line")})
+    return {"meta": meta, "symbols": out}
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root")
+    ap.add_argument("--quiet", action="store_true")
+    a = ap.parse_args(argv)
+    root = L.find_root(a.root)
+    res = build(root)
+    L.dump_json(root, ".ai/map/repo.json", res["repo"])
+    L.dump_json(root, ".ai/map/dependencies.json", res["deps"])
+    sym = symbols(root, res["files"], res["repo"]["meta"])
+    sym_path = L.safe_path(root, ".ai/map/symbols.json")
+    if sym is not None:
+        L.dump_json(root, ".ai/map/symbols.json", sym)
+    elif sym_path.exists():
+        sym_path.unlink()  # never leave a stale symbol index behind
+    if not a.quiet:
+        s = res["repo"]["summary"]
+        print(f"ai-map: {s['files']} files via {res['repo']['meta']['method']}; "
+              f"languages={list(s['languages'])[:5]}; unavailable={res['unavailable'] or 'none'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

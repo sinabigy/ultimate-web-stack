@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/context.schema.json",
+  "title": "Context engineering configuration (canonical)",
+  "type": "object",
+  "required": [
+    "context_schema_version",
+    "layers",
+    "never_auto_load",
+    "map"
+  ],
+  "properties": {
+    "context_schema_version": {
+      "const": 1
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "order",
+          "name",
+          "load"
+        ],
+        "properties": {
+          "order": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "load": {
+            "enum": [
+              "always",
+              "on_demand"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stability": {
+            "enum": [
+              "stable",
+              "dynamic"
+            ]
+          }
+        }
+      }
+    },
+    "never_auto_load": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "retrieval_question": {
+      "type": "string"
+    },
+    "log_reduction": {
+      "type": "object",
+      "properties": {
+        "max_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "keep": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "map": {
+      "type": "object",
+      "properties": {
+        "max_files": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_manifest_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stale_warning": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

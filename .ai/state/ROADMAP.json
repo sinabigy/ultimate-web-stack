@@ -1,0 +1,14 @@
+{
+  "roadmap_schema_version": 1,
+  "milestones": [
+    {
+      "id": "M0",
+      "title": "Project discovery",
+      "goal": "Confirmed objective, map and runnable validation.",
+      "status": "planned",
+      "tasks": [
+        "T-0001"
+      ]
+    }
+  ]
+}

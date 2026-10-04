@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""ai-task: create tasks and move them through an enforced state machine.
+
+  new TITLE --objective O --accept A [--accept ...] --validate V [--validate ...] --class C
+            [--risk R] [--constraint X] [--non-goal X] [--dep T-NNNN] [--file F] [--component C]
+            [--cap ns.capability] [--context-class small|medium|large]
+  new --from-template NAME [TITLE]
+  start ID | block ID --reason R | unblock ID [--to queue|active]
+  complete ID --summary S --evidence E [--evidence ...] [--next]
+  list [--status S] | current | show ID
+
+Allowed transitions: queue→active, queue→blocked, active→blocked, active→completed,
+blocked→queue, blocked→active. Anything else needs --force and is recorded in history.
+Tasks are never created with placeholder content: missing required fields are refused.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _ailib as L  # noqa: E402
+
+ALLOWED = {("queue", "active"), ("queue", "blocked"), ("active", "blocked"), ("active", "completed"),
+           ("blocked", "queue"), ("blocked", "active")}
+
+
+class TaskError(Exception):
+    pass
+
+
+def _find(root: Path, tid: str) -> tuple[str, Path, dict]:
+    if not L.TASK_ID_RE.match(tid):
+        raise TaskError(f"invalid task id: {tid}")
+    for status, p in L.task_files(root):
+        data = L.load_json(p)
+        if data.get("id") == tid:
+            return status, p, data
+    raise TaskError(f"task not found: {tid}")
+
+
+def _next_id(root: Path) -> str:
+    nums = [int(L.load_json(p).get("id", "T-0")[2:] or 0) for _, p in L.task_files(root)]
+    return f"T-{(max(nums) + 1 if nums else 1):04d}"
+
+
+def _validate_task(root: Path, data: dict) -> None:
+    v = L.validate(data, L.load_schema(root, "task"))
+    if not v.ok:
+        raise TaskError("task would be invalid:\n  " + "\n  ".join(v.errors))
+
+
+def _current(root: Path) -> dict:
+    return L.load_json(root / ".ai/state/CURRENT_TASK.json")
+
+
+def _set_current(root: Path, tid, path, next_step) -> None:
+    L.dump_json(root, ".ai/state/CURRENT_TASK.json", {
+        "current_task_schema_version": 1, "task_id": tid, "path": path,
+        "next_step": next_step, "updated_at": L.now_iso()})
+
+
+def create(root: Path, fields: dict, template: str | None = None) -> dict:
+    if template:
+        tp = L.safe_path(root, f".ai/templates/{template}.task.json")
+        if not tp.is_file():
+            raise TaskError(f"no task template named '{template}' in .ai/templates/")
+        base = L.load_json(tp)
+        base.update({k: v for k, v in fields.items() if v})
+        fields = base
+    tid = _next_id(root)
+    task = {
+        "task_schema_version": 1, "id": tid, "title": fields.get("title", ""),
+        "objective": fields.get("objective", ""),
+        "acceptance_criteria": fields.get("acceptance_criteria", []),
+        "non_goals": fields.get("non_goals", []), "dependencies": fields.get("dependencies", []),
+        "components": fields.get("components", []), "likely_files": fields.get("likely_files", []),
+        "constraints": fields.get("constraints", []), "validation": fields.get("validation", []),
+        "risk": fields.get("risk", "medium"), "task_class": fields.get("task_class", ""),
+        "required_capabilities": fields.get("required_capabilities", []),
+        "context_class": fields.get("context_class", "medium"), "status": "queue",
+        "blocked_reason": None, "template": template, "result": None,
+        "history": [{"at": L.now_iso(), "event": "created", "from": None, "to": "queue",
+                     "note": f"from template {template}" if template else None}],
+    }
+    routing = L.load_json(root / ".ai/config/routing.json")
+    if task["task_class"] and task["task_class"] not in routing["task_classes"]:
+        raise TaskError(f"unknown task class '{task['task_class']}'; known: {', '.join(routing['task_classes'])}")
+    _validate_task(root, task)
+    rel = f".ai/tasks/queue/{tid}-{L.slugify(task['title'])}.json"
+    L.dump_json(root, rel, task)
+    return {"id": tid, "path": rel}
+
+
+def transition(root: Path, tid: str, to: str, *, force=False, note=None, set_current=True) -> str:
+    status, path, data = _find(root, tid)
+    if (status, to) not in ALLOWED:
+        if not force:
+            raise TaskError(f"illegal transition {status}→{to} for {tid} (use --force to override; it is recorded)")
+    project = L.load_json(root / ".ai/config/project.json")
+    if to == "active" and not project.get("policies", {}).get("allow_parallel_active", False):
+        others = [L.load_json(p)["id"] for s, p in L.task_files(root) if s == "active" and L.load_json(p).get("id") != tid]
+        if others and not force:
+            raise TaskError(f"{others[0]} is already active; only one primary active task is allowed")
+    if to == "active":
+        unmet = []
+        for dep in data.get("dependencies", []):
+            try:
+                if _find(root, dep)[0] != "completed":
+                    unmet.append(dep)
+            except TaskError:
+                unmet.append(dep)
+        if unmet and not force:
+            raise TaskError(f"{tid} has unfinished dependencies: {', '.join(unmet)}")
+    data["status"] = to
+    data["blocked_reason"] = note if to == "blocked" else None
+    entry = {"at": L.now_iso(), "event": "transition", "from": status, "to": to, "note": note}
+    if force and (status, to) not in ALLOWED:
+        entry["forced"] = True
+    data["history"].append(entry)
+    _validate_task(root, data)
+    new_rel = f".ai/tasks/{to}/{path.name}"
+    L.dump_json(root, new_rel, data)
+    if L.safe_path(root, new_rel) != path:
+        path.unlink()
+    cur = _current(root)
+    if to == "active" and set_current and cur.get("task_id") in (None, tid):
+        _set_current(root, tid, new_rel, f"Work on {tid}: {data['title']}")
+    elif cur.get("task_id") == tid and to != "active":
+        _set_current(root, None, None, None)
+    return new_rel
+
+
+def complete(root: Path, tid: str, summary: str, evidence: list[str], *, force=False, pick_next=False) -> dict:
+    status, _, _ = _find(root, tid)
+    result = {"result_schema_version": 1, "task_id": tid, "outcome": "completed", "summary": summary,
+              "changes": [], "decisions": [], "validation": [{"cmd": None, "evidence": e, "passed": True} for e in evidence],
+              "unresolved": [], "lessons": [], "next_steps": [], "created_at": L.now_iso()}
+    v = L.validate(result, L.load_schema(root, "result"))
+    if not v.ok:
+        raise TaskError("result packet would be invalid:\n  " + "\n  ".join(v.errors))
+    if (status, "completed") not in ALLOWED and not force:
+        raise TaskError(f"illegal transition {status}→completed for {tid} (use --force to override; it is recorded)")
+    res_rel = f".ai/context/summaries/{tid}.result.json"
+    L.dump_json(root, res_rel, result)
+    new_rel = transition(root, tid, "completed", force=force, note="completed")
+    data = L.load_json(L.safe_path(root, new_rel))
+    data["result"] = res_rel
+    L.dump_json(root, new_rel, data)
+    out = {"completed": tid, "result": res_rel, "next": None}
+    if pick_next:
+        nxt = next_eligible(root)
+        if nxt:
+            out["next"] = nxt
+            transition(root, nxt, "active")
+    return out
+
+
+def next_eligible(root: Path) -> str | None:
+    """Deterministic and documented: ROADMAP order first, then lowest id. Only queued tasks whose
+    dependencies are all completed are eligible. No priority is invented."""
+    tasks = {L.load_json(p)["id"]: (s, L.load_json(p)) for s, p in L.task_files(root)}
+    def eligible(t):
+        s, d = tasks.get(t, (None, None))
+        return s == "queue" and all(tasks.get(dep, ("",))[0] == "completed" for dep in d.get("dependencies", []))
+    road = L.load_json(root / ".ai/state/ROADMAP.json")
+    for m in road.get("milestones", []):
+        for t in m.get("tasks", []):
+            if eligible(t):
+                return t
+    for t in sorted(tasks, key=lambda x: int(x[2:])):
+        if eligible(t):
+            return t
+    return None
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    n = sub.add_parser("new")
+    n.add_argument("title", nargs="?")
+    n.add_argument("--from-template")
+    n.add_argument("--objective")
+    n.add_argument("--accept", action="append", default=[])
+    n.add_argument("--validate", action="append", default=[])
+    n.add_argument("--class", dest="task_class")
+    n.add_argument("--risk", choices=["low", "medium", "high", "critical"])
+    n.add_argument("--constraint", action="append", default=[])
+    n.add_argument("--non-goal", action="append", default=[])
+    n.add_argument("--dep", action="append", default=[])
+    n.add_argument("--file", action="append", default=[])
+    n.add_argument("--component", action="append", default=[])
+    n.add_argument("--cap", action="append", default=[])
+    n.add_argument("--context-class")
+    for name in ("start", "show"):
+        sub.add_parser(name).add_argument("id")
+    b = sub.add_parser("block"); b.add_argument("id"); b.add_argument("--reason", required=True)
+    u = sub.add_parser("unblock"); u.add_argument("id"); u.add_argument("--to", choices=["queue", "active"], default="queue")
+    c = sub.add_parser("complete"); c.add_argument("id"); c.add_argument("--summary", required=True)
+    c.add_argument("--evidence", action="append", required=True); c.add_argument("--next", action="store_true")
+    ls = sub.add_parser("list"); ls.add_argument("--status", choices=L.TASK_STATUSES)
+    sub.add_parser("current")
+    for p in (sub.choices["start"], b, u, c):
+        p.add_argument("--force", action="store_true")
+    a = ap.parse_args(argv)
+    root = L.find_root(a.root)
+    try:
+        if a.cmd == "new":
+            if not a.from_template:
+                missing = [f for f, v in (("TITLE", a.title), ("--objective", a.objective), ("--accept", a.accept),
+                                          ("--validate", a.validate), ("--class", a.task_class)) if not v]
+                if missing:
+                    raise TaskError("refusing to create an incomplete task; missing: " + ", ".join(missing)
+                                    + " (or use --from-template NAME)")
+            fields = {"title": a.title, "objective": a.objective, "acceptance_criteria": a.accept,
+                      "validation": a.validate, "task_class": a.task_class, "risk": a.risk,
+                      "constraints": a.constraint, "non_goals": a.non_goal, "dependencies": a.dep,
+                      "likely_files": a.file, "components": a.component, "required_capabilities": a.cap,
+                      "context_class": a.context_class}
+            if not a.from_template:
+                fields = {k: v for k, v in fields.items() if v is not None}
+            print(json.dumps(create(root, fields, a.from_template)))
+        elif a.cmd == "start":
+            print(transition(root, a.id, "active", force=a.force))
+        elif a.cmd == "block":
+            print(transition(root, a.id, "blocked", force=a.force, note=a.reason))
+        elif a.cmd == "unblock":
+            print(transition(root, a.id, a.to, force=a.force, note="unblocked"))
+        elif a.cmd == "complete":
+            print(json.dumps(complete(root, a.id, a.summary, a.evidence, force=a.force, pick_next=a.next)))
+        elif a.cmd == "list":
+            for s, p in L.task_files(root):
+                if a.status in (None, s):
+                    d = L.load_json(p)
+                    print(f"{d.get('id')}\t{s}\t{d.get('task_class')}\t{d.get('title')}")
+        elif a.cmd == "current":
+            print(json.dumps(_current(root), indent=2))
+        elif a.cmd == "show":
+            print(json.dumps(_find(root, a.id)[2], indent=2))
+    except (TaskError, ValueError) as e:
+        print(f"ai-task: {e}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,124 @@
+{
+  "context_schema_version": 1,
+  "retrieval_question": "What specific uncertainty will these tokens resolve? If none, do not load them.",
+  "layers": [
+    {
+      "order": 1,
+      "name": "protocol",
+      "load": "always",
+      "stability": "stable",
+      "sources": [
+        "AI_PROTOCOL.md"
+      ]
+    },
+    {
+      "order": 2,
+      "name": "project",
+      "load": "always",
+      "stability": "stable",
+      "sources": [
+        ".ai/config/project.json"
+      ]
+    },
+    {
+      "order": 3,
+      "name": "current task",
+      "load": "always",
+      "stability": "dynamic",
+      "sources": [
+        ".ai/state/CURRENT_TASK.json",
+        "the task file it points to"
+      ]
+    },
+    {
+      "order": 4,
+      "name": "map",
+      "load": "on_demand",
+      "stability": "dynamic",
+      "sources": [
+        ".ai/map/repo.json (generated; run tools/ai-map if missing or stale)"
+      ]
+    },
+    {
+      "order": 5,
+      "name": "constraints",
+      "load": "on_demand",
+      "stability": "stable",
+      "sources": [
+        ".ai/knowledge/CONSTRAINTS.md",
+        ".ai/knowledge/ARCHITECTURE.md"
+      ]
+    },
+    {
+      "order": 6,
+      "name": "implementation",
+      "load": "on_demand",
+      "stability": "dynamic",
+      "sources": [
+        "exact files/symbols located by search"
+      ]
+    },
+    {
+      "order": 7,
+      "name": "neighbours",
+      "load": "on_demand",
+      "stability": "dynamic",
+      "sources": [
+        "callers",
+        "dependencies",
+        "related tests"
+      ]
+    },
+    {
+      "order": 8,
+      "name": "history",
+      "load": "on_demand",
+      "stability": "stable",
+      "sources": [
+        ".ai/knowledge/DECISIONS/",
+        ".ai/knowledge/LESSONS.md",
+        "git log"
+      ]
+    },
+    {
+      "order": 9,
+      "name": "guidance",
+      "load": "on_demand",
+      "stability": "stable",
+      "sources": [
+        "docs/protocol/*.md"
+      ]
+    }
+  ],
+  "never_auto_load": [
+    "the whole repository",
+    "full logs",
+    "completed task packets and result packets",
+    "old conversations or transcripts",
+    ".ai/runtime/",
+    "vendored or generated code",
+    "lockfiles"
+  ],
+  "log_reduction": {
+    "max_lines": 60,
+    "keep": [
+      "primary error",
+      "meaningful stack frames",
+      "relevant warnings",
+      "reproduction command",
+      "relevant state"
+    ]
+  },
+  "map": {
+    "max_files": 20000,
+    "max_manifest_bytes": 262144,
+    "include": [],
+    "exclude": [
+      "tools/_ailib.py",
+      "tools/ai-*",
+      "tools/tests/template_selftest.py",
+      "docs/protocol/*"
+    ],
+    "stale_warning": true
+  }
+}

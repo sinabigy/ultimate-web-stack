@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/current-task.schema.json",
+  "title": "Pointer to the current primary task (not a copy of it)",
+  "type": "object",
+  "required": [
+    "current_task_schema_version",
+    "task_id",
+    "path",
+    "next_step",
+    "updated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "current_task_schema_version": {
+      "const": 1
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^T-[0-9]{4,}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "next_step": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "updated_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

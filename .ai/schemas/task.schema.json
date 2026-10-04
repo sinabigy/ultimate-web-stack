@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/task.schema.json",
+  "title": "Task packet",
+  "type": "object",
+  "required": [
+    "task_schema_version",
+    "id",
+    "title",
+    "objective",
+    "acceptance_criteria",
+    "non_goals",
+    "dependencies",
+    "components",
+    "likely_files",
+    "constraints",
+    "validation",
+    "risk",
+    "task_class",
+    "required_capabilities",
+    "context_class",
+    "status",
+    "history"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "task_schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^T-[0-9]{4,}$"
+    },
+    "title": {
+      "$ref": "#/$defs/real"
+    },
+    "objective": {
+      "$ref": "#/$defs/real"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/real"
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/real"
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^T-[0-9]{4,}$"
+      },
+      "uniqueItems": true
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "likely_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/real"
+      }
+    },
+    "validation": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/real"
+      }
+    },
+    "risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "task_class": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+        "description": "Namespaced capability id, e.g. core.tool_use, future.native_repo_reasoning, vendor.x. Unknown namespaces are valid and must be preserved."
+      },
+      "uniqueItems": true
+    },
+    "context_class": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "status": {
+      "enum": [
+        "queue",
+        "active",
+        "blocked",
+        "completed"
+      ]
+    },
+    "blocked_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "template": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "at",
+          "event"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "forced": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "real": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "^\\s*$|^\\s*(TODO|TBD|FIXME|XXX|PLACEHOLDER|[Tt]odo|[Tt]bd|[Ff]ixme|[Pp]laceholder)\\b|^\\s*<[^>]+>\\s*$"
+      },
+      "description": "Real content: placeholder strings (TODO, TBD, <...>) are rejected."
+    }
+  }
+}

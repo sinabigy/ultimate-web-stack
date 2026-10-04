@@ -1,0 +1,57 @@
+{
+  "registry_schema_version": 1,
+  "_comment": "Copy to .ai/runtime/available-models.json (gitignored) and describe the workers available in THIS environment. Entries below are fictional examples. Unknown fields and capabilities are preserved.",
+  "models": [
+    {
+      "id": "example-small",
+      "provider": "example-provider",
+      "max_tier": 1,
+      "capabilities": [
+        "core.code_generation",
+        "core.summarization",
+        "core.filesystem",
+        "core.tool_use",
+        "core.structured_output"
+      ],
+      "reasoning_class": "basic",
+      "cost_class": "low",
+      "latency_class": "interactive",
+      "context_class": "medium"
+    },
+    {
+      "id": "example-large",
+      "provider": "example-provider",
+      "max_tier": 3,
+      "capabilities": [
+        "core.code_generation",
+        "core.code_understanding",
+        "core.code_review",
+        "core.reasoning",
+        "core.tool_use",
+        "core.shell",
+        "core.filesystem",
+        "core.long_context",
+        "core.structured_output",
+        "core.summarization"
+      ],
+      "reasoning_class": "deep",
+      "cost_class": "high",
+      "latency_class": "normal",
+      "context_class": "very_large"
+    },
+    {
+      "id": "example-local",
+      "provider": "local",
+      "max_tier": 1,
+      "capabilities": [
+        "core.summarization",
+        "core.code_generation",
+        "core.filesystem"
+      ],
+      "reasoning_class": "basic",
+      "cost_class": "free",
+      "latency_class": "normal",
+      "context_class": "small"
+    }
+  ]
+}

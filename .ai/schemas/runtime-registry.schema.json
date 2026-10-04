@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/runtime-registry.schema.json",
+  "title": "Runtime model registry (LOCAL, non-authoritative, gitignored). Unknown fields and capabilities are preserved.",
+  "type": "object",
+  "required": [
+    "registry_schema_version",
+    "models"
+  ],
+  "properties": {
+    "registry_schema_version": {
+      "const": 1
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "capabilities",
+          "max_tier"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provider": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+              "description": "Namespaced capability id, e.g. core.tool_use, future.native_repo_reasoning, vendor.x. Unknown namespaces are valid and must be preserved."
+            }
+          },
+          "max_tier": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reasoning_class": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "cost_class": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "latency_class": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "context_class": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

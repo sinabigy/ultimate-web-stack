@@ -1,0 +1,109 @@
+{
+  "capabilities_schema_version": 1,
+  "core_capabilities": {
+    "core.code_understanding": "Read and reason about existing code across files.",
+    "core.code_generation": "Write new code that follows existing conventions.",
+    "core.code_review": "Critically review a diff for correctness, security and scope.",
+    "core.reasoning": "Multi-step reasoning about designs, bugs and trade-offs.",
+    "core.tool_use": "Call tools reliably and act on their results.",
+    "core.shell": "Run shell commands in the project environment.",
+    "core.filesystem": "Read and write files in the repository.",
+    "core.structured_output": "Emit output conforming to a JSON schema.",
+    "core.long_context": "Work accurately with very large inputs.",
+    "core.summarization": "Compress information without losing decisions or evidence.",
+    "core.vision": "Understand images, screenshots and diagrams.",
+    "core.audio": "Understand or produce audio.",
+    "core.browsing": "Fetch and read web content (always untrusted data).",
+    "core.computer_use": "Operate graphical interfaces.",
+    "core.parallel_execution": "Run independent work concurrently (e.g. subagents).",
+    "core.persistent_state": "Retain state across sessions outside the repository.",
+    "core.prompt_caching": "Reuse a stable context prefix cheaply."
+  },
+  "known_namespaces": [
+    "core",
+    "future",
+    "vendor",
+    "local"
+  ],
+  "tiers": [
+    {
+      "tier": 0,
+      "name": "deterministic",
+      "requires_model": false,
+      "description": "Tools establish facts: search, parsers, compilers, tests, linters, git, scripts.",
+      "typical_work": [
+        "search",
+        "formatting",
+        "running tests",
+        "static analysis",
+        "mechanical renames"
+      ]
+    },
+    {
+      "tier": 1,
+      "name": "economical",
+      "requires_model": true,
+      "description": "Cheap, fast intelligence for well-specified low-risk work.",
+      "typical_work": [
+        "classification",
+        "extraction",
+        "summaries",
+        "docs",
+        "boilerplate",
+        "simple fixes"
+      ]
+    },
+    {
+      "tier": 2,
+      "name": "primary",
+      "requires_model": true,
+      "description": "Primary engineering intelligence.",
+      "typical_work": [
+        "features",
+        "debugging",
+        "multi-file changes",
+        "integrations",
+        "refactoring"
+      ]
+    },
+    {
+      "tier": 3,
+      "name": "highest",
+      "requires_model": true,
+      "description": "Highest available reasoning; reserved for hard or high-blast-radius work.",
+      "typical_work": [
+        "architecture",
+        "unknown hard bugs",
+        "concurrency",
+        "security",
+        "complex migrations",
+        "contradictory evidence"
+      ]
+    }
+  ],
+  "classes": {
+    "reasoning": [
+      "none",
+      "basic",
+      "standard",
+      "deep"
+    ],
+    "cost": [
+      "free",
+      "low",
+      "medium",
+      "high"
+    ],
+    "latency": [
+      "interactive",
+      "normal",
+      "batch"
+    ],
+    "context": [
+      "small",
+      "medium",
+      "large",
+      "very_large"
+    ]
+  }
+}

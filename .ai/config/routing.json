@@ -1,0 +1,182 @@
+{
+  "routing_schema_version": 1,
+  "default_class": "feature",
+  "task_classes": {
+    "mechanical": {
+      "description": "Fully determined by tools (format, rename, regenerate map). No model needed.",
+      "min_tier": 0,
+      "reasoning_class": "none",
+      "context_class": "small",
+      "required_capabilities": [],
+      "tools_required": [
+        "shell"
+      ],
+      "max_cost_class": "free"
+    },
+    "discovery": {
+      "description": "Map the project, establish objective and validation commands.",
+      "min_tier": 1,
+      "reasoning_class": "basic",
+      "context_class": "medium",
+      "required_capabilities": [
+        "core.code_understanding",
+        "core.tool_use",
+        "core.filesystem"
+      ],
+      "preferred_capabilities": [
+        "core.summarization"
+      ],
+      "tools_required": [
+        "shell",
+        "search"
+      ]
+    },
+    "docs": {
+      "description": "Documentation, summaries, state updates.",
+      "min_tier": 1,
+      "reasoning_class": "basic",
+      "context_class": "small",
+      "required_capabilities": [
+        "core.summarization",
+        "core.filesystem"
+      ],
+      "max_cost_class": "low"
+    },
+    "simple_fix": {
+      "description": "Small, well-located change with an obvious test.",
+      "min_tier": 1,
+      "reasoning_class": "basic",
+      "context_class": "small",
+      "required_capabilities": [
+        "core.code_generation",
+        "core.filesystem"
+      ],
+      "tools_required": [
+        "shell"
+      ]
+    },
+    "feature": {
+      "description": "Normal feature work, possibly multi-file.",
+      "min_tier": 2,
+      "reasoning_class": "standard",
+      "context_class": "medium",
+      "required_capabilities": [
+        "core.code_generation",
+        "core.code_understanding",
+        "core.tool_use",
+        "core.filesystem",
+        "core.shell"
+      ],
+      "tools_required": [
+        "shell",
+        "search"
+      ]
+    },
+    "debug": {
+      "description": "Diagnose and fix a reproducible defect.",
+      "min_tier": 2,
+      "reasoning_class": "standard",
+      "context_class": "medium",
+      "required_capabilities": [
+        "core.code_understanding",
+        "core.reasoning",
+        "core.tool_use",
+        "core.shell"
+      ],
+      "tools_required": [
+        "shell",
+        "search"
+      ]
+    },
+    "refactor": {
+      "description": "Behaviour-preserving restructuring backed by tests.",
+      "min_tier": 2,
+      "reasoning_class": "standard",
+      "context_class": "medium",
+      "required_capabilities": [
+        "core.code_understanding",
+        "core.code_generation",
+        "core.shell"
+      ]
+    },
+    "review": {
+      "description": "Review a diff against acceptance criteria.",
+      "min_tier": 2,
+      "reasoning_class": "standard",
+      "context_class": "small",
+      "required_capabilities": [
+        "core.code_review",
+        "core.code_understanding"
+      ]
+    },
+    "architecture": {
+      "description": "Decisions with long-lived consequences; produce an ADR.",
+      "min_tier": 3,
+      "reasoning_class": "deep",
+      "context_class": "large",
+      "required_capabilities": [
+        "core.reasoning",
+        "core.code_understanding"
+      ]
+    },
+    "security": {
+      "description": "Security-sensitive changes or audits.",
+      "min_tier": 3,
+      "reasoning_class": "deep",
+      "context_class": "medium",
+      "required_capabilities": [
+        "core.reasoning",
+        "core.code_review",
+        "core.code_understanding"
+      ]
+    },
+    "hard_debug": {
+      "description": "Unknown cause, concurrency, distributed or repeatedly failed fixes.",
+      "min_tier": 3,
+      "reasoning_class": "deep",
+      "context_class": "large",
+      "required_capabilities": [
+        "core.reasoning",
+        "core.code_understanding",
+        "core.tool_use",
+        "core.shell"
+      ]
+    },
+    "migration": {
+      "description": "Complex data/schema/platform migrations.",
+      "min_tier": 3,
+      "reasoning_class": "deep",
+      "context_class": "large",
+      "required_capabilities": [
+        "core.reasoning",
+        "core.code_generation",
+        "core.tool_use",
+        "core.shell"
+      ]
+    }
+  },
+  "risk_min_tier": {
+    "low": 0,
+    "medium": 1,
+    "high": 2,
+    "critical": 3
+  },
+  "escalation": {
+    "max_similar_attempts": 2,
+    "triggers": [
+      "substantially the same attempt failed twice",
+      "the same error repeats",
+      "evidence contradicts the current hypothesis",
+      "work crosses unexpected subsystem boundaries",
+      "an architectural change becomes necessary",
+      "security risk increases",
+      "concurrency or distributed/network behaviour becomes relevant",
+      "current capability is demonstrably insufficient"
+    ],
+    "before_escalating": "Name the specific capability the current approach is missing. Changing strategy at the same tier is often cheaper than escalating."
+  },
+  "de_escalation": [
+    "After a hard decision is made, return routine follow-up work to the lowest sufficient tier.",
+    "Delegate mechanical steps to tier-0 tools."
+  ]
+}

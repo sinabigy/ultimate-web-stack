@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-project-template.invalid/schemas/result.schema.json",
+  "title": "Result / handoff packet written when a task finishes",
+  "type": "object",
+  "required": [
+    "result_schema_version",
+    "task_id",
+    "outcome",
+    "summary",
+    "validation",
+    "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "result_schema_version": {
+      "const": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^T-[0-9]{4,}$"
+    },
+    "outcome": {
+      "enum": [
+        "completed",
+        "partial",
+        "abandoned"
+      ]
+    },
+    "summary": {
+      "$ref": "#/$defs/real"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "validation": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "evidence",
+          "passed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "cmd": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence": {
+            "$ref": "#/$defs/real"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "lessons": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/lesson"
+      }
+    },
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "real": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "^\\s*$|^\\s*(TODO|TBD|FIXME|XXX|PLACEHOLDER|[Tt]odo|[Tt]bd|[Ff]ixme|[Pp]laceholder)\\b|^\\s*<[^>]+>\\s*$"
+      },
+      "description": "Real content: placeholder strings (TODO, TBD, <...>) are rejected."
+    },
+    "lesson": {
+      "type": "object",
+      "required": [
+        "statement",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "^\\s*$|^\\s*(TODO|TBD|FIXME|XXX|PLACEHOLDER|[Tt]odo|[Tt]bd|[Ff]ixme|[Pp]laceholder)\\b|^\\s*<[^>]+>\\s*$"
+          },
+          "description": "Real content: placeholder strings (TODO, TBD, <...>) are rejected."
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "^\\s*$|^\\s*(TODO|TBD|FIXME|XXX|PLACEHOLDER|[Tt]odo|[Tt]bd|[Ff]ixme|[Pp]laceholder)\\b|^\\s*<[^>]+>\\s*$"
+          },
+          "description": "Real content: placeholder strings (TODO, TBD, <...>) are rejected."
+        },
+        "applies_to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
