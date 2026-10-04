@@ -110,6 +110,37 @@ pub async fn public_ws(State(state): State<AppState>, ws: WebSocketUpgrade) -> R
     ws_response(state, ws, Subscriber::default())
 }
 
+/// Build a subscriber from the caller's *current* memberships (re-read at connect time).
+async fn subscriber_for(state: &AppState, u: &crate::auth::UserPrincipal) -> Result<Subscriber, app_errors::ApiError> {
+    use crate::errors::ResultExt;
+    let orgs = app_db::orgs::list_for_user(&state.svc()?.db, u.user_id).await.api()?;
+    let ctx = app_authz::Context {
+        require_mfa_for_system: state.config.auth.require_mfa_for_system_admin,
+        max_auth_age: None,
+    };
+    let admin = crate::auth::Principal::User(u.clone()).actor();
+    let system_admin =
+        state.svc()?.authz.authorize_system(&admin, app_authz::SystemPermission::ProvidersRead, &ctx).is_ok();
+    Ok(Subscriber { user_id: Some(u.user_id), organizations: orgs.into_iter().map(|o| o.id).collect(), system_admin })
+}
+
+pub async fn user_sse(
+    State(state): State<AppState>,
+    crate::auth::extract::UserAuth(u): crate::auth::extract::UserAuth,
+) -> Result<Response, app_errors::ApiError> {
+    let sub = subscriber_for(&state, &u).await?;
+    Ok(sse_response(&state, sub).into_response())
+}
+
+pub async fn user_ws(
+    State(state): State<AppState>,
+    crate::auth::extract::UserAuth(u): crate::auth::extract::UserAuth,
+    ws: WebSocketUpgrade,
+) -> Result<Response, app_errors::ApiError> {
+    let sub = subscriber_for(&state, &u).await?;
+    Ok(ws_response(state, ws, sub))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

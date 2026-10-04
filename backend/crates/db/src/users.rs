@@ -242,3 +242,35 @@ pub async fn mark_deleted(conn: &mut PgConnection, id: Uuid) -> DbResult<()> {
     .await?;
     if r.rows_affected() == 0 { Err(DbError::NotFound) } else { Ok(()) }
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SystemCounts {
+    pub users: i64,
+    pub active_users_7d: i64,
+    pub organizations: i64,
+    pub active_sessions: i64,
+    pub denied_24h: i64,
+    pub system_admins: i64,
+}
+
+pub async fn system_counts(db: impl PgExecutor<'_>) -> DbResult<SystemCounts> {
+    let r = sqlx::query!(
+        r#"SELECT
+             (SELECT count(*) FROM users WHERE status <> 'deleted') AS "users!",
+             (SELECT count(*) FROM users WHERE last_login_at > now() - interval '7 days') AS "active_users_7d!",
+             (SELECT count(*) FROM organizations WHERE deleted_at IS NULL) AS "organizations!",
+             (SELECT count(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > now() AND idle_expires_at > now()) AS "active_sessions!",
+             (SELECT count(*) FROM audit_events WHERE outcome = 'denied' AND occurred_at > now() - interval '24 hours') AS "denied_24h!",
+             (SELECT count(*) FROM users WHERE system_role = 'system_admin' AND status = 'active') AS "system_admins!""#
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(SystemCounts {
+        users: r.users,
+        active_users_7d: r.active_users_7d,
+        organizations: r.organizations,
+        active_sessions: r.active_sessions,
+        denied_24h: r.denied_24h,
+        system_admins: r.system_admins,
+    })
+}

@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n             (SELECT count(*) FROM users WHERE status <> 'deleted') AS \"users!\",\n             (SELECT count(*) FROM users WHERE last_login_at > now() - interval '7 days') AS \"active_users_7d!\",\n             (SELECT count(*) FROM organizations WHERE deleted_at IS NULL) AS \"organizations!\",\n             (SELECT count(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > now() AND idle_expires_at > now()) AS \"active_sessions!\",\n             (SELECT count(*) FROM audit_events WHERE outcome = 'denied' AND occurred_at > now() - interval '24 hours') AS \"denied_24h!\",\n             (SELECT count(*) FROM users WHERE system_role = 'system_admin' AND status = 'active') AS \"system_admins!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "users!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "active_users_7d!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "organizations!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "active_sessions!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "denied_24h!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "system_admins!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "816dfd497cc706b5438531f0643427f99e6a92fccb65c1ff770f77bef3136c12"
+}

@@ -6,11 +6,16 @@
 //! - [`routes`]: handlers grouped by concern.
 //! - [`server`]: listener + graceful shutdown (drain, then stop).
 
+pub mod audit;
+pub mod auth;
+pub mod bootstrap;
+pub mod errors;
 pub mod health;
 pub mod middleware;
 pub mod router;
 pub mod routes;
 pub mod server;
+pub mod services;
 pub mod state;
 
 pub use router::build_router;

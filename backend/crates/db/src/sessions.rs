@@ -258,3 +258,51 @@ pub async fn take_flow(db: impl PgExecutor<'_>, state_hash: &[u8]) -> DbResult<O
     .filter(|r| r.expires_at > OffsetDateTime::now_utc())
     .map(|r| OidcFlow { nonce: r.nonce, pkce_verifier: r.pkce_verifier, return_to: r.return_to, intent: r.intent }))
 }
+
+/// Session plus the user facts needed to authenticate a request, in one indexed query.
+#[derive(Debug, Clone)]
+pub struct AuthenticatedSession {
+    pub session_id: Uuid,
+    pub user_id: Uuid,
+    pub csrf_token: String,
+    pub last_seen_at: OffsetDateTime,
+    pub rotated_at: OffsetDateTime,
+    pub expires_at: OffsetDateTime,
+    pub auth_time: OffsetDateTime,
+    pub amr: Vec<String>,
+    pub mfa: bool,
+    pub ip: Option<IpNet>,
+    pub user_agent: Option<String>,
+    pub matched_previous: bool,
+    pub email: String,
+    pub email_verified: bool,
+    pub display_name: String,
+    pub user_status: String,
+    pub system_role: String,
+    pub external_subject: String,
+}
+
+pub async fn find_active_with_user(
+    db: impl PgExecutor<'_>,
+    token_hash: &[u8],
+) -> DbResult<Option<AuthenticatedSession>> {
+    Ok(sqlx::query_as!(
+        AuthenticatedSession,
+        r#"
+        SELECT s.id AS session_id, s.user_id, s.csrf_token, s.last_seen_at, s.rotated_at, s.expires_at, s.auth_time,
+               s.amr, s.mfa, s.ip, s.user_agent, (s.token_hash <> $1) AS "matched_previous!",
+               u.email, u.email_verified, u.display_name, u.status AS user_status, u.system_role, u.external_subject
+        FROM sessions s JOIN users u ON u.id = s.user_id
+        WHERE (s.token_hash = $1 OR (s.previous_token_hash = $1 AND s.previous_valid_until > now()))
+          AND s.revoked_at IS NULL AND s.expires_at > now() AND s.idle_expires_at > now()
+        "#,
+        token_hash
+    )
+    .fetch_optional(db)
+    .await?)
+}
+
+/// Encrypted ID token of a session (for RP-initiated logout).
+pub async fn id_token_enc(db: impl PgExecutor<'_>, id: Uuid) -> DbResult<Option<Vec<u8>>> {
+    Ok(sqlx::query_scalar!("SELECT id_token_enc FROM sessions WHERE id = $1", id).fetch_optional(db).await?.flatten())
+}

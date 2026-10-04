@@ -32,6 +32,10 @@ pub enum ApiError {
     Unauthenticated,
     #[error("forbidden")]
     Forbidden,
+    /// 403 with a stable machine-readable reason (`mfa_required`, `reauth_required`,
+    /// `csrf_failed`, `escalation`, `last_owner`, ...) so clients can react precisely.
+    #[error("forbidden: {0}")]
+    ForbiddenReason(&'static str),
     #[error("not found")]
     NotFound,
     #[error("conflict: {0}")]
@@ -66,7 +70,7 @@ impl ApiError {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Unauthenticated => StatusCode::UNAUTHORIZED,
-            Self::Forbidden => StatusCode::FORBIDDEN,
+            Self::Forbidden | Self::ForbiddenReason(_) => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
@@ -85,6 +89,7 @@ impl ApiError {
             Self::Validation(_) => "validation_failed",
             Self::Unauthenticated => "unauthenticated",
             Self::Forbidden => "forbidden",
+            Self::ForbiddenReason(code) => code,
             Self::NotFound => "not_found",
             Self::Conflict(_) => "conflict",
             Self::PayloadTooLarge => "payload_too_large",

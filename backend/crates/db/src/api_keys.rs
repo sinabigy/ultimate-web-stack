@@ -160,3 +160,16 @@ pub async fn register_service_client(
     .await?;
     Ok(id)
 }
+
+/// Rotation overlap: let the old key keep working until `at` (bounded by any earlier expiry).
+pub async fn expire_at(db: impl PgExecutor<'_>, access: &OrgAccess, id: Uuid, at: OffsetDateTime) -> DbResult<()> {
+    let r = sqlx::query!(
+        "UPDATE api_keys SET expires_at = LEAST(COALESCE(expires_at, $3), $3) WHERE organization_id = $1 AND id = $2 AND revoked_at IS NULL",
+        access.org_id(),
+        id,
+        at
+    )
+    .execute(db)
+    .await?;
+    if r.rows_affected() == 0 { Err(DbError::NotFound) } else { Ok(()) }
+}

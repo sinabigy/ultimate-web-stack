@@ -295,6 +295,12 @@ pub struct AuthConfig {
     pub require_mfa_for_system_admin: bool,
     /// Email addresses granted the `system_admin` level on first login (bootstrap only).
     pub bootstrap_system_admins: Vec<String>,
+    /// Take the system trust level from an ID-token claim at every login (IdP is the source
+    /// of truth for platform operators). Organisation roles always stay application-owned.
+    pub system_roles_from_idp: bool,
+    /// Claim holding granted project roles. ZITADEL: `urn:zitadel:iam:org:project:roles`
+    /// (an object keyed by role name); generic providers: an array of role names.
+    pub system_role_claim: String,
     /// ZITADEL management API access (service account personal access token). Optional.
     pub zitadel_api_token: Secret,
 }
@@ -329,6 +335,8 @@ impl Default for AuthConfig {
             service_audiences: Vec::new(),
             require_mfa_for_system_admin: true,
             bootstrap_system_admins: Vec::new(),
+            system_roles_from_idp: false,
+            system_role_claim: "urn:zitadel:iam:org:project:roles".into(),
             zitadel_api_token: Secret::default(),
         }
     }

@@ -44,8 +44,10 @@ font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; fo
 /// CSP for API responses: nothing may be loaded or framed.
 pub const API_CSP: &str = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 
+/// The full application: identity, account, organisations, admin, realtime.
 pub fn build_router(state: AppState) -> Router {
-    build_router_with(state, Router::new(), Router::new())
+    let api = crate::routes::auth_routes().merge(crate::routes::api_routes(state.config.admin.enabled));
+    build_router_with(state, api, crate::routes::stream_routes())
 }
 
 /// `api` routes get timeouts + load shedding; `streams` are long-lived. Both receive state.
@@ -67,6 +69,7 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
     let ordinary = ordinary.layer(
         ServiceBuilder::new()
             .layer(middleware::from_fn_with_state(state.clone(), mw::shed_load))
+            .layer(middleware::from_fn_with_state(state.clone(), crate::auth::authenticate))
             .layer(TimeoutLayer::with_status_code(StatusCode::GATEWAY_TIMEOUT, cfg.request_timeout()))
             .layer(DefaultBodyLimit::max(cfg.body_limit_bytes))
             .layer(RequestBodyLimitLayer::new(cfg.body_limit_bytes)),

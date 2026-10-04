@@ -32,6 +32,20 @@ async fn main() -> anyhow::Result<()> {
         limiter.spawn_janitor(Duration::from_secs(60));
         builder = builder.rate_limiter(limiter);
     }
+    // PostgreSQL is the core of every profile.
+    let pool = app_db::connect(&config.database, "app-server").await?;
+    if config.database.migrate_on_start {
+        app_db::migrate(&pool).await.context("running migrations")?;
+        tracing::info!("migrations applied");
+    }
+    if let Err(e) = app_db::orgs::sync_permissions(&pool).await {
+        tracing::warn!(error = %e, "permission vocabulary sync failed (database unavailable?); will be retried on next start");
+    }
+    let services = Arc::new(app_api::bootstrap::build_services(&config, pool.clone())?);
+    builder = builder
+        .health_check(Arc::new(app_api::services::DbCheck(pool.clone())))
+        .health_check(Arc::new(app_api::services::IdpCheck(services.oidc.clone())))
+        .services(services);
     let state = builder.build();
     let router = app_api::build_router(state.clone());
 

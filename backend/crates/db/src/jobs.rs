@@ -45,13 +45,22 @@ pub struct NewJob<'a> {
 }
 
 /// Returns `(job_id, created)`. A duplicate idempotency key returns the existing job.
-pub async fn enqueue(db: impl PgExecutor<'_> + Copy, j: &NewJob<'_>) -> DbResult<(Uuid, bool)> {
-    let id = app_domain::new_id();
-    let inserted = sqlx::query_scalar!(
-        r#"INSERT INTO jobs (id, queue, kind, payload, priority, max_attempts, run_at, idempotency_key, organization_id, trace_context)
-           VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, now()), $8, $9, $10)
-           ON CONFLICT (idempotency_key) DO NOTHING RETURNING id"#,
-        id,
+/// One statement, so it composes with the caller's transaction (transactional outbox:
+/// the business row and its job commit or roll back together).
+pub async fn enqueue(db: impl PgExecutor<'_>, j: &NewJob<'_>) -> DbResult<(Uuid, bool)> {
+    let row = sqlx::query!(
+        r#"
+        WITH ins AS (
+            INSERT INTO jobs (id, queue, kind, payload, priority, max_attempts, run_at, idempotency_key, organization_id, trace_context)
+            VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, now()), $8, $9, $10)
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING id
+        )
+        SELECT id AS "id!", true AS "created!" FROM ins
+        UNION ALL
+        SELECT id, false FROM jobs WHERE idempotency_key = $8 AND NOT EXISTS (SELECT 1 FROM ins)
+        "#,
+        app_domain::new_id(),
         j.queue,
         j.kind,
         j.payload,
@@ -63,16 +72,9 @@ pub async fn enqueue(db: impl PgExecutor<'_> + Copy, j: &NewJob<'_>) -> DbResult
         j.trace_context
     )
     .fetch_optional(db)
-    .await?;
-    match (inserted, j.idempotency_key) {
-        (Some(id), _) => Ok((id, true)),
-        (None, Some(key)) => {
-            let existing =
-                sqlx::query_scalar!("SELECT id FROM jobs WHERE idempotency_key = $1", key).fetch_one(db).await?;
-            Ok((existing, false))
-        }
-        (None, None) => Err(DbError::Conflict("jobs".into())),
-    }
+    .await?
+    .ok_or(DbError::Conflict("jobs".into()))?;
+    Ok((row.id, row.created))
 }
 
 /// Claim up to `limit` ready jobs for `worker`, leasing them for `lease_secs`.

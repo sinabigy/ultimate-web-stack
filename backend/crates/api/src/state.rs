@@ -54,6 +54,15 @@ pub struct AppInner {
     pub lifecycle: Lifecycle,
     /// Global in-flight cap for ordinary requests (load shedding).
     pub inflight: Arc<Semaphore>,
+    /// Database, identity and authorization services. `None` only in minimal tests.
+    pub services: Option<Arc<crate::services::Services>>,
+}
+
+impl AppInner {
+    /// Services or 503 (never a panic) when the instance was built without them.
+    pub fn svc(&self) -> Result<&Arc<crate::services::Services>, app_errors::ApiError> {
+        self.services.as_ref().ok_or(app_errors::ApiError::Unavailable("application services"))
+    }
 }
 
 impl Deref for AppState {
@@ -70,11 +79,20 @@ pub struct AppStateBuilder {
     health: Vec<Arc<dyn HealthCheck>>,
     events: Option<Arc<dyn EventBus>>,
     rate_limiter: Option<Arc<dyn RateLimiter>>,
+    services: Option<Arc<crate::services::Services>>,
 }
 
 impl AppState {
     pub fn builder(config: AppConfig, build: BuildInfo) -> AppStateBuilder {
-        AppStateBuilder { config, build, metrics: None, health: Vec::new(), events: None, rate_limiter: None }
+        AppStateBuilder {
+            config,
+            build,
+            metrics: None,
+            health: Vec::new(),
+            events: None,
+            rate_limiter: None,
+            services: None,
+        }
     }
 }
 
@@ -95,6 +113,10 @@ impl AppStateBuilder {
         self.rate_limiter = Some(l);
         self
     }
+    pub fn services(mut self, s: Arc<crate::services::Services>) -> Self {
+        self.services = Some(s);
+        self
+    }
     pub fn build(self) -> AppState {
         let inflight = Arc::new(Semaphore::new(self.config.http.max_inflight));
         AppState(Arc::new(AppInner {
@@ -106,6 +128,7 @@ impl AppStateBuilder {
             rate_limiter: self.rate_limiter,
             lifecycle: Lifecycle::default(),
             inflight,
+            services: self.services,
         }))
     }
 }

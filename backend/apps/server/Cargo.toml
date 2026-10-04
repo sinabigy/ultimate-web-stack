@@ -11,7 +11,11 @@ publish.workspace = true
 name = "app-server"
 path = "src/main.rs"
 
+[features]
+cedar = ["app-api/cedar"]
+
 [dependencies]
+app-db.workspace = true
 app-api.workspace = true
 app-config.workspace = true
 app-messaging.workspace = true
