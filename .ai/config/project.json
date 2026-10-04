@@ -71,6 +71,20 @@
         "timeout_s": 1800
       },
       {
+        "id": "gateway-check",
+        "stage": "lint",
+        "cmd": "cargo clippy --release -q -- -D warnings",
+        "cwd": "backend/gateway",
+        "requires": [
+          "cargo",
+          "cmake"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 2400,
+        "note": "Pingora gateway (hyperscale profile) is a separate workspace; this keeps it compiling and lint-clean."
+      },
+      {
         "id": "sqlx-offline-fresh",
         "stage": "lint",
         "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo sqlx prepare --workspace --check",
@@ -523,7 +537,15 @@
       "gateway_pingora": {
         "enabled": false,
         "adapter": "pingora",
-        "reason": "Hyperscale profile; adopted only with benchmark evidence (T-0012)."
+        "paths": [
+          "backend/gateway",
+          "docs/benchmarks/pingora.md"
+        ],
+        "reason": "Available (hyperscale profile) but not in the default path: a proxy hop roughly halves trivial-endpoint throughput on a shared host and nginx measured equivalent. Adopt for programmable edge logic on dedicated nodes.",
+        "evidence": [
+          "benchmarks/results/20261004T140349Z-0cd96a42816b-pingora-vs-nginx.json",
+          ".ai/knowledge/DECISIONS/0009-pingora-gateway-only-for-edge-needs.md"
+        ]
       },
       "runtime_monoio": {
         "enabled": false,
@@ -574,7 +596,8 @@
       "docs/operations/observability.md",
       "docs/security/threat-model.md",
       "docs/architecture/analytics.md",
-      "docs/architecture/messaging.md"
+      "docs/architecture/messaging.md",
+      "docs/benchmarks/pingora.md"
     ]
   }
 }

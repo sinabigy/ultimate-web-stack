@@ -73,6 +73,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with: { name: ai-validate-backend, path: ai-validate-backend.json }
 
+  gateway:
+    # Pingora edge gateway (hyperscale profile): separate workspace, compile + lint only.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - working-directory: backend
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: backend/gateway }
+      - run: python3 tools/ai-validate --strict --only gateway-check
+
   frontend:
     runs-on: ubuntu-24.04
     steps:

@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "apps/*"]
+# Separate workspace (hyperscale profile): keeps Pingora out of the core build.
+exclude = ["gateway"]
 
 [workspace.package]
 version = "0.1.0"

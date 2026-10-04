@@ -15,6 +15,7 @@ Suites:
   db        PostgreSQL workloads and pool behaviour (app-bench)
   messaging PostgreSQL job queue vs NATS JetStream: publish and drain rates (app-bench queue)
   analytics ClickHouse vs PostgreSQL: sink ingest, tenant and cross-tenant aggregates, storage
+  gateway   direct vs through the Pingora gateway (hyperscale profile): added latency, throughput, gateway CPU/RSS
 
 Output: benchmarks/results/<UTC timestamp>-<git sha>[-label].json and benchmarks/results/latest.json.
 Then: `python3 benchmarks/compare.py` (regression gates) and `python3 benchmarks/report.py` (docs).
@@ -48,7 +49,7 @@ REDIS_URL = os.environ.get("BENCH_REDIS_URL", "redis://127.0.0.1:56379")
 DRAGONFLY_URL = os.environ.get("BENCH_DRAGONFLY_URL", "redis://127.0.0.1:56380")
 APP_PORT, IDP_PORT = 18090, 59083
 APP = f"http://127.0.0.1:{APP_PORT}"
-SUITES = ["http", "auth", "cache", "outbound", "db", "messaging", "analytics"]
+SUITES = ["http", "auth", "cache", "outbound", "db", "messaging", "analytics", "gateway"]
 
 
 def log(msg: str) -> None:
@@ -336,6 +337,104 @@ def suite_cache(smoke: bool) -> dict:
     return out
 
 
+GATEWAY_PORT = 18100
+NGINX_PORT = 18101
+
+NGINX_CONF = """
+worker_processes {workers};
+pid {dir}/nginx.pid;
+error_log {dir}/error.log warn;
+events {{ worker_connections 4096; }}
+http {{
+    access_log off;
+    upstream app {{ server 127.0.0.1:{app_port}; keepalive 256; }}
+    server {{
+        listen 127.0.0.1:{port} reuseport;
+        location / {{
+            proxy_pass http://app;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }}
+    }}
+}}
+"""
+
+
+def start_nginx(workers: str) -> subprocess.Popen | None:
+    """Baseline proxy with the same worker count and upstream keep-alive, when nginx exists."""
+    exe = shutil.which("nginx") or ("/opt/homebrew/bin/nginx" if Path("/opt/homebrew/bin/nginx").exists() else None)
+    if not exe:
+        return None
+    d = Path(os.environ.get("TMPDIR", "/tmp")) / f"bench-nginx-{os.getpid()}"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "nginx.conf").write_text(NGINX_CONF.format(workers=workers, dir=d, app_port=APP_PORT, port=NGINX_PORT))
+    return subprocess.Popen([exe, "-p", str(d), "-c", str(d / "nginx.conf"), "-g", "daemon off;"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def suite_gateway(smoke: bool) -> dict:
+    gw_dir = BACKEND / "gateway"
+    gw_bin = gw_dir / "target" / "release" / "app-gateway"
+    log("building gateway (separate workspace; needs cmake)…")
+    run(["cargo", "build", "--release", "-q"], cwd=gw_dir)
+    d = "3s" if smoke else "6s"
+    conc = [64] if smoke else [64, 256]
+    gw_url = f"http://127.0.0.1:{GATEWAY_PORT}"
+    threads = "4"
+    out: dict = {"duration_per_point": d, "gateway_threads": int(threads), "points": []}
+    with Stack() as st:
+        env = {**os.environ, "GATEWAY_LISTEN": f"127.0.0.1:{GATEWAY_PORT}", "GATEWAY_UPSTREAMS": f"127.0.0.1:{APP_PORT}",
+               "GATEWAY_THREADS": threads}
+        gw = subprocess.Popen([str(gw_bin)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ngx = start_nginx(threads)
+        ngx_url = f"http://127.0.0.1:{NGINX_PORT}"
+        out["baseline_proxy"] = "nginx" if ngx else None
+        try:
+            if ngx and not wait_http(f"{ngx_url}/healthz", 15):
+                ngx.terminate()
+                ngx = None
+                out["baseline_proxy"] = None
+            if not wait_http(f"{gw_url}/healthz", 30):
+                raise RuntimeError("gateway did not answer")
+            oha(f"{APP}/bench/plaintext", "2s", 32)
+            oha(f"{gw_url}/bench/plaintext", "2s", 32)
+            for path in ["/bench/plaintext", "/bench/json", "/bench/db"]:
+                for c in conc:
+                    direct = oha(f"{APP}{path}", d, c, pid=st.server.pid)
+                    sampler = Sampler(gw.pid)
+                    sampler.start()
+                    try:
+                        proxied = oha(f"{gw_url}{path}", d, c, pid=st.server.pid)
+                    finally:
+                        sampler.stop.set()
+                        sampler.join()
+                    g = sampler.result()
+                    proxied["gateway_cpu_pct_avg"] = g["server_cpu_pct_avg"]
+                    proxied["gateway_rss_mb_max"] = g["server_rss_mb_max"]
+                    point = {"path": path, "concurrency": c, "direct": direct, "proxied": proxied}
+                    if ngx:
+                        # nginx CPU is not sampled (multi-process); compare throughput and latency.
+                        nginx_res = oha(f"{ngx_url}{path}", d, c, pid=st.server.pid)
+                        point["nginx"] = nginx_res
+                        if direct["success_rps"]:
+                            point["nginx_throughput_ratio"] = round(nginx_res["success_rps"] / direct["success_rps"], 4)
+                    if direct["success_rps"]:
+                        point["throughput_ratio"] = round(proxied["success_rps"] / direct["success_rps"], 4)
+                    for q in ("p50_ms", "p99_ms"):
+                        if direct.get(q) is not None and proxied.get(q) is not None:
+                            point[f"added_{q}"] = round(proxied[q] - direct[q], 3)
+                    out["points"].append(point)
+        finally:
+            for p in [gw] + ([ngx] if ngx else []):
+                p.terminate()
+                try:
+                    p.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+    return out
+
+
 def suite_tool(mode: str, smoke: bool) -> dict:
     cmd = [str(BIN / "app-bench"), mode] + (["--smoke"] if smoke else [])
     return json.loads(run(cmd, env={**os.environ, "BENCH_DATABASE_URL": BENCH_DB_URL}).stdout)
@@ -401,6 +500,8 @@ def main() -> int:
                     data = suite_tool("queue", a.smoke)
                 elif s == "analytics":
                     data = suite_tool("analytics", a.smoke)
+                elif s == "gateway":
+                    data = suite_gateway(a.smoke)
                 else:
                     data = suite_tool(s if s == "db" else "outbound", a.smoke)
                 entry = {"status": "ok", "wall_s": round(time.time() - t, 1), "data": data}

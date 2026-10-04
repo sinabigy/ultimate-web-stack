@@ -1,0 +1,22 @@
+# Hyperscale profile: Pingora reverse proxy / load balancer in front of app-server.
+# A separate workspace so the core build never pays for Pingora's dependency tree.
+[package]
+name = "app-gateway"
+description = "Pingora-based edge gateway (load balancing, health checks, connection reuse) for the hyperscale profile."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+pingora = { version = "0.9", default-features = false, features = ["proxy", "lb"] }
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[lints.rust]
+unsafe_code = "forbid"
