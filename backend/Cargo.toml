@@ -1,0 +1,69 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# internal
+app-config = { path = "crates/config" }
+app-errors = { path = "crates/errors" }
+app-telemetry = { path = "crates/telemetry" }
+app-domain = { path = "crates/domain" }
+app-api = { path = "crates/api" }
+app-rate-limit = { path = "crates/rate_limit" }
+app-messaging = { path = "crates/messaging" }
+
+# core runtime
+tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "signal", "net", "time", "sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+axum = { version = "0.8.9", features = ["ws", "macros"] }
+tower = { version = "0.5.3", features = ["limit", "load-shed", "timeout", "util"] }
+tower-http = { version = "0.7.1", features = ["trace", "request-id", "propagate-header", "timeout", "limit", "catch-panic", "set-header", "cors", "fs", "sensitive-headers", "csrf"] }
+hyper = "1.11"
+http = "1"
+http-body-util = "0.1"
+bytes = "1"
+futures = "0.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+async-trait = "0.1"
+anyhow = "1"
+uuid = { version = "1.27", features = ["v4", "v7", "serde"] }
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
+figment = { version = "0.10.19", features = ["env", "toml"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
+
+# test
+proptest = "1.11"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+strip = "debuginfo"
+panic = "unwind"
+
+[profile.bench]
+inherits = "release"

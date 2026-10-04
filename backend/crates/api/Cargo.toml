@@ -1,0 +1,39 @@
+[package]
+name = "app-api"
+description = "HTTP surface: router, middleware, handlers. Composes the domain and adapter crates."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+app-config.workspace = true
+app-domain.workspace = true
+app-errors.workspace = true
+app-messaging.workspace = true
+app-rate-limit.workspace = true
+app-telemetry.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+futures.workspace = true
+http.workspace = true
+metrics.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+async-trait.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

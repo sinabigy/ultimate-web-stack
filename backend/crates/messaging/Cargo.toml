@@ -1,0 +1,18 @@
+[package]
+name = "app-messaging"
+description = "Event bus abstraction: in-process broadcast (core) or NATS (distributed profile)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+app-domain.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+metrics.workspace = true
+
+[lints]
+workspace = true

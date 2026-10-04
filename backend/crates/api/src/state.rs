@@ -1,0 +1,111 @@
+use std::{
+    ops::Deref,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+use app_config::AppConfig;
+use app_messaging::EventBus;
+use app_rate_limit::RateLimiter;
+use app_telemetry::MetricsHandle;
+use tokio::sync::Semaphore;
+use tokio_util::sync::CancellationToken;
+
+use crate::health::HealthCheck;
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BuildInfo {
+    pub name: &'static str,
+    pub version: &'static str,
+    pub git_sha: &'static str,
+    pub profile: &'static str,
+}
+
+/// Lifecycle flags shared by the server loop and handlers.
+#[derive(Default)]
+pub struct Lifecycle {
+    draining: AtomicBool,
+    /// Cancelled when the server stops; long-lived streams (SSE/WS) end on it.
+    pub shutdown: CancellationToken,
+}
+
+impl Lifecycle {
+    pub fn start_draining(&self) {
+        self.draining.store(true, Ordering::SeqCst);
+    }
+    pub fn is_draining(&self) -> bool {
+        self.draining.load(Ordering::SeqCst)
+    }
+}
+
+/// Shared state. Cloning is a pointer copy.
+#[derive(Clone)]
+pub struct AppState(Arc<AppInner>);
+
+pub struct AppInner {
+    pub config: AppConfig,
+    pub build: BuildInfo,
+    pub metrics: Option<MetricsHandle>,
+    pub health: Vec<Arc<dyn HealthCheck>>,
+    pub events: Arc<dyn EventBus>,
+    pub rate_limiter: Option<Arc<dyn RateLimiter>>,
+    pub lifecycle: Lifecycle,
+    /// Global in-flight cap for ordinary requests (load shedding).
+    pub inflight: Arc<Semaphore>,
+}
+
+impl Deref for AppState {
+    type Target = AppInner;
+    fn deref(&self) -> &AppInner {
+        &self.0
+    }
+}
+
+pub struct AppStateBuilder {
+    config: AppConfig,
+    build: BuildInfo,
+    metrics: Option<MetricsHandle>,
+    health: Vec<Arc<dyn HealthCheck>>,
+    events: Option<Arc<dyn EventBus>>,
+    rate_limiter: Option<Arc<dyn RateLimiter>>,
+}
+
+impl AppState {
+    pub fn builder(config: AppConfig, build: BuildInfo) -> AppStateBuilder {
+        AppStateBuilder { config, build, metrics: None, health: Vec::new(), events: None, rate_limiter: None }
+    }
+}
+
+impl AppStateBuilder {
+    pub fn metrics(mut self, h: MetricsHandle) -> Self {
+        self.metrics = Some(h);
+        self
+    }
+    pub fn health_check(mut self, c: Arc<dyn HealthCheck>) -> Self {
+        self.health.push(c);
+        self
+    }
+    pub fn events(mut self, bus: Arc<dyn EventBus>) -> Self {
+        self.events = Some(bus);
+        self
+    }
+    pub fn rate_limiter(mut self, l: Arc<dyn RateLimiter>) -> Self {
+        self.rate_limiter = Some(l);
+        self
+    }
+    pub fn build(self) -> AppState {
+        let inflight = Arc::new(Semaphore::new(self.config.http.max_inflight));
+        AppState(Arc::new(AppInner {
+            events: self.events.unwrap_or_else(|| Arc::new(app_messaging::LocalEventBus::default())),
+            config: self.config,
+            build: self.build,
+            metrics: self.metrics,
+            health: self.health,
+            rate_limiter: self.rate_limiter,
+            lifecycle: Lifecycle::default(),
+            inflight,
+        }))
+    }
+}
