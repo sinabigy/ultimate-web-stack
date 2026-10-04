@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0021",
+  "outcome": "completed",
+  "summary": "Organisations: personal workspace per user (suffixed slug), multi-org membership, members, teams, invitations (hashed token, verified-email binding, single use), built-in + custom roles, settings, billing hook, org audit, overview dashboard API.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "python3 tools/ai-validate (Rust fmt/clippy/sqlx/tests/cedar + web typecheck/lint/test/build/budget) and Playwright 12/12 E2E PASS on 2026-10-04",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "tenancy.rs invitation/last-owner; E2E invite → outsider refused → member accepts",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T09:59:33Z"
+}

@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0024",
+  "outcome": "completed",
+  "summary": "AppShell (sidebar, top nav, breadcrumbs, command palette, user menu, notifications, mobile nav), dashboard primitives, functional auth/dashboard/account/org/admin pages over generated types; accessible (axe AA light/dark, keyboard, skip link, focus management).",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "python3 tools/ai-validate (Rust fmt/clippy/sqlx/tests/cedar + web typecheck/lint/test/build/budget) and Playwright 12/12 E2E PASS on 2026-10-04",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "routes.spec.ts: 28 routes render real data; a11y.spec.ts; bundle budget gate",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T09:59:33Z"
+}

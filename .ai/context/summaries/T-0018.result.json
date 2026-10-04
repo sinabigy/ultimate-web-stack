@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0018",
+  "outcome": "completed",
+  "summary": "Standards OIDC BFF (code+PKCE S256+nonce+state, lazy discovery, key rotation refresh, userinfo fallback, RP-initiated logout) with ZITADEL as default provider kind and IdentityAdmin trait (ZITADEL v2 + console-only); mock OIDC IdP with fault injection for tests/offline dev. Real-ZITADEL verification is T-0025 per the acceptance criterion.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "python3 tools/ai-validate (Rust fmt/clippy/sqlx/tests/cedar + web typecheck/lint/test/build/budget) and Playwright 12/12 E2E PASS on 2026-10-04",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "auth_flow.rs 18 tests (bad state/nonce/iss/aud/expired/forged); E2E login via BFF; only configured methods shown (auth.spec.ts)",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T09:59:33Z"
+}

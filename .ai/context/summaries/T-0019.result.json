@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0019",
+  "outcome": "completed",
+  "summary": "Opaque 256-bit session tokens hashed at rest; absolute + idle expiry; rotation with 60s grace; new session id on every login; logout, logout-others, logout-all; per-session revocation; device listing; CSRF synchronizer token + Fetch-Metadata layer; suspended users cut off. Redis cache criterion moved to T-0008.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "python3 tools/ai-validate (Rust fmt/clippy/sqlx/tests/cedar + web typecheck/lint/test/build/budget) and Playwright 12/12 E2E PASS on 2026-10-04",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "auth_flow.rs: forged/expired/idle/revoked/rotation/fixation/CSRF/logout(-all); E2E sessions page and sign-out",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T09:59:33Z"
+}
