@@ -1,0 +1,34 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0006",
+  "outcome": "completed",
+  "summary": "Observability: /metrics with HTTP/provider/job/cache series (tested, no tenant ids in labels); W3C tracing request -> job -> worker -> provider (tested, mutation-checked) with opt-in OTLP export; JSON logs carry trace_id; Prometheus/Tempo/Loki/Alloy/Grafana dev profile verified end to end. Security: cargo audit, cargo deny, npm audit and gitleaks history scan in canonical validation + CI; staged-secret pre-commit check; STRIDE threat model with controls mapped to tests. Found and fixed: ops endpoints were rate limited/shed; rate limiting ran before authentication (always per IP); job span held across awaits.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "./dev check: 21 commands, all pass after E2E locator fix (2026-10-04)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "cargo test -p app-api --test tracing: 3 passed (trace propagation, new root traces, metrics exposition)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "Live stack check: trace 1111... present in Tempo (3 spans) and Loki (5 lines with trace_id); Prometheus app-server target up; Grafana datasources healthy",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "docs/security/threat-model.md; docs/operations/observability.md; ADR 0006",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T13:15:54Z"
+}
