@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0002",
+  "outcome": "completed",
+  "summary": "Rust workspace (modular monolith) with config/errors/telemetry/domain/rate_limit/messaging/api crates and app-server binary. Middleware: request ids, trace spans, metrics by route template, CSRF (fetch metadata), CORS, secure headers/CSP, body limit, timeouts, load shedding, GCRA rate limiting. Ops: healthz/readyz (critical vs degraded, draining)/version/metrics; SSE + WebSocket with deny-by-default audience filtering; drain-then-stop graceful shutdown. DB/auth/cached endpoints are delivered by T-0004/T-0018+/T-0008.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "python3 tools/ai-validate: rust-fmt, rust-clippy (-D warnings), rust-test PASS (43 tests)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "Live smoke: app-server answered healthz/version/readyz/bench/json/problem+json 404/metrics; SIGTERM -> readyz 503 during drain -> exit 0",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T08:14:06Z"
+}
