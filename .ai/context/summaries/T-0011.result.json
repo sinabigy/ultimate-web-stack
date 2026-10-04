@@ -1,0 +1,29 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0011",
+  "outcome": "completed",
+  "summary": "Outbound engine: adaptive concurrency (AIMD + latency floor, drain epochs, priority queue), learned request rate (ceiling memory, hold/probe, slow start, short-horizon GCRA), token budgets, breaker (hard window + recent-span outage), retries (full jitter, budget, Retry-After, idempotency keys), pooled keep-alive clients. Useful-throughput benchmark recorded vs a naive client (rate-limited, overload, outage, keep-alive, concurrency sweep). Algorithm documented in docs/architecture/outbound-engine.md and ADR 0005. Unresolved: rate-limit header parsing (x-ratelimit-*, IETF RateLimit) would remove learning pauses.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "cargo test -p app-networking: 26 unit/property + 8 engine tests passed (2026-10-04)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "benchmarks/baseline.json suites.outbound: engine 100% completion at 429-limited and overloaded providers, waste 1.9% / 0.2% vs naive 99.5% / 98.8%; outage amplification 0.48x vs 21x",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "docs/architecture/outbound-engine.md; .ai/knowledge/DECISIONS/0005-outbound-engine-controllers.md",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T12:28:17Z"
+}
