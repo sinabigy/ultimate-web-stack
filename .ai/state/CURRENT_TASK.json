@@ -1,7 +1,7 @@
 {
   "current_task_schema_version": 1,
-  "task_id": null,
-  "path": null,
-  "next_step": null,
-  "updated_at": "2026-10-04T07:56:03Z"
+  "task_id": "T-0002",
+  "path": ".ai/tasks/active/T-0002-rust-axum-tokio-backend-core.json",
+  "next_step": "Work on T-0002: Rust/Axum/Tokio backend core",
+  "updated_at": "2026-10-04T07:56:09Z"
 }

@@ -1,0 +1,40 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0024",
+  "title": "Frontend application shell, design system and dashboards",
+  "objective": "Lightweight design system and AppShell (sidebar, top nav, breadcrumbs, command palette, user menu, notifications, responsive mobile nav); dashboard primitives (metric cards, charts, tables with sort/filter/pagination, date ranges, search, empty/error/loading states, realtime indicator, activity feed); functional pages for auth, dashboard, account, org and admin routes using generated typed API bindings.",
+  "acceptance_criteria": [
+    "Every listed route renders real data from the backend in E2E tests",
+    "Keyboard navigation, labels, focus management and axe accessibility checks pass",
+    "Bundle stays within the recorded budget"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0003",
+    "T-0023"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "npm run typecheck && npm test",
+    "npx playwright test"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:04Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

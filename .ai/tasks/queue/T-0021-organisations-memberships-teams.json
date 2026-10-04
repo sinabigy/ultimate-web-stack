@@ -1,0 +1,37 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0021",
+  "title": "Organisations, memberships, teams, invitations, roles",
+  "objective": "Multi-tenant organisation model: personal org on first login, multi-org membership, members, teams, invitations (link/token) with role assignment on acceptance, custom org roles, settings, billing hooks, org audit.",
+  "acceptance_criteria": [
+    "Invitation flow test: invite -> accept as invited email -> membership with assigned role",
+    "Owner protections: last owner cannot be removed or demoted (test)"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0020"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p app-api --test organizations"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:03Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

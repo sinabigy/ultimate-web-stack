@@ -12,3 +12,14 @@
 __pycache__/
 .DS_Store
 Thumbs.db
+
+# --- build outputs and local tooling ---
+target/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+.env.zitadel
+/var/

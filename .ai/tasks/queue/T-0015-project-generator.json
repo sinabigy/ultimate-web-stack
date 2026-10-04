@@ -2,11 +2,12 @@
   "task_schema_version": 1,
   "id": "T-0015",
   "title": "Project generator",
-  "objective": "create-project command: copies the app skeleton, initialises ai-project-template protocol via ai-init --target, selects profile/modules, writes architecture block and confirmed validation commands, inherits ADRs, git init, validation, optional dev start. Interactive and non-interactive.",
+  "objective": "create-project command: copies the app skeleton, initialises ai-project-template protocol via ai-init --target, selects profile/modules, writes architecture block and confirmed validation commands, inherits ADRs, git init, validation, optional dev start. Interactive and non-interactive. Supports identity profiles (--auth basic|consumer|b2b|enterprise, --organizations, --admin, --cedar) with full auth/admin/account foundation on by default unless opted out.",
   "acceptance_criteria": [
     "create-project demo --profile core --no-start produces a project whose ./dev check passes",
     "Generated project.json architecture matches flags",
-    "Generator has automated tests"
+    "Generator has automated tests",
+    "create-project app --auth b2b --admin yields organizations + admin enabled in project.json architecture and passing auth/tenancy tests"
   ],
   "non_goals": [],
   "dependencies": [

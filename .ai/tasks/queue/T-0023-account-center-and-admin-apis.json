@@ -1,0 +1,39 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0023",
+  "title": "Account center and admin APIs",
+  "objective": "Account center APIs (profile, preferences, security state, passkeys/MFA/linked identities via IdentityAdmin, sessions, account deletion workflow with policy hook) and system admin APIs (users, organisations, roles, audit, jobs, providers, system) with independent authorization.",
+  "acceptance_criteria": [
+    "Admin API tests: non-admin and org-admin denied; MFA-required enforced for system admin when configured",
+    "Account deletion requires confirmation + recent authentication and blocks sole-owner deletion (tests)"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0021",
+    "T-0022"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p app-api --test admin",
+    "cargo test -p app-api --test account"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:04Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

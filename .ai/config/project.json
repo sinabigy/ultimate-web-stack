@@ -10,21 +10,72 @@
     "template_version": "1.1.0"
   },
   "stack": {
-    "languages": [],
-    "package_managers": [],
-    "build_systems": [],
-    "frameworks": [],
-    "detected_by": "ai-map 1.1.0 (evidence; review in T-0001)"
+    "languages": [
+      "rust"
+    ],
+    "package_managers": [
+      "cargo"
+    ],
+    "build_systems": [
+      "cargo"
+    ],
+    "frameworks": [
+      "axum",
+      "tokio"
+    ],
+    "detected_by": "user"
   },
   "paths": {
-    "source": [],
-    "tests": [],
+    "source": [
+      "backend/crates",
+      "backend/apps"
+    ],
+    "tests": [
+      "backend/crates/api/tests"
+    ],
     "docs": [
       "docs"
     ]
   },
   "validation": {
-    "commands": []
+    "commands": [
+      {
+        "id": "rust-fmt",
+        "stage": "format",
+        "cmd": "cargo fmt --all --check",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true
+      },
+      {
+        "id": "rust-clippy",
+        "stage": "lint",
+        "cmd": "cargo clippy --workspace --all-targets -- -D warnings",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1800
+      },
+      {
+        "id": "rust-test",
+        "stage": "unit",
+        "cmd": "cargo test --workspace",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1800,
+        "note": "Unit + in-process integration tests; tests needing services are gated by env (see docs/development/testing.md)."
+      }
+    ]
   },
   "shims": [
     "AGENTS.md",

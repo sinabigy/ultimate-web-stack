@@ -1,0 +1,40 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0020",
+  "title": "Authorization: RBAC, permissions, ownership, tenant isolation, optional Cedar",
+  "objective": "Authorizer abstraction (deny by default) with RBAC role->permission mapping, resource ownership, organisation membership checks, system-admin trust level separate from organisation roles, MFA-required checks; type-level org scoping for repositories; optional Cedar engine passing the same test suite.",
+  "acceptance_criteria": [
+    "Tenant A user cannot read/modify Tenant B resources at API and repository layers (tests)",
+    "Org admin cannot reach /admin APIs; role changes cannot self-escalate (tests)",
+    "Cedar engine (feature) passes the shared authorization conformance suite"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0019"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p app-authz",
+    "cargo test -p app-authz --features cedar",
+    "cargo test -p app-api --test tenancy"
+  ],
+  "risk": "medium",
+  "task_class": "security",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:03Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

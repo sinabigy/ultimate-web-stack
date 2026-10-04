@@ -1,0 +1,39 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0026",
+  "title": "Auth documentation, invariants and validation gates",
+  "objective": "docs/authentication, authorization, multitenancy and admin with diagrams; the ten security invariants recorded in canonical knowledge; architecture block extended with authentication/authorization/organizations/admin; validation includes auth checks.",
+  "acceptance_criteria": [
+    "project.json architecture answers provider, auth profile, organizations, authorization mode, Cedar, session strategy and admin model",
+    "./dev check runs identity config validation and auth/tenancy test suites"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0024",
+    "T-0025"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "python3 tools/ai-check",
+    "./dev check"
+  ],
+  "risk": "medium",
+  "task_class": "docs",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:04Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

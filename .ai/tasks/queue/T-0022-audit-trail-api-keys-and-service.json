@@ -1,0 +1,39 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0022",
+  "title": "Audit trail, API keys and service authentication",
+  "objective": "Append-only audit events (actor, action, target, org, request id, safe metadata) for security-sensitive actions including denied escalations; API keys (prefix+id+secret, HMAC hash, scopes, expiry, last-used, revocation, rotation, shown once); machine-to-machine JWT bearer auth via JWKS distinct from human users.",
+  "acceptance_criteria": [
+    "Audit rows cannot be updated or deleted (DB trigger test); no secrets in metadata (test)",
+    "API key tests: shown once, wrong secret, revoked, expired, scope denied, rotation",
+    "Service JWT tests: wrong audience/issuer/expired rejected; service principal is not a user"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0020"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p app-api --test api_keys",
+    "cargo test -p app-api --test audit"
+  ],
+  "risk": "medium",
+  "task_class": "security",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:03Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0018",
+  "title": "Identity provider abstraction and OIDC BFF login",
+  "objective": "Standards-based OIDC (authorization code + PKCE) BFF login with ZITADEL as default provider behind an IdentityProvider abstraction; login/register/logout/callback; IdP-specific admin features behind a separate trait; a mock OIDC provider for tests and offline development that production config refuses.",
+  "acceptance_criteria": [
+    "Callback rejects bad state, nonce, issuer, audience, expired and forged ID tokens (tests)",
+    "No token or credential ever reaches browser storage; only an HttpOnly session cookie",
+    "Login page shows only configured methods; social login uses provider hints",
+    "Works against generic OIDC (mock) and ZITADEL with config change only"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0004"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p app-auth",
+    "cargo test -p app-api --test auth_flow"
+  ],
+  "risk": "medium",
+  "task_class": "security",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:03Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

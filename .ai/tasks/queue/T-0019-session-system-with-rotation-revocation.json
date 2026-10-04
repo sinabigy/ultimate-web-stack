@@ -1,0 +1,39 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0019",
+  "title": "Session system with rotation, revocation and device listing",
+  "objective": "PostgreSQL-canonical session store (optional Redis cache): opaque random tokens stored only as hashes, absolute + idle expiry, rotation on login and privilege change, logout, logout-all, per-session revocation, device/session listing with last-active and optional IP/UA metadata, suspicious-session hooks, CSRF protection.",
+  "acceptance_criteria": [
+    "Tests: valid, expired, idle-expired, revoked, forged cookie, rotated token, logout-all",
+    "CSRF: unsafe method without matching token or with cross-site Origin is rejected (tests)",
+    "Redis outage falls back to PostgreSQL without failing open (test)"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0018"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p app-auth sessions",
+    "cargo test -p app-api --test sessions"
+  ],
+  "risk": "medium",
+  "task_class": "security",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T08:03:03Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

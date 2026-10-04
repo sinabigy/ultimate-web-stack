@@ -25,6 +25,23 @@
     },
     {
       "id": "M2",
+      "title": "Identity, authorization and application shell",
+      "goal": "ZITADEL/OIDC BFF sessions, RBAC + tenancy + optional Cedar, organisations, audit, API keys, account center, admin and a production-quality app shell, all proven by security tests.",
+      "status": "planned",
+      "tasks": [
+        "T-0018",
+        "T-0019",
+        "T-0020",
+        "T-0021",
+        "T-0022",
+        "T-0023",
+        "T-0024",
+        "T-0025",
+        "T-0026"
+      ]
+    },
+    {
+      "id": "M3",
       "title": "Evidence",
       "goal": "Own benchmark suite with machine-readable results and regression gates.",
       "status": "planned",
@@ -33,7 +50,7 @@
       ]
     },
     {
-      "id": "M3",
+      "id": "M4",
       "title": "Progressive profiles",
       "goal": "Cache, messaging, analytics and the external API engine, each optional and individually validated.",
       "status": "planned",
@@ -45,7 +62,7 @@
       ]
     },
     {
-      "id": "M4",
+      "id": "M5",
       "title": "Specialisation experiments",
       "goal": "Pingora and specialised runtimes kept or rejected on measured evidence.",
       "status": "planned",
@@ -55,7 +72,7 @@
       ]
     },
     {
-      "id": "M5",
+      "id": "M6",
       "title": "Reuse",
       "goal": "Deployment profiles, generator and a validated generated example application.",
       "status": "planned",
@@ -66,7 +83,7 @@
       ]
     },
     {
-      "id": "M6",
+      "id": "M7",
       "title": "Completion",
       "goal": "Full validation, benchmark report, documentation and compacted state.",
       "status": "planned",
