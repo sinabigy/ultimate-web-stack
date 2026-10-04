@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0004",
+  "outcome": "completed",
+  "summary": "PostgreSQL 18 via SQLx: 5 migrations (identity, tenancy, audit/keys, runs/jobs), pool with statement_timeout + slow-statement logging, embedded migrator, compile-time checked tenant-scoped repositories with offline .sqlx data, readiness check, 503 on outage.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "python3 tools/ai-validate: ai-check, rust-fmt, rust-clippy, sqlx-offline-fresh, rust-test, rust-test-cedar PASS (2026-10-04)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "17 repository tests on real PostgreSQL (crates/db/tests/repositories.rs); degradation.rs proves 503 + readyz failure on DB outage",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T09:20:09Z"
+}

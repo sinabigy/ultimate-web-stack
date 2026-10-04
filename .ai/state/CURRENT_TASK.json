@@ -1,7 +1,7 @@
 {
   "current_task_schema_version": 1,
-  "task_id": "T-0004",
-  "path": ".ai/tasks/active/T-0004-postgresql-via-sqlx-migrations-pool.json",
-  "next_step": "Work on T-0004: PostgreSQL via SQLx: migrations, pool, example domain",
-  "updated_at": "2026-10-04T08:14:06Z"
+  "task_id": "T-0003",
+  "path": ".ai/tasks/active/T-0003-solidjs-typescript-frontend-foundation.json",
+  "next_step": "Work on T-0003: SolidJS + TypeScript frontend foundation",
+  "updated_at": "2026-10-04T09:20:09Z"
 }
