@@ -7,7 +7,8 @@
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, ts_rs::TS)]
+#[ts(export)]
 pub struct AuthMethod {
     /// `passkey`, `totp`, `password`, `otp_email`, `otp_sms`, `idp_link`, ...
     pub kind: String,
@@ -15,10 +16,12 @@ pub struct AuthMethod {
     pub label: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Default, ts_rs::TS)]
+#[ts(export)]
 pub struct SecurityOverview {
     pub methods: Vec<AuthMethod>,
     pub mfa_enabled: bool,
+    #[ts(type = "number")]
     pub passkeys: usize,
     /// Where the user manages credentials when we cannot do it in-app.
     pub manage_url: Option<String>,

@@ -246,7 +246,7 @@ async fn logout_everywhere(pool: PgPool) {
     let laptop = app.login("multi@example.com").await;
     let phone = app.login("multi@example.com").await;
     let r = app.post(&laptop, "/api/v1/account/sessions/revoke-all", json!({})).await;
-    assert_eq!(r.body["revoked"], 1, "other devices only");
+    assert_eq!(r.body["count"], 1, "other devices only");
     assert_eq!(app.get(&phone, "/api/v1/dashboard").await.status, StatusCode::UNAUTHORIZED);
     assert_eq!(app.get(&laptop, "/api/v1/dashboard").await.status, StatusCode::OK);
     let r = app.post(&laptop, "/api/v1/account/sessions/revoke-all", json!({"include_current": true})).await;

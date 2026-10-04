@@ -17,7 +17,8 @@ pub trait HealthCheck: Send + Sync {
     async fn check(&self) -> Result<(), String>;
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct CheckResult {
     pub name: &'static str,
     pub ok: bool,

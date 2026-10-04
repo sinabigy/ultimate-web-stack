@@ -143,9 +143,12 @@ pub async fn insert(db: impl PgExecutor<'_>, e: &AuditEvent) -> DbResult<Uuid> {
     Ok(id)
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct AuditRow {
     pub id: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub occurred_at: OffsetDateTime,
     pub actor_type: String,
     pub actor_id: Option<Uuid>,

@@ -15,7 +15,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::health::HealthCheck;
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct BuildInfo {
     pub name: &'static str,
     pub version: &'static str,
@@ -56,7 +57,11 @@ pub struct AppInner {
     pub inflight: Arc<Semaphore>,
     /// Database, identity and authorization services. `None` only in minimal tests.
     pub services: Option<Arc<crate::services::Services>>,
+    /// Live outbound-provider health (set when the provider engine is running).
+    pub provider_health: Option<ProviderHealthFn>,
 }
+
+pub type ProviderHealthFn = Arc<dyn Fn(&str) -> Option<crate::dto::ProviderHealth> + Send + Sync>;
 
 impl AppInner {
     /// Services or 503 (never a panic) when the instance was built without them.
@@ -80,6 +85,7 @@ pub struct AppStateBuilder {
     events: Option<Arc<dyn EventBus>>,
     rate_limiter: Option<Arc<dyn RateLimiter>>,
     services: Option<Arc<crate::services::Services>>,
+    provider_health: Option<ProviderHealthFn>,
 }
 
 impl AppState {
@@ -92,6 +98,7 @@ impl AppState {
             events: None,
             rate_limiter: None,
             services: None,
+            provider_health: None,
         }
     }
 }
@@ -117,6 +124,10 @@ impl AppStateBuilder {
         self.services = Some(s);
         self
     }
+    pub fn provider_health(mut self, f: ProviderHealthFn) -> Self {
+        self.provider_health = Some(f);
+        self
+    }
     pub fn build(self) -> AppState {
         let inflight = Arc::new(Semaphore::new(self.config.http.max_inflight));
         AppState(Arc::new(AppInner {
@@ -129,6 +140,7 @@ impl AppStateBuilder {
             lifecycle: Lifecycle::default(),
             inflight,
             services: self.services,
+            provider_health: self.provider_health,
         }))
     }
 }

@@ -101,6 +101,20 @@
         "confirmed": true,
         "timeout_s": 1800,
         "note": "Cedar engine conformance + RBAC/Cedar differential property test."
+      },
+      {
+        "id": "ts-bindings-fresh",
+        "stage": "typecheck",
+        "cmd": "cargo test --workspace export_bindings -q >/dev/null && git diff --quiet --exit-code -- ../frontend/src/api/generated && test -z \"$(git ls-files --others --exclude-standard ../frontend/src/api/generated)\"",
+        "cwd": "backend",
+        "requires": [
+          "cargo",
+          "git"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1800,
+        "note": "Fails when Rust API types changed but frontend/src/api/generated was not regenerated (./dev types) and committed."
       }
     ]
   },

@@ -13,12 +13,13 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     audit,
     auth::{Principal, ReqMeta, extract::UserAuth, extract::require_system},
+    dto,
     errors::ResultExt,
     health::run_checks,
     routes::orgs::AuditQuery,
@@ -40,14 +41,14 @@ pub async fn overview(
     State(state): State<AppState>,
     UserAuth(u): UserAuth,
     meta: ReqMeta,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::AdminOverview>, ApiError> {
     guard(&state, &u, S::SystemRead, &meta).await?;
     let svc = state.svc()?;
-    Ok(Json(json!({
-        "counts": users::system_counts(&svc.db).await.api()?,
-        "jobs": jobs::stats(&svc.db).await.api()?,
-        "pool": app_db::pool_stats(&svc.db),
-    })))
+    Ok(Json(dto::AdminOverview {
+        counts: users::system_counts(&svc.db).await.api()?,
+        jobs: jobs::stats(&svc.db).await.api()?,
+        pool: app_db::pool_stats(&svc.db),
+    }))
 }
 
 #[derive(Deserialize, Default)]
@@ -71,12 +72,12 @@ pub async fn list_users(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Query(q): Query<ListQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::PagedResponse<users::AdminUserRow>>, ApiError> {
     guard(&state, &u, S::UsersRead, &meta).await?;
     let (limit, offset) = q.bounds();
     let status = q.status.as_deref().filter(|s| UserStatus::parse(s).is_some());
     let (items, total) = users::admin_list(&state.svc()?.db, q.search.as_deref(), status, limit, offset).await.api()?;
-    Ok(Json(json!({"items": items, "total": total, "page": q.page.unwrap_or(1), "per_page": limit})))
+    Ok(Json(dto::PagedResponse { items, total, page: q.page.unwrap_or(1), per_page: limit }))
 }
 
 pub async fn get_user(
@@ -84,19 +85,27 @@ pub async fn get_user(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Path(id): Path<Uuid>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::AdminUserDetail>, ApiError> {
     guard(&state, &u, S::UsersRead, &meta).await?;
     let svc = state.svc()?;
     let row = users::get(&svc.db, id).await.api()?;
-    let orgs = orgs::list_for_user(&svc.db, id).await.api()?;
-    let sessions = sessions::list_active(&svc.db, id).await.api()?;
-    Ok(Json(json!({
-        "user": {"id": row.id, "email": row.email, "display_name": row.display_name, "status": row.status,
-                 "system_role": row.system_role, "email_verified": row.email_verified,
-                 "identity_provider": row.identity_provider, "created_at": row.created_at, "last_login_at": row.last_login_at},
-        "organizations": orgs,
-        "active_sessions": sessions.len(),
-    })))
+    let organizations = orgs::list_for_user(&svc.db, id).await.api()?;
+    let active_sessions = sessions::list_active(&svc.db, id).await.api()?.len();
+    Ok(Json(dto::AdminUserDetail {
+        user: dto::AdminUserInfo {
+            id: row.id,
+            email: row.email,
+            display_name: row.display_name,
+            status: row.status,
+            system_role: row.system_role,
+            email_verified: row.email_verified,
+            identity_provider: row.identity_provider,
+            created_at: dto::rfc3339(row.created_at),
+            last_login_at: row.last_login_at.map(dto::rfc3339),
+        },
+        organizations,
+        active_sessions,
+    }))
 }
 
 #[derive(Deserialize)]
@@ -111,7 +120,7 @@ pub async fn update_user(
     meta: ReqMeta,
     Path(id): Path<Uuid>,
     Json(b): Json<UpdateUser>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::OkResponse>, ApiError> {
     let p = guard(&state, &u, S::UsersManage, &meta).await?;
     if id == u.user_id {
         return Err(ApiError::ForbiddenReason("cannot_modify_self"));
@@ -155,7 +164,7 @@ pub async fn update_user(
         app_db::audit::insert(&mut *tx, &e).await.api()?;
     }
     tx.commit().await.api()?;
-    Ok(Json(json!({"ok": true})))
+    Ok(Json(dto::OkResponse { ok: true }))
 }
 
 pub async fn revoke_user_sessions(
@@ -163,7 +172,7 @@ pub async fn revoke_user_sessions(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Path(id): Path<Uuid>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::CountResponse>, ApiError> {
     let p = guard(&state, &u, S::UsersManage, &meta).await?;
     let svc = state.svc()?;
     let mut tx = svc.db.begin().await.api()?;
@@ -174,7 +183,7 @@ pub async fn revoke_user_sessions(
             .meta(json!({"count": n, "by": "system_admin"}));
     app_db::audit::insert(&mut *tx, &e).await.api()?;
     tx.commit().await.api()?;
-    Ok(Json(json!({"revoked": n})))
+    Ok(Json(dto::CountResponse { count: n }))
 }
 
 pub async fn list_orgs(
@@ -182,35 +191,41 @@ pub async fn list_orgs(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Query(q): Query<ListQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::PagedResponse<orgs::AdminOrgRow>>, ApiError> {
     guard(&state, &u, S::OrgsRead, &meta).await?;
     let (limit, offset) = q.bounds();
     let (items, total) = orgs::admin_list(&state.svc()?.db, q.search.as_deref(), limit, offset).await.api()?;
-    Ok(Json(json!({"items": items, "total": total, "page": q.page.unwrap_or(1), "per_page": limit})))
+    Ok(Json(dto::PagedResponse { items, total, page: q.page.unwrap_or(1), per_page: limit }))
 }
 
 pub async fn roles_model(
     State(state): State<AppState>,
     UserAuth(u): UserAuth,
     meta: ReqMeta,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::RolesModelResponse>, ApiError> {
     guard(&state, &u, S::RolesRead, &meta).await?;
-    let roles: Vec<Value> = OrgRole::ALL
-        .iter()
-        .rev()
-        .map(|r| json!({"key": r.as_str(), "permissions": rbac::builtin_permissions(*r)}))
-        .collect();
-    let system: Vec<Value> = [SystemRole::SystemAdmin, SystemRole::SystemAuditor]
-        .iter()
-        .map(|r| json!({"key": r.as_str(), "permissions": rbac::system_permissions(*r).iter().map(|p| p.key()).collect::<Vec<_>>()}))
-        .collect();
-    Ok(Json(json!({
-        "organization_roles": roles,
-        "system_roles": system,
-        "permissions": Permission::ALL.iter().map(|p| json!({"key": p.key(), "description": p.description()})).collect::<Vec<_>>(),
-        "engine": state.config.authorization.engine,
-        "system_roles_source": if state.config.auth.system_roles_from_idp { "identity_provider" } else { "application" },
-    })))
+    let keys = |p: app_authz::PermissionSet| p.keys().into_iter().map(String::from).collect::<Vec<_>>();
+    Ok(Json(dto::RolesModelResponse {
+        organization_roles: OrgRole::ALL
+            .iter()
+            .rev()
+            .map(|r| dto::RoleModel { key: r.as_str().into(), permissions: keys(rbac::builtin_permissions(*r)) })
+            .collect(),
+        system_roles: [SystemRole::SystemAdmin, SystemRole::SystemAuditor]
+            .iter()
+            .map(|r| dto::RoleModel {
+                key: r.as_str().into(),
+                permissions: rbac::system_permissions(*r).iter().map(|p| p.key().to_string()).collect(),
+            })
+            .collect(),
+        permissions: Permission::ALL
+            .iter()
+            .map(|p| dto::PermissionDescription { key: p.key().into(), description: p.description().into() })
+            .collect(),
+        engine: dto::enum_str(&state.config.authorization.engine),
+        system_roles_source: if state.config.auth.system_roles_from_idp { "identity_provider" } else { "application" }
+            .into(),
+    }))
 }
 
 pub async fn audit_log(
@@ -218,10 +233,10 @@ pub async fn audit_log(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Query(q): Query<AuditQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<app_db::pagination::Page<app_db::audit::AuditRow>>, ApiError> {
     guard(&state, &u, S::AuditRead, &meta).await?;
     let (filter, cursor, limit) = q.filter()?;
-    Ok(Json(json!(app_db::audit::list(&state.svc()?.db, None, &filter, cursor, limit).await.api()?)))
+    Ok(Json(app_db::audit::list(&state.svc()?.db, None, &filter, cursor, limit).await.api()?))
 }
 
 #[derive(Deserialize, Default)]
@@ -234,13 +249,14 @@ pub async fn list_jobs(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Query(q): Query<JobsQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::AdminJobs>, ApiError> {
     guard(&state, &u, S::JobsRead, &meta).await?;
     let svc = state.svc()?;
     let status = q.status.as_deref().filter(|s| matches!(*s, "queued" | "running" | "succeeded" | "dead"));
-    Ok(Json(
-        json!({"stats": jobs::stats(&svc.db).await.api()?, "items": jobs::list(&svc.db, status, 100).await.api()?}),
-    ))
+    Ok(Json(dto::AdminJobs {
+        stats: jobs::stats(&svc.db).await.api()?,
+        items: jobs::list(&svc.db, status, 100).await.api()?,
+    }))
 }
 
 pub async fn retry_job(
@@ -262,41 +278,51 @@ pub async fn providers(
     State(state): State<AppState>,
     UserAuth(u): UserAuth,
     meta: ReqMeta,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::ListResponse<dto::ProviderInfo>>, ApiError> {
     guard(&state, &u, S::ProvidersRead, &meta).await?;
-    // Live health comes from the outbound engine when enabled; configuration is shown otherwise.
-    let items: Vec<Value> = state
+    let items = state
         .config
         .providers
         .definitions
         .iter()
-        .map(|(name, d)| {
-            json!({"name": name, "base_url": d.base_url, "max_concurrency": d.max_concurrency,
-                   "requests_per_second": d.requests_per_second, "tokens_per_minute": d.tokens_per_minute})
+        .map(|(name, d)| dto::ProviderInfo {
+            name: name.clone(),
+            base_url: d.base_url.clone(),
+            max_concurrency: d.max_concurrency,
+            requests_per_second: d.requests_per_second,
+            tokens_per_minute: d.tokens_per_minute,
+            health: state.provider_health.as_ref().and_then(|f| f(name)),
         })
         .collect();
-    Ok(Json(json!({"items": items})))
+    Ok(Json(dto::ListResponse::new(items)))
 }
 
 pub async fn system(
     State(state): State<AppState>,
     UserAuth(u): UserAuth,
     meta: ReqMeta,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::SystemInfo>, ApiError> {
     guard(&state, &u, S::SystemRead, &meta).await?;
     let checks = run_checks(&state.health, Duration::from_secs(2)).await;
     let c = &state.config;
-    Ok(Json(json!({
-        "build": state.build,
-        "environment": c.environment,
-        "checks": checks,
-        "pool": state.services.as_ref().map(|s| app_db::pool_stats(&s.db)),
-        "modules": {
-            "cache": c.cache.backend, "rate_limit": c.rate_limit.enabled, "messaging": c.messaging.enabled,
-            "analytics": c.analytics.enabled, "organizations": c.tenancy.organizations,
-            "authorization_engine": c.authorization.engine,
+    Ok(Json(dto::SystemInfo {
+        build: state.build.clone(),
+        environment: c.environment.clone(),
+        checks,
+        pool: state.services.as_ref().map(|s| app_db::pool_stats(&s.db)),
+        modules: dto::ModulesInfo {
+            cache: dto::enum_str(&c.cache.backend),
+            rate_limit: c.rate_limit.enabled,
+            messaging: c.messaging.enabled,
+            analytics: c.analytics.enabled,
+            organizations: c.tenancy.organizations,
+            authorization_engine: dto::enum_str(&c.authorization.engine),
         },
-        "identity": {"provider": c.auth.provider, "issuer": c.auth.issuer_url, "profile": c.auth.profile,
-                     "require_mfa_for_system_admin": c.auth.require_mfa_for_system_admin},
-    })))
+        identity: dto::IdentityInfo {
+            provider: dto::enum_str(&c.auth.provider),
+            issuer: c.auth.issuer_url.clone(),
+            profile: dto::enum_str(&c.auth.profile),
+            require_mfa_for_system_admin: c.auth.require_mfa_for_system_admin,
+        },
+    }))
 }

@@ -6,7 +6,8 @@ use crate::run::RunStatus;
 /// Events pushed to dashboards over SSE/WebSocket. Tagged JSON: `{"type": "run_progress", ...}`.
 /// Payloads carry ids and counters only: never user-supplied content beyond what the
 /// recipient could already read, and never provider payloads.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ts_rs::TS)]
+#[ts(export)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RealtimeEvent {
     RunCreated {
@@ -42,6 +43,7 @@ pub enum RealtimeEvent {
         healthy: bool,
     },
     Heartbeat {
+        #[ts(type = "number")]
         at_unix_ms: i64,
     },
 }

@@ -6,7 +6,8 @@ use uuid::Uuid;
 
 use crate::{DbError, DbResult};
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct NotificationRow {
     pub id: Uuid,
     pub kind: String,
@@ -14,7 +15,11 @@ pub struct NotificationRow {
     pub body: String,
     pub link: Option<String>,
     pub organization_id: Option<Uuid>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub read_at: Option<OffsetDateTime>,
 }
 

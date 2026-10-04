@@ -38,6 +38,9 @@ async fn session_listing_marks_current(pool: PgPool) {
     let items = list.body["items"].as_array().unwrap();
     assert_eq!(items.len(), 2);
     assert_eq!(items.iter().filter(|i| i["current"] == true).count(), 1);
+    // Wire format: timestamps are RFC 3339 strings (regression: time's default serde is a tuple).
+    let created = items[0]["created_at"].as_str().expect("created_at is a string");
+    assert!(time::OffsetDateTime::parse(created, &time::format_description::well_known::Rfc3339).is_ok(), "{created}");
     assert!(items[0]["user_agent"].is_string() || items[0]["user_agent"].is_null());
     // cannot revoke someone else's session
     let other = app.login("x@acc.example").await;

@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::{
     audit,
     auth::{Principal, ReqMeta, UserPrincipal, cookies, extract::UserAuth},
+    dto,
     errors::ResultExt,
     state::AppState,
 };
@@ -32,14 +33,23 @@ fn recent_auth(state: &AppState, u: &UserPrincipal) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub async fn get_profile(State(state): State<AppState>, UserAuth(u): UserAuth) -> Result<Json<Value>, ApiError> {
+pub async fn get_profile(
+    State(state): State<AppState>,
+    UserAuth(u): UserAuth,
+) -> Result<Json<dto::ProfileResponse>, ApiError> {
     let row = users::get(&state.svc()?.db, u.user_id).await.api()?;
-    Ok(Json(json!({
-        "id": row.id, "email": row.email, "email_verified": row.email_verified,
-        "display_name": row.display_name, "avatar_url": row.avatar_url, "preferences": row.preferences,
-        "system_role": row.system_role, "created_at": row.created_at, "last_login_at": row.last_login_at,
-        "identity": {"provider": row.identity_provider, "subject": row.external_subject},
-    })))
+    Ok(Json(dto::ProfileResponse {
+        id: row.id,
+        email: row.email,
+        email_verified: row.email_verified,
+        display_name: row.display_name,
+        avatar_url: row.avatar_url,
+        preferences: row.preferences,
+        system_role: row.system_role,
+        created_at: dto::rfc3339(row.created_at),
+        last_login_at: row.last_login_at.map(dto::rfc3339),
+        identity: dto::IdentityRef { provider: row.identity_provider, subject: row.external_subject },
+    }))
 }
 
 #[derive(Deserialize)]
@@ -53,7 +63,7 @@ pub async fn update_profile(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Json(body): Json<ProfileUpdate>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::ProfileUpdated>, ApiError> {
     let name = validate_display_name(&body.display_name).map_err(|e| ApiError::validation(e.field, e.message))?;
     let avatar = body.avatar_url.filter(|a| !a.is_empty());
     if let Some(a) = &avatar
@@ -70,7 +80,7 @@ pub async fn update_profile(
         .meta(json!({"fields": ["display_name", "avatar_url"]}));
     app_db::audit::insert(&mut *tx, &e).await.api()?;
     tx.commit().await.api()?;
-    Ok(Json(json!({"display_name": row.display_name, "avatar_url": row.avatar_url})))
+    Ok(Json(dto::ProfileUpdated { display_name: row.display_name, avatar_url: row.avatar_url }))
 }
 
 pub async fn update_preferences(
@@ -85,13 +95,16 @@ pub async fn update_preferences(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn security(State(state): State<AppState>, UserAuth(u): UserAuth) -> Result<Json<Value>, ApiError> {
+pub async fn security(
+    State(state): State<AppState>,
+    UserAuth(u): UserAuth,
+) -> Result<Json<dto::SecurityResponse>, ApiError> {
     let svc = state.svc()?;
-    let overview = match svc.idp_admin.security_overview(&u.external_subject).await {
-        Ok(o) => json!(o),
+    let identity_provider = match svc.idp_admin.security_overview(&u.external_subject).await {
+        Ok(o) => dto::IdpState { available: true, overview: Some(o) },
         Err(e) => {
             tracing::warn!(error = %e, "identity provider security overview unavailable");
-            json!({"methods": [], "mfa_enabled": null, "passkeys": null, "manage_url": null, "unavailable": true})
+            dto::IdpState { available: false, overview: None }
         }
     };
     let filter = app_db::audit::AuditFilter { actor_id: Some(u.user_id), ..Default::default() };
@@ -103,12 +116,17 @@ pub async fn security(State(state): State<AppState>, UserAuth(u): UserAuth) -> R
             e.action.starts_with("security.") || e.action.starts_with("user.login") || e.action == "user.logout"
         })
         .collect();
-    Ok(Json(json!({
-        "session": {"mfa": u.mfa, "amr": u.amr, "auth_time": u.auth_time.unix_timestamp()},
-        "identity_provider": overview,
-        "events": security_events,
-        "reauth_window_minutes": state.config.auth.reauth_window_minutes,
-    })))
+    Ok(Json(dto::SecurityResponse {
+        session: dto::SessionMeta {
+            id: u.session_id,
+            mfa: u.mfa,
+            amr: u.amr.clone(),
+            auth_time: u.auth_time.unix_timestamp(),
+        },
+        identity_provider,
+        events: security_events,
+        reauth_window_minutes: state.config.auth.reauth_window_minutes,
+    }))
 }
 
 pub async fn remove_method(
@@ -143,18 +161,13 @@ pub async fn resend_verification(State(state): State<AppState>, UserAuth(u): Use
     }
 }
 
-pub async fn list_sessions(State(state): State<AppState>, UserAuth(u): UserAuth) -> Result<Json<Value>, ApiError> {
+pub async fn list_sessions(
+    State(state): State<AppState>,
+    UserAuth(u): UserAuth,
+) -> Result<Json<dto::ListResponse<dto::SessionItem>>, ApiError> {
     let list = sessions::list_active(&state.svc()?.db, u.user_id).await.api()?;
-    let items: Vec<Value> = list
-        .into_iter()
-        .map(|s| {
-            let current = s.id == u.session_id;
-            let mut v = json!(s);
-            v["current"] = json!(current);
-            v
-        })
-        .collect();
-    Ok(Json(json!({"items": items})))
+    let items = list.into_iter().map(|s| dto::SessionItem { current: s.id == u.session_id, session: s }).collect();
+    Ok(Json(dto::ListResponse::new(items)))
 }
 
 pub async fn revoke_session(
@@ -203,17 +216,19 @@ pub async fn revoke_all_sessions(
             .meta(json!({"count": n, "include_current": include_current}));
     app_db::audit::insert(&mut *tx, &e).await.api()?;
     tx.commit().await.api()?;
-    let mut res = Json(json!({"revoked": n})).into_response();
+    let mut res = Json(dto::CountResponse { count: n }).into_response();
     if include_current && let Ok(c) = cookies::clear_session_cookie(&state.config.auth) {
         res.headers_mut().append(header::SET_COOKIE, c);
     }
     Ok(res)
 }
 
-pub async fn activity(State(state): State<AppState>, UserAuth(u): UserAuth) -> Result<Json<Value>, ApiError> {
+pub async fn activity(
+    State(state): State<AppState>,
+    UserAuth(u): UserAuth,
+) -> Result<Json<app_db::pagination::Page<app_db::audit::AuditRow>>, ApiError> {
     let filter = app_db::audit::AuditFilter { actor_id: Some(u.user_id), ..Default::default() };
-    let page = app_db::audit::list(&state.svc()?.db, None, &filter, None, 50).await.api()?;
-    Ok(Json(json!(page)))
+    Ok(Json(app_db::audit::list(&state.svc()?.db, None, &filter, None, 50).await.api()?))
 }
 
 #[derive(Deserialize)]
@@ -276,11 +291,11 @@ pub async fn list_notifications(
     State(state): State<AppState>,
     UserAuth(u): UserAuth,
     Query(q): Query<NotifQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::NotificationsResponse>, ApiError> {
     let svc = state.svc()?;
     let items = notifications::list(&svc.db, u.user_id, q.unread, 50).await.api()?;
     let unread = notifications::unread_count(&svc.db, u.user_id).await.api()?;
-    Ok(Json(json!({"items": items, "unread": unread})))
+    Ok(Json(dto::NotificationsResponse { items, unread }))
 }
 
 pub async fn read_notification(
@@ -301,7 +316,10 @@ pub async fn read_all_notifications(
 }
 
 /// Personal dashboard: modular widgets the frontend renders independently.
-pub async fn dashboard(State(state): State<AppState>, UserAuth(u): UserAuth) -> Result<Json<Value>, ApiError> {
+pub async fn dashboard(
+    State(state): State<AppState>,
+    UserAuth(u): UserAuth,
+) -> Result<Json<dto::DashboardResponse>, ApiError> {
     let svc = state.svc()?;
     let my_orgs = orgs::list_for_user(&svc.db, u.user_id).await.api()?;
     let unread = notifications::unread_count(&svc.db, u.user_id).await.api()?;
@@ -309,14 +327,23 @@ pub async fn dashboard(State(state): State<AppState>, UserAuth(u): UserAuth) -> 
     let filter = app_db::audit::AuditFilter { actor_id: Some(u.user_id), ..Default::default() };
     let activity = app_db::audit::list(&svc.db, None, &filter, None, 10).await.api()?;
     let sessions = sessions::list_active(&svc.db, u.user_id).await.api()?;
-    Ok(Json(json!({
-        "widgets": {
-            "account": {"display_name": u.display_name, "email": u.email, "email_verified": u.email_verified,
-                        "organizations": my_orgs.len(), "system_role": u.system_role},
-            "security": {"mfa_this_session": u.mfa, "active_sessions": sessions.len(), "email_verified": u.email_verified},
-            "notifications": {"unread": unread, "recent": recent},
-            "activity": activity.items,
-            "organizations": my_orgs,
-        }
-    })))
+    Ok(Json(dto::DashboardResponse {
+        widgets: dto::DashboardWidgets {
+            account: dto::AccountWidget {
+                display_name: u.display_name.clone(),
+                email: u.email.clone(),
+                email_verified: u.email_verified,
+                organizations: my_orgs.len(),
+                system_role: u.system_role,
+            },
+            security: dto::SecurityWidget {
+                mfa_this_session: u.mfa,
+                active_sessions: sessions.len(),
+                email_verified: u.email_verified,
+            },
+            notifications: dto::NotificationsWidget { unread, recent },
+            activity: activity.items,
+            organizations: my_orgs,
+        },
+    }))
 }

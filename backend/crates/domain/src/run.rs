@@ -4,7 +4,8 @@ use uuid::Uuid;
 
 use crate::ValidationError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum RunStatus {
     Queued,
@@ -39,7 +40,8 @@ impl RunStatus {
 }
 
 /// A batch of provider calls executed by a background job.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS)]
+#[ts(export)]
 pub struct Run {
     pub id: Uuid,
     /// Tenant. Every tenant-owned record carries it; queries are always scoped by it.
@@ -53,13 +55,16 @@ pub struct Run {
     pub failed: i32,
     pub status: RunStatus,
     #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub updated_at: OffsetDateTime,
 }
 
 /// Validated input for creating a run.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS)]
+#[ts(export)]
 pub struct NewRun {
     pub label: String,
     pub provider: String,

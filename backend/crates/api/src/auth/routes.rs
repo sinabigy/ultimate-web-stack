@@ -22,7 +22,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use time::OffsetDateTime;
 
@@ -263,11 +263,6 @@ pub async fn callback(
     }
 }
 
-#[derive(Serialize)]
-pub struct LogoutResponse {
-    redirect: String,
-}
-
 /// End this session. Returns where the browser should go next (the IdP end-session endpoint
 /// when available, so the IdP session ends too).
 pub async fn logout(State(state): State<AppState>, UserAuth(u): UserAuth, meta: ReqMeta) -> Result<Response, ApiError> {
@@ -288,30 +283,17 @@ pub async fn logout(State(state): State<AppState>, UserAuth(u): UserAuth, meta: 
     .api()?;
     tx.commit().await.api()?;
     let redirect = svc.oidc.logout_url(id_token.as_deref()).await.unwrap_or_else(|| "/login".into());
-    let mut res = Json(LogoutResponse { redirect }).into_response();
+    let mut res = Json(crate::dto::LogoutResponse { redirect }).into_response();
     if let Ok(c) = cookies::clear_session_cookie(&state.config.auth) {
         res.headers_mut().append(header::SET_COOKIE, c);
     }
     Ok(res)
 }
 
-#[derive(Serialize)]
-pub struct LoginConfig {
-    provider: &'static str,
-    passkey: bool,
-    password: bool,
-    social: Vec<String>,
-    enterprise_sso: bool,
-    registration: bool,
-}
-
-pub fn login_config(state: &AppState) -> LoginConfig {
+pub fn login_config(state: &AppState) -> crate::dto::LoginConfig {
     let a = &state.config.auth;
-    LoginConfig {
-        provider: match a.provider {
-            app_config::IdentityProviderKind::Zitadel => "zitadel",
-            app_config::IdentityProviderKind::Oidc => "oidc",
-        },
+    crate::dto::LoginConfig {
+        provider: crate::dto::enum_str(&a.provider),
         passkey: a.methods.passkey,
         password: a.methods.password,
         social: a.methods.social.keys().cloned().collect(),
@@ -322,32 +304,51 @@ pub fn login_config(state: &AppState) -> LoginConfig {
 
 /// Current session for the SPA. Always 200 so the login page can render its configuration.
 pub async fn session(State(state): State<AppState>, MaybeAuth(p): MaybeAuth) -> Result<Response, ApiError> {
-    let features = json!({
-        "organizations": state.config.tenancy.organizations,
-        "org_creation": state.config.tenancy.allow_org_creation,
-        "admin": state.config.admin.enabled,
-        "auth_profile": state.config.auth.profile,
-    });
+    use crate::dto::{Features, SessionMeta, SessionResponse, SessionUser};
+    let features = Features {
+        organizations: state.config.tenancy.organizations,
+        org_creation: state.config.tenancy.allow_org_creation,
+        admin: state.config.admin.enabled,
+        auth_profile: crate::dto::enum_str(&state.config.auth.profile),
+    };
     let login = login_config(&state);
     let Some(Principal::User(u)) = p else {
-        return Ok(Json(json!({"authenticated": false, "features": features, "login": login})).into_response());
+        return Ok(Json(SessionResponse {
+            authenticated: false,
+            csrf_token: None,
+            user: None,
+            session: None,
+            organizations: Vec::new(),
+            unread_notifications: 0,
+            features,
+            login,
+        })
+        .into_response());
     };
     let svc = state.svc()?;
-    let orgs = orgs::list_for_user(&svc.db, u.user_id).await.api()?;
+    let organizations = orgs::list_for_user(&svc.db, u.user_id).await.api()?;
     let unread = app_db::notifications::unread_count(&svc.db, u.user_id).await.api()?;
-    let mut res = Json(json!({
-        "authenticated": true,
-        "csrf_token": u.csrf_token,
-        "user": {
-            "id": u.user_id, "email": u.email, "email_verified": u.email_verified,
-            "display_name": u.display_name, "system_role": u.system_role,
-        },
-        "session": {"id": u.session_id, "mfa": u.mfa, "amr": u.amr, "auth_time": u.auth_time.unix_timestamp()},
-        "organizations": orgs,
-        "unread_notifications": unread,
-        "features": features,
-        "login": login,
-    }))
+    let mut res = Json(SessionResponse {
+        authenticated: true,
+        csrf_token: Some(u.csrf_token.clone()),
+        user: Some(SessionUser {
+            id: u.user_id,
+            email: u.email.clone(),
+            email_verified: u.email_verified,
+            display_name: u.display_name.clone(),
+            system_role: u.system_role,
+        }),
+        session: Some(SessionMeta {
+            id: u.session_id,
+            mfa: u.mfa,
+            amr: u.amr.clone(),
+            auth_time: u.auth_time.unix_timestamp(),
+        }),
+        organizations,
+        unread_notifications: unread,
+        features,
+        login,
+    })
     .into_response();
     res.headers_mut().insert(header::CACHE_CONTROL, axum::http::HeaderValue::from_static("no-store"));
     Ok(res)

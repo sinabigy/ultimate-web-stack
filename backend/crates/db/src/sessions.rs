@@ -169,11 +169,18 @@ pub async fn revoke_all(db: impl PgExecutor<'_>, user_id: Uuid, except: Option<U
     .rows_affected())
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct SessionSummary {
     pub id: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub last_seen_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub expires_at: OffsetDateTime,
     pub ip: Option<String>,
     pub user_agent: Option<String>,

@@ -22,6 +22,7 @@ use crate::{
         Principal, ReqMeta,
         extract::{Org, UserAuth},
     },
+    dto,
     errors::ResultExt,
     state::AppState,
 };
@@ -64,8 +65,11 @@ async fn require(state: &AppState, o: &Org, meta: &ReqMeta, p: P, resource: &Res
 
 // ------------------------------------------------------------------ organisations
 
-pub async fn list_mine(State(state): State<AppState>, UserAuth(u): UserAuth) -> Result<Json<Value>, ApiError> {
-    Ok(Json(json!({"items": orgs::list_for_user(&state.svc()?.db, u.user_id).await.api()?})))
+pub async fn list_mine(
+    State(state): State<AppState>,
+    UserAuth(u): UserAuth,
+) -> Result<Json<dto::ListResponse<orgs::MyOrg>>, ApiError> {
+    Ok(Json(dto::ListResponse::new(orgs::list_for_user(&state.svc()?.db, u.user_id).await.api()?)))
 }
 
 #[derive(Deserialize)]
@@ -79,7 +83,7 @@ pub async fn create(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Json(b): Json<CreateOrg>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<orgs::OrgRow>), ApiError> {
     if !state.config.tenancy.organizations || !state.config.tenancy.allow_org_creation {
         return Err(ApiError::ForbiddenReason("org_creation_disabled"));
     }
@@ -95,15 +99,19 @@ pub async fn create(
         .target("organization", org.id);
     app_db::audit::insert(&mut *tx, &e).await.api()?;
     tx.commit().await.api()?;
-    Ok((StatusCode::CREATED, Json(json!(org))))
+    Ok((StatusCode::CREATED, Json(org)))
 }
 
-pub async fn get(o: Org) -> Json<Value> {
-    Json(json!({
-        "organization": o.org,
-        "role": o.access.role().map(|r| r.key.clone()),
-        "permissions": o.access.permissions(),
-    }))
+fn perm_keys(o: &Org) -> Vec<String> {
+    o.access.permissions().keys().into_iter().map(String::from).collect()
+}
+
+pub async fn get(o: Org) -> Json<dto::OrgDetail> {
+    Json(dto::OrgDetail {
+        role: o.access.role().map(|r| r.key.clone()),
+        permissions: perm_keys(&o),
+        organization: o.org,
+    })
 }
 
 #[derive(Deserialize)]
@@ -117,7 +125,7 @@ pub async fn update(
     o: Org,
     meta: ReqMeta,
     Json(b): Json<UpdateOrg>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<orgs::OrgRow>, ApiError> {
     if b.name.is_some() {
         require(&state, &o, &meta, P::OrgUpdate, &Resource::Organization).await?;
     }
@@ -139,7 +147,7 @@ pub async fn update(
         .meta(json!({"name": b.name.is_some(), "settings": b.settings.is_some()}));
     app_db::audit::insert(&mut *tx, &e).await.api()?;
     tx.commit().await.api()?;
-    Ok(Json(json!(row)))
+    Ok(Json(row))
 }
 
 pub async fn delete(State(state): State<AppState>, o: Org, meta: ReqMeta) -> Result<StatusCode, ApiError> {
@@ -173,43 +181,44 @@ pub async fn overview(
     State(state): State<AppState>,
     o: Org,
     Query(q): Query<DaysQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::OrgOverview>, ApiError> {
     o.access.require(P::OrgRead).api()?;
     let svc = state.svc()?;
     let days = q.days.unwrap_or(14).clamp(1, 90);
     let since = OffsetDateTime::now_utc() - time::Duration::days(i64::from(days));
-    let mut widgets = serde_json::Map::new();
+    let mut widgets = dto::OrgWidgets::default();
     if o.access.can(P::RunsRead) {
-        widgets.insert("runs".into(), json!(runs::stats(&svc.db, &o.access, since).await.api()?));
-        let series: Vec<Value> = runs::daily_counts(&svc.db, &o.access, days)
-            .await
-            .api()?
-            .into_iter()
-            .map(|(d, ok, err)| json!({"date": d.to_string(), "succeeded": ok, "failed": err}))
-            .collect();
-        widgets.insert("usage".into(), json!(series));
+        widgets.runs = Some(runs::stats(&svc.db, &o.access, since).await.api()?);
+        widgets.usage = Some(
+            runs::daily_counts(&svc.db, &o.access, days)
+                .await
+                .api()?
+                .into_iter()
+                .map(|(d, ok, err)| dto::UsagePoint { date: d.to_string(), succeeded: ok, failed: err })
+                .collect(),
+        );
     }
     if o.access.can(P::MembersRead) {
-        widgets.insert("members".into(), json!(orgs::list_members(&svc.db, &o.access).await.api()?.len()));
+        widgets.members = Some(orgs::list_members(&svc.db, &o.access).await.api()?.len());
     }
     if o.access.can(P::MembersInvite) {
-        widgets.insert(
-            "pending_invitations".into(),
-            json!(orgs::list_pending_invitations(&svc.db, &o.access).await.api()?.len()),
-        );
+        widgets.pending_invitations = Some(orgs::list_pending_invitations(&svc.db, &o.access).await.api()?.len());
     }
     if o.access.can(P::AuditRead) {
         let page = app_db::audit::list(&svc.db, Some(o.access.org_id()), &Default::default(), None, 10).await.api()?;
-        widgets.insert("recent_audit".into(), json!(page.items));
+        widgets.recent_audit = Some(page.items);
     }
-    Ok(Json(json!({"organization": o.org, "permissions": o.access.permissions(), "widgets": widgets, "days": days})))
+    Ok(Json(dto::OrgOverview { permissions: perm_keys(&o), organization: o.org, widgets, days }))
 }
 
 // ------------------------------------------------------------------ members
 
-pub async fn list_members(State(state): State<AppState>, o: Org) -> Result<Json<Value>, ApiError> {
+pub async fn list_members(
+    State(state): State<AppState>,
+    o: Org,
+) -> Result<Json<dto::ListResponse<orgs::MemberRow>>, ApiError> {
     o.access.require(P::MembersRead).api()?;
-    Ok(Json(json!({"items": orgs::list_members(&state.svc()?.db, &o.access).await.api()?})))
+    Ok(Json(dto::ListResponse::new(orgs::list_members(&state.svc()?.db, &o.access).await.api()?)))
 }
 
 #[derive(Deserialize)]
@@ -304,9 +313,12 @@ pub async fn leave(State(state): State<AppState>, o: Org, meta: ReqMeta) -> Resu
 
 // ------------------------------------------------------------------ invitations
 
-pub async fn list_invitations(State(state): State<AppState>, o: Org) -> Result<Json<Value>, ApiError> {
+pub async fn list_invitations(
+    State(state): State<AppState>,
+    o: Org,
+) -> Result<Json<dto::ListResponse<orgs::InvitationRow>>, ApiError> {
     o.access.require(P::MembersInvite).api()?;
-    Ok(Json(json!({"items": orgs::list_pending_invitations(&state.svc()?.db, &o.access).await.api()?})))
+    Ok(Json(dto::ListResponse::new(orgs::list_pending_invitations(&state.svc()?.db, &o.access).await.api()?)))
 }
 
 #[derive(Deserialize)]
@@ -320,7 +332,7 @@ pub async fn invite(
     o: Org,
     meta: ReqMeta,
     Json(b): Json<Invite>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<dto::InviteCreated>), ApiError> {
     let Principal::User(u) = &o.principal else { return Err(ApiError::ForbiddenReason("user_session_required")) };
     if o.org.personal {
         return Err(ApiError::ForbiddenReason("personal_organization"));
@@ -352,7 +364,7 @@ pub async fn invite(
     // admin can share it manually when no mailer is configured.
     let link = format!("{}/invitations/{token}", state.config.auth.public_origin.trim_end_matches('/'));
     tracing::info!(invitation = %id, "invitation created (deliver the link via the configured mailer)");
-    Ok((StatusCode::CREATED, Json(json!({"id": id, "link": link, "expires_at": expires}))))
+    Ok((StatusCode::CREATED, Json(dto::InviteCreated { id, link, expires_at: dto::rfc3339(expires) })))
 }
 
 pub async fn revoke_invitation(
@@ -377,15 +389,17 @@ pub async fn invitation_preview(
     State(state): State<AppState>,
     UserAuth(_u): UserAuth,
     Path(token): Path<String>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::InvitationView>, ApiError> {
     if !tokens::plausible_token(&token) {
         return Err(ApiError::NotFound);
     }
     let inv = orgs::find_invitation(&state.svc()?.db, &tokens::token_hash(&token)).await.api()?;
-    Ok(Json(json!({
-        "organization": {"slug": inv.organization_slug, "name": inv.organization_name},
-        "role": inv.role_key, "email": inv.email, "expires_at": inv.expires_at,
-    })))
+    Ok(Json(dto::InvitationView {
+        organization: dto::OrgRef { slug: inv.organization_slug, name: inv.organization_name },
+        role: inv.role_key,
+        email: inv.email,
+        expires_at: dto::rfc3339(inv.expires_at),
+    }))
 }
 
 /// Accept: the signed-in user's *verified* email must equal the invited address, so a
@@ -395,7 +409,7 @@ pub async fn accept_invitation(
     UserAuth(u): UserAuth,
     meta: ReqMeta,
     Path(token): Path<String>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::InvitationAccepted>, ApiError> {
     if !tokens::plausible_token(&token) {
         return Err(ApiError::NotFound);
     }
@@ -428,16 +442,20 @@ pub async fn accept_invitation(
             .meta(json!({"role": inv.role_key, "via": "invitation"}));
     app_db::audit::insert(&mut *tx, &e).await.api()?;
     tx.commit().await.api()?;
-    Ok(Json(
-        json!({"organization": {"slug": inv.organization_slug, "name": inv.organization_name}, "role": inv.role_key}),
-    ))
+    Ok(Json(dto::InvitationAccepted {
+        organization: dto::OrgRef { slug: inv.organization_slug, name: inv.organization_name },
+        role: inv.role_key,
+    }))
 }
 
 // ------------------------------------------------------------------ teams
 
-pub async fn list_teams(State(state): State<AppState>, o: Org) -> Result<Json<Value>, ApiError> {
+pub async fn list_teams(
+    State(state): State<AppState>,
+    o: Org,
+) -> Result<Json<dto::ListResponse<orgs::TeamRow>>, ApiError> {
     o.access.require(P::TeamsRead).api()?;
-    Ok(Json(json!({"items": orgs::list_teams(&state.svc()?.db, &o.access).await.api()?})))
+    Ok(Json(dto::ListResponse::new(orgs::list_teams(&state.svc()?.db, &o.access).await.api()?)))
 }
 
 #[derive(Deserialize)]
@@ -452,7 +470,7 @@ pub async fn create_team(
     o: Org,
     meta: ReqMeta,
     Json(b): Json<CreateTeam>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<dto::Created>), ApiError> {
     o.access.require(P::TeamsManage).api()?;
     let name = validate_org_name(&b.name).map_err(|e| ApiError::validation("name", e.message))?;
     let svc = state.svc()?;
@@ -463,7 +481,7 @@ pub async fn create_team(
             .api()?;
     app_db::audit::insert(&mut *tx, &ev(&state, &o, &meta, "team.created").target("team", id)).await.api()?;
     tx.commit().await.api()?;
-    Ok((StatusCode::CREATED, Json(json!({"id": id}))))
+    Ok((StatusCode::CREATED, Json(dto::Created { id })))
 }
 
 pub async fn delete_team(
@@ -531,16 +549,19 @@ pub async fn list_team_members(
     State(state): State<AppState>,
     o: Org,
     Path((_s, team)): Path<(String, Uuid)>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<dto::ListResponse<Uuid>>, ApiError> {
     o.access.require(P::TeamsRead).api()?;
-    Ok(Json(json!({"items": orgs::list_team_members(&state.svc()?.db, &o.access, team).await.api()?})))
+    Ok(Json(dto::ListResponse::new(orgs::list_team_members(&state.svc()?.db, &o.access, team).await.api()?)))
 }
 
 // ------------------------------------------------------------------ roles
 
-pub async fn list_roles(State(state): State<AppState>, o: Org) -> Result<Json<Value>, ApiError> {
+pub async fn list_roles(
+    State(state): State<AppState>,
+    o: Org,
+) -> Result<Json<dto::ListResponse<orgs::RoleRow>>, ApiError> {
     o.access.require(P::RolesRead).api()?;
-    Ok(Json(json!({"items": orgs::list_roles(&state.svc()?.db, &o.access).await.api()?})))
+    Ok(Json(dto::ListResponse::new(orgs::list_roles(&state.svc()?.db, &o.access).await.api()?)))
 }
 
 #[derive(Deserialize)]
@@ -557,7 +578,7 @@ pub async fn create_role(
     o: Org,
     meta: ReqMeta,
     Json(b): Json<CreateRole>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<dto::Created>), ApiError> {
     require(&state, &o, &meta, P::RolesManage, &Resource::Organization).await?;
     let key = b.key.trim().to_ascii_lowercase();
     if key.is_empty()
@@ -588,7 +609,7 @@ pub async fn create_role(
     .await
     .api()?;
     tx.commit().await.api()?;
-    Ok((StatusCode::CREATED, Json(json!({"id": id}))))
+    Ok((StatusCode::CREATED, Json(dto::Created { id })))
 }
 
 pub async fn delete_role(
@@ -606,15 +627,18 @@ pub async fn delete_role(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn permission_catalog() -> Json<Value> {
-    let items: Vec<Value> = P::ALL
-        .iter()
-        .map(|p| {
-            json!({"key": p.key(), "description": p.description(),
-                   "owner_only": P::owner_only().contains(*p), "credential_assignable": P::assignable_to_credentials().contains(*p)})
-        })
-        .collect();
-    Json(json!({"items": items}))
+pub async fn permission_catalog() -> Json<dto::ListResponse<dto::PermissionInfo>> {
+    Json(dto::ListResponse::new(
+        P::ALL
+            .iter()
+            .map(|p| dto::PermissionInfo {
+                key: p.key().into(),
+                description: p.description().into(),
+                owner_only: P::owner_only().contains(*p),
+                credential_assignable: P::assignable_to_credentials().contains(*p),
+            })
+            .collect(),
+    ))
 }
 
 // ------------------------------------------------------------------ audit
@@ -656,17 +680,20 @@ pub async fn audit_log(
     o: Org,
     meta: ReqMeta,
     Query(q): Query<AuditQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<app_db::pagination::Page<app_db::audit::AuditRow>>, ApiError> {
     require(&state, &o, &meta, P::AuditRead, &Resource::Organization).await?;
     let (filter, cursor, limit) = q.filter()?;
-    Ok(Json(json!(app_db::audit::list(&state.svc()?.db, Some(o.access.org_id()), &filter, cursor, limit).await.api()?)))
+    Ok(Json(app_db::audit::list(&state.svc()?.db, Some(o.access.org_id()), &filter, cursor, limit).await.api()?))
 }
 
 // ------------------------------------------------------------------ API keys & service clients
 
-pub async fn list_api_keys(State(state): State<AppState>, o: Org) -> Result<Json<Value>, ApiError> {
+pub async fn list_api_keys(
+    State(state): State<AppState>,
+    o: Org,
+) -> Result<Json<dto::ListResponse<app_db::api_keys::ApiKeyRow>>, ApiError> {
     o.access.require(P::ApiKeysRead).api()?;
-    Ok(Json(json!({"items": app_db::api_keys::list(&state.svc()?.db, &o.access).await.api()?})))
+    Ok(Json(dto::ListResponse::new(app_db::api_keys::list(&state.svc()?.db, &o.access).await.api()?)))
 }
 
 #[derive(Deserialize)]
@@ -683,7 +710,7 @@ pub async fn create_api_key(
     o: Org,
     meta: ReqMeta,
     Json(b): Json<CreateKey>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<dto::ApiKeyCreated>), ApiError> {
     let Principal::User(u) = &o.principal else { return Err(ApiError::ForbiddenReason("user_session_required")) };
     let scopes = PermissionSet::parse_keys(b.scopes.iter().map(String::as_str))
         .map_err(|e| ApiError::validation("scopes", e))?;
@@ -721,7 +748,12 @@ pub async fn create_api_key(
     // The plaintext key is returned exactly once and never stored.
     Ok((
         StatusCode::CREATED,
-        Json(json!({"id": id, "key": generated.plaintext, "key_id": generated.key_id, "expires_at": expires})),
+        Json(dto::ApiKeyCreated {
+            id,
+            key: generated.plaintext,
+            key_id: generated.key_id,
+            expires_at: expires.map(dto::rfc3339),
+        }),
     ))
 }
 
@@ -747,7 +779,7 @@ pub async fn rotate_api_key(
     o: Org,
     meta: ReqMeta,
     Path((_s, id)): Path<(String, Uuid)>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<dto::ApiKeyRotated>), ApiError> {
     let Principal::User(u) = &o.principal else { return Err(ApiError::ForbiddenReason("user_session_required")) };
     let svc = state.svc()?;
     let old = app_db::api_keys::get(&svc.db, &o.access, id).await.api()?;
@@ -784,7 +816,11 @@ pub async fn rotate_api_key(
     tx.commit().await.api()?;
     Ok((
         StatusCode::CREATED,
-        Json(json!({"id": new_id, "key": generated.plaintext, "old_key_expires_at": overlap_until})),
+        Json(dto::ApiKeyRotated {
+            id: new_id,
+            key: generated.plaintext,
+            old_key_expires_at: dto::rfc3339(overlap_until),
+        }),
     ))
 }
 
@@ -800,7 +836,7 @@ pub async fn register_service_client(
     o: Org,
     meta: ReqMeta,
     Json(b): Json<RegisterService>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<dto::Created>), ApiError> {
     let Principal::User(u) = &o.principal else { return Err(ApiError::ForbiddenReason("user_session_required")) };
     let scopes = PermissionSet::parse_keys(b.scopes.iter().map(String::as_str))
         .map_err(|e| ApiError::validation("scopes", e))?;
@@ -822,19 +858,23 @@ pub async fn register_service_client(
     .await
     .api()?;
     tx.commit().await.api()?;
-    Ok((StatusCode::CREATED, Json(json!({"id": id}))))
+    Ok((StatusCode::CREATED, Json(dto::Created { id })))
 }
 
 // ------------------------------------------------------------------ billing hook
 
-pub async fn billing(State(state): State<AppState>, o: Org, meta: ReqMeta) -> Result<Json<Value>, ApiError> {
+pub async fn billing(
+    State(state): State<AppState>,
+    o: Org,
+    meta: ReqMeta,
+) -> Result<Json<dto::BillingResponse>, ApiError> {
     require(&state, &o, &meta, P::BillingRead, &Resource::Organization).await?;
-    Ok(Json(json!({
-        "plan": o.org.billing_plan,
-        "customer_ref": o.org.billing_customer_ref.is_some(),
-        "provider": null,
-        "note": "Billing is a hook: connect a provider (e.g. Stripe) by implementing the billing adapter; see docs/multitenancy/billing.md",
-    })))
+    Ok(Json(dto::BillingResponse {
+        plan: o.org.billing_plan.clone(),
+        has_customer: o.org.billing_customer_ref.is_some(),
+        provider: None,
+        note: "Billing is a hook: connect a provider (e.g. Stripe) by implementing the billing adapter; see docs/multitenancy/billing.md".into(),
+    }))
 }
 
 // ------------------------------------------------------------------ runs (example domain)
@@ -850,7 +890,7 @@ pub async fn list_runs(
     State(state): State<AppState>,
     o: Org,
     Query(q): Query<RunsQuery>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<app_db::pagination::Page<app_domain::Run>>, ApiError> {
     o.access.require(P::RunsRead).api()?;
     let cursor = match &q.cursor {
         Some(c) => Some(Cursor::decode(c).ok_or(ApiError::BadRequest("invalid cursor".into()))?),
@@ -861,7 +901,7 @@ pub async fn list_runs(
         runs::list(&state.svc()?.db, &o.access, status, cursor, app_db::pagination::clamp_limit(q.limit, 25, 100))
             .await
             .api()?;
-    Ok(Json(json!(page)))
+    Ok(Json(page))
 }
 
 pub async fn create_run(
@@ -869,7 +909,7 @@ pub async fn create_run(
     o: Org,
     meta: ReqMeta,
     Json(b): Json<NewRun>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+) -> Result<(StatusCode, Json<app_domain::Run>), ApiError> {
     o.access.require(P::RunsCreate).api()?;
     let new = b.validate().map_err(|errs| {
         ApiError::Validation(
@@ -910,16 +950,16 @@ pub async fn create_run(
             requested: run.requested,
         })
         .await;
-    Ok((StatusCode::CREATED, Json(json!(run))))
+    Ok((StatusCode::CREATED, Json(run)))
 }
 
 pub async fn get_run(
     State(state): State<AppState>,
     o: Org,
     Path((_s, id)): Path<(String, Uuid)>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<app_domain::Run>, ApiError> {
     o.access.require(P::RunsRead).api()?;
-    Ok(Json(json!(runs::get(&state.svc()?.db, &o.access, id).await.api()?)))
+    Ok(Json(runs::get(&state.svc()?.db, &o.access, id).await.api()?))
 }
 
 pub async fn delete_run(

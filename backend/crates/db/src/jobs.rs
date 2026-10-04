@@ -14,7 +14,8 @@ use uuid::Uuid;
 
 use crate::{DbError, DbResult};
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct JobRow {
     pub id: Uuid,
     pub queue: String,
@@ -24,11 +25,17 @@ pub struct JobRow {
     pub priority: i16,
     pub attempts: i32,
     pub max_attempts: i32,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub run_at: OffsetDateTime,
     pub last_error: Option<String>,
     pub organization_id: Option<Uuid>,
     pub trace_context: Option<serde_json::Value>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub finished_at: Option<OffsetDateTime>,
 }
 
@@ -166,12 +173,17 @@ pub async fn reap_expired(db: impl PgExecutor<'_>) -> DbResult<u64> {
     .rows_affected())
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct QueueStats {
     pub queue: String,
+    #[ts(type = "number")]
     pub queued: i64,
+    #[ts(type = "number")]
     pub running: i64,
+    #[ts(type = "number")]
     pub dead: i64,
+    #[ts(type = "number")]
     pub succeeded_24h: i64,
     pub oldest_queued_secs: Option<f64>,
 }

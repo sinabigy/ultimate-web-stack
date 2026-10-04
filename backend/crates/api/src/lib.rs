@@ -9,6 +9,7 @@
 pub mod audit;
 pub mod auth;
 pub mod bootstrap;
+pub mod dto;
 pub mod errors;
 pub mod health;
 pub mod middleware;

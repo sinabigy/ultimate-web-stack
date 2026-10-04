@@ -5,7 +5,8 @@ use uuid::Uuid;
 use crate::ValidationError;
 
 /// URL-safe organisation identifier: lowercase letters, digits and single hyphens, 3-48 chars.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, type = "string")]
 #[serde(try_from = "String", into = "String")]
 pub struct Slug(String);
 
@@ -80,7 +81,8 @@ pub fn validate_org_name(raw: &str) -> Result<String, ValidationError> {
     Ok(s.to_string())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS)]
+#[ts(export)]
 pub struct Organization {
     pub id: Uuid,
     pub slug: Slug,
@@ -88,6 +90,7 @@ pub struct Organization {
     /// Personal organisations are created automatically for every user and have one member.
     pub personal: bool,
     #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
 }
 

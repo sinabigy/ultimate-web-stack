@@ -11,7 +11,8 @@ use crate::ValidationError;
 
 /// Organisation-level role. Ordered by privilege: owner ⊇ admin ⊇ manager ⊇ member ⊇ viewer.
 /// The permissions each role grants are defined in `app-authz`, not here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "lowercase")]
 pub enum OrgRole {
     Viewer,
@@ -41,7 +42,8 @@ impl OrgRole {
 
 /// System (platform operator) trust level. **Independent** of organisation roles: an
 /// organisation owner or admin is `SystemRole::None` unless separately granted.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum SystemRole {
     #[default]
@@ -71,7 +73,8 @@ impl SystemRole {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "lowercase")]
 pub enum UserStatus {
     Active,
@@ -100,7 +103,8 @@ impl UserStatus {
 
 /// A syntactically plausible, normalised (trimmed, lower-cased) email address.
 /// The identity provider verifies ownership; this type only rejects garbage input.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, type = "string")]
 #[serde(try_from = "String", into = "String")]
 pub struct Email(String);
 
@@ -156,7 +160,8 @@ pub fn validate_display_name(raw: &str) -> Result<String, ValidationError> {
     Ok(s.to_string())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS)]
+#[ts(export)]
 pub struct User {
     pub id: Uuid,
     /// Cached from the identity provider on each login; the IdP is the source of truth.
@@ -166,6 +171,7 @@ pub struct User {
     pub status: UserStatus,
     pub system_role: SystemRole,
     #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
 }
 

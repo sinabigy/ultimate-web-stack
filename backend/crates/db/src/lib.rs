@@ -66,7 +66,8 @@ pub async fn ping(pool: &PgPool) -> DbResult<()> {
 }
 
 /// Pool saturation snapshot for metrics and `/admin/system`.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct PoolStats {
     pub size: u32,
     pub idle: usize,

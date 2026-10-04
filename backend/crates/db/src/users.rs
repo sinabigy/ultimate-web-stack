@@ -7,7 +7,8 @@ use uuid::Uuid;
 
 use crate::{DbError, DbResult};
 
-#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize)]
+#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct UserRow {
     pub id: Uuid,
     pub identity_provider: String,
@@ -19,8 +20,14 @@ pub struct UserRow {
     pub preferences: serde_json::Value,
     pub status: String,
     pub system_role: String,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub last_login_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub updated_at: OffsetDateTime,
 }
 
@@ -145,7 +152,8 @@ pub async fn update_preferences(db: impl PgExecutor<'_>, id: Uuid, prefs: &serde
     if r.rows_affected() == 0 { Err(DbError::NotFound) } else { Ok(()) }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct AdminUserRow {
     pub id: Uuid,
     pub email: String,
@@ -153,8 +161,13 @@ pub struct AdminUserRow {
     pub status: String,
     pub system_role: String,
     pub email_verified: bool,
+    #[ts(type = "number")]
     pub org_count: i64,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub last_login_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
 }
 
@@ -243,13 +256,20 @@ pub async fn mark_deleted(conn: &mut PgConnection, id: Uuid) -> DbResult<()> {
     if r.rows_affected() == 0 { Err(DbError::NotFound) } else { Ok(()) }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct SystemCounts {
+    #[ts(type = "number")]
     pub users: i64,
+    #[ts(type = "number")]
     pub active_users_7d: i64,
+    #[ts(type = "number")]
     pub organizations: i64,
+    #[ts(type = "number")]
     pub active_sessions: i64,
+    #[ts(type = "number")]
     pub denied_24h: i64,
+    #[ts(type = "number")]
     pub system_admins: i64,
 }
 

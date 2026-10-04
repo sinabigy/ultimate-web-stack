@@ -11,7 +11,8 @@ use uuid::Uuid;
 
 use crate::{DbError, DbResult};
 
-#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize)]
+#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct OrgRow {
     pub id: Uuid,
     pub slug: String,
@@ -20,8 +21,14 @@ pub struct OrgRow {
     pub settings: serde_json::Value,
     pub billing_plan: String,
     pub billing_customer_ref: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub updated_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub deleted_at: Option<OffsetDateTime>,
 }
 
@@ -193,13 +200,15 @@ pub async fn facts_for_credential(
     })
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct MyOrg {
     pub id: Uuid,
     pub slug: String,
     pub name: String,
     pub personal: bool,
     pub role: String,
+    #[ts(type = "number")]
     pub member_count: i64,
 }
 
@@ -252,7 +261,8 @@ pub async fn soft_delete(db: impl PgExecutor<'_>, access: &OrgAccess) -> DbResul
 
 // ------------------------------------------------------------------ members
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct MemberRow {
     pub user_id: Uuid,
     pub email: String,
@@ -260,7 +270,11 @@ pub struct MemberRow {
     pub role_id: Uuid,
     pub role_key: String,
     pub role_name: String,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub joined_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub last_login_at: Option<OffsetDateTime>,
 }
 
@@ -354,7 +368,8 @@ pub async fn sole_owner_orgs(db: impl PgExecutor<'_>, user_id: Uuid) -> DbResult
 
 // ------------------------------------------------------------------ roles
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct RoleRow {
     pub id: Uuid,
     pub key: String,
@@ -362,6 +377,7 @@ pub struct RoleRow {
     pub description: String,
     pub builtin: bool,
     pub permissions: Vec<String>,
+    #[ts(type = "number")]
     pub member_count: i64,
 }
 
@@ -467,12 +483,16 @@ pub async fn sync_permissions(db: impl PgExecutor<'_>) -> DbResult<()> {
 
 // ------------------------------------------------------------------ teams
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct TeamRow {
     pub id: Uuid,
     pub name: String,
     pub description: String,
+    #[ts(type = "number")]
     pub member_count: i64,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
 }
 
@@ -559,14 +579,19 @@ pub async fn list_team_members(db: impl PgExecutor<'_>, access: &OrgAccess, team
 
 // ------------------------------------------------------------------ invitations
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct InvitationRow {
     pub id: Uuid,
     pub email: String,
     pub role_id: Uuid,
     pub role_key: String,
     pub invited_by: Option<Uuid>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub expires_at: OffsetDateTime,
 }
 
@@ -620,7 +645,8 @@ pub async fn revoke_invitation(db: impl PgExecutor<'_>, access: &OrgAccess, id: 
     if r.rows_affected() == 0 { Err(DbError::NotFound) } else { Ok(()) }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct InvitationPreview {
     pub id: Uuid,
     pub organization_id: Uuid,
@@ -629,6 +655,8 @@ pub struct InvitationPreview {
     pub email: String,
     pub role_id: Uuid,
     pub role_key: String,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub expires_at: OffsetDateTime,
 }
 
@@ -676,15 +704,21 @@ pub async fn accept_invitation(conn: &mut PgConnection, invitation_id: Uuid, use
 
 // ------------------------------------------------------------------ system admin
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct AdminOrgRow {
     pub id: Uuid,
     pub slug: String,
     pub name: String,
     pub personal: bool,
     pub billing_plan: String,
+    #[ts(type = "number")]
     pub member_count: i64,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub deleted_at: Option<OffsetDateTime>,
 }
 

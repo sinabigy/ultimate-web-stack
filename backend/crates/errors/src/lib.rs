@@ -16,7 +16,8 @@ use axum::{
 use serde::Serialize;
 
 /// Field-level validation problem.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, ts_rs::TS)]
+#[ts(export)]
 pub struct FieldError {
     pub field: String,
     pub message: String,
@@ -112,14 +113,17 @@ impl ApiError {
 }
 
 /// RFC 9457 problem document.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct Problem {
     #[serde(rename = "type")]
     pub kind: String,
     pub title: String,
     pub status: u16,
+    #[ts(type = "string")]
     pub code: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub detail: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<FieldError>,

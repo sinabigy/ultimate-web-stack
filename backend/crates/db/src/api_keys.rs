@@ -71,16 +71,25 @@ pub async fn insert(db: impl PgExecutor<'_>, access: &OrgAccess, k: &NewApiKey<'
     Ok(id)
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
 pub struct ApiKeyRow {
     pub id: Uuid,
     pub key_id: String,
     pub name: String,
     pub scopes: Vec<String>,
     pub created_by: Option<Uuid>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[ts(type = "string")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub expires_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub last_used_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[ts(type = "string | null")]
     pub revoked_at: Option<OffsetDateTime>,
 }
 
