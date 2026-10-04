@@ -186,4 +186,53 @@ mod tests {
         assert!(w > Duration::from_millis(1900));
         assert!(r.reserve(1.0, Instant::now() + Duration::from_millis(500)).is_err());
     }
+
+    proptest::proptest! {
+        /// GCRA conformance: for any rate, burst and sequence of reservations, any two granted
+        /// slots i < j satisfy (j − i + 1) ≤ burst + rate × (t_j − t_i).
+        #[test]
+        fn granted_slots_conform_to_rate_and_burst(rate in 1.0f64..2000.0, burst in 1u32..50, n in 1usize..250) {
+            let r = RateLimiter::new(rate, f64::from(burst));
+            let far = Instant::now() + Duration::from_secs(3600);
+            let mut slots = Vec::with_capacity(n);
+            for _ in 0..n {
+                let now = Instant::now();
+                let wait = r.reserve(1.0, far).unwrap();
+                slots.push(now + wait);
+            }
+            slots.sort();
+            for i in 0..slots.len() {
+                for j in (i + 1)..slots.len() {
+                    let span = (slots[j] - slots[i]).as_secs_f64();
+                    // j − i + 1 grants in a closed span: at most burst + rate × span (exact GCRA
+                    // bound). The test reads the clock just before the limiter does, so spans may
+                    // measure up to a few µs short: allow 50 µs (an off-by-one is a whole extra
+                    // grant, i.e. ≥ 500 µs at the highest tested rate).
+                    let allowed = f64::from(burst) + rate * (span + 50e-6) + 1e-9;
+                    proptest::prop_assert!(((j - i + 1) as f64) <= allowed,
+                        "{} grants in {:.6}s at {}/s burst {}", j - i, span, rate, burst);
+                }
+            }
+        }
+
+        /// Raising or lowering the rate never produces a slot earlier than "now" and keeps
+        /// subsequent grants conformant to the new rate.
+        #[test]
+        fn rate_changes_keep_conformance(r1 in 5.0f64..500.0, r2 in 5.0f64..500.0, n in 2usize..120) {
+            let r = RateLimiter::new(r1, 1.0);
+            let far = Instant::now() + Duration::from_secs(3600);
+            for _ in 0..n { r.reserve(1.0, far).unwrap(); }
+            r.set_rate(r2, 1.0);
+            let mut slots = Vec::new();
+            for _ in 0..n {
+                let now = Instant::now();
+                let w = r.reserve(1.0, far).unwrap();
+                slots.push(now + w);
+            }
+            for k in 1..slots.len() {
+                let gap = (slots[k] - slots[k - 1]).as_secs_f64();
+                proptest::prop_assert!(gap + 1e-6 >= 1.0 / r2 - 1e-3, "gap {gap} < 1/{r2}");
+            }
+        }
+    }
 }

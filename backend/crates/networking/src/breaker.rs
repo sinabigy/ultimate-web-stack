@@ -262,4 +262,34 @@ mod tests {
         }
         assert_eq!(b.state(), CircuitState::Closed, "3 failures < min_requests");
     }
+
+    proptest::proptest! {
+        /// Below `min_requests` outcomes the circuit never opens, whatever they are.
+        #[test]
+        fn never_opens_below_minimum_volume(outcomes in proptest::collection::vec(0u8..3, 0..19)) {
+            let b = CircuitBreaker::new(BreakerConfig { min_requests: 20, soft_min_span: Duration::ZERO, ..Default::default() });
+            for o in outcomes {
+                b.record(match o { 0 => Health::Success, 1 => Health::Soft, _ => Health::Hard });
+            }
+            proptest::prop_assert_eq!(b.state(), CircuitState::Closed);
+        }
+
+        /// A provider that only succeeds never trips the breaker, at any volume.
+        #[test]
+        fn successes_never_open(n in 0usize..2000) {
+            let b = CircuitBreaker::new(BreakerConfig { min_requests: 1, soft_min_span: Duration::ZERO, ..Default::default() });
+            for _ in 0..n { b.record(Health::Success); }
+            proptest::prop_assert_eq!(b.state(), CircuitState::Closed);
+        }
+
+        /// Hard failures below `failure_ratio` with healthy recent traffic keep it closed.
+        #[test]
+        fn minority_hard_failures_keep_it_closed(n in 40usize..400, every in 3usize..10) {
+            let b = CircuitBreaker::new(BreakerConfig { min_requests: 20, ..Default::default() });
+            for i in 0..n {
+                b.record(if i % every == 0 { Health::Hard } else { Health::Success });
+            }
+            proptest::prop_assert_eq!(b.state(), CircuitState::Closed);
+        }
+    }
 }
