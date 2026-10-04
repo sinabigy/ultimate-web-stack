@@ -38,6 +38,8 @@ pub struct JobServices {
     pub db: PgPool,
     pub events: Arc<dyn EventBus>,
     pub providers: ProviderRegistry,
+    /// Analytics events (ClickHouse when enabled; `NoopSink` otherwise). Never blocks.
+    pub analytics: Arc<dyn app_analytics::AnalyticsSink>,
 }
 
 pub struct JobContext<'a> {

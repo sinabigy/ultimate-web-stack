@@ -214,6 +214,19 @@
         "note": "NATS event bus fan-out and JetStream queue: dedup, exactly-once processing, retry/backoff, dead letters + replay, crash-on-last-attempt sweep, graceful drain, trace propagation. Needs ./dev up with NATS."
       },
       {
+        "id": "rust-test-clickhouse",
+        "stage": "integration",
+        "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics && cargo test -p app-api --test analytics",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1200,
+        "note": "ClickHouse schema (partitions, TTL, rollup), batched non-blocking sink, outage behaviour, tenant-scoped queries and the analytics endpoint. Needs ./dev up with ClickHouse."
+      },
+      {
         "id": "ts-bindings-fresh",
         "stage": "typecheck",
         "cmd": "cargo test --workspace export_bindings -q >/dev/null && git diff --quiet --exit-code -- ../frontend/src/api/generated && test -z \"$(git ls-files --others --exclude-standard ../frontend/src/api/generated)\"",
@@ -342,7 +355,8 @@
       "tenancy": "organizations-shared-schema",
       "jobs": "postgres-skip-locked-queue",
       "outbound": "adaptive-engine",
-      "observability": "otel-tracing-prometheus-loki-tempo"
+      "observability": "otel-tracing-prometheus-loki-tempo",
+      "analytics": "clickhouse"
     },
     "modules": {
       "identity": {
@@ -494,9 +508,17 @@
         ]
       },
       "analytics_clickhouse": {
-        "enabled": false,
+        "enabled": true,
         "adapter": "clickhouse",
-        "reason": "Planned (T-0010)."
+        "paths": [
+          "backend/crates/analytics",
+          "docs/architecture/analytics.md"
+        ],
+        "reason": "Event analytics: non-blocking batched ingestion, monthly partitions + TTL, daily rollup, tenant-scoped queries; PostgreSQL stays the system of record.",
+        "evidence": [
+          "backend/crates/analytics/tests/clickhouse.rs",
+          ".ai/knowledge/DECISIONS/0008-clickhouse-for-event-analytics.md"
+        ]
       },
       "gateway_pingora": {
         "enabled": false,
@@ -550,7 +572,9 @@
       "docs/architecture/outbound-engine.md",
       "benchmarks/README.md",
       "docs/operations/observability.md",
-      "docs/security/threat-model.md"
+      "docs/security/threat-model.md",
+      "docs/architecture/analytics.md",
+      "docs/architecture/messaging.md"
     ]
   }
 }

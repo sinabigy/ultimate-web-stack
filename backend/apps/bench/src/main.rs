@@ -261,6 +261,169 @@ async fn outage_open_loop(use_engine: bool) -> anyhow::Result<Value> {
     }))
 }
 
+fn lat_summary(mut v: Vec<f64>) -> Value {
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    json!({"p50_ms": pct(&v, 0.5), "p95_ms": pct(&v, 0.95), "max_ms": v.last().copied().unwrap_or(0.0), "runs": v.len()})
+}
+
+/// ClickHouse vs PostgreSQL for event analytics: ingest through the real batching sink, then the
+/// same aggregate queries over identical data (100 organisations, 60 days).
+async fn analytics_bench(smoke: bool) -> anyhow::Result<Value> {
+    let n: u64 = if smoke { 200_000 } else { 2_000_000 };
+    let orgs: Vec<uuid::Uuid> =
+        (0..100u128).map(|i| uuid::Uuid::from_u128(0xA000_0000_0000_7000_8000_0000_0000_0000 | i)).collect();
+    let runs = if smoke { 10 } else { 30 };
+    let ch_url = std::env::var("BENCH_CLICKHOUSE_URL").unwrap_or_else(|_| "http://127.0.0.1:58123".into());
+    let db_url = std::env::var("BENCH_DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://app:app-dev-only@localhost:55432/app_bench".into());
+    let mut out = serde_json::Map::new();
+    out.insert("events".into(), json!(n));
+    out.insert("organizations".into(), json!(orgs.len()));
+    out.insert("days".into(), json!(60));
+    let start = time::OffsetDateTime::now_utc() - time::Duration::days(60);
+    // Realistic entropy (random timestamps, values and 32-hex request ids, like real events);
+    // highly regular synthetic data would overstate columnar compression.
+    let splitmix = |mut z: u64| {
+        z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    };
+    let row = |i: u64| {
+        let (h1, h2) = (splitmix(i), splitmix(i ^ 0xDEAD_BEEF));
+        let mut e = app_analytics::EventRow::new(
+            if h1 % 4 == 0 { "run_finished" } else { "run_created" },
+            orgs[(h2 % 100) as usize],
+        );
+        e.ts = start + time::Duration::milliseconds((h1 % (60 * 86_400_000)) as i64);
+        e.value = (h2 % 1000) as f64;
+        e.request_id = format!("{h1:016x}{h2:016x}");
+        e
+    };
+
+    // ClickHouse
+    let admin = clickhouse::Client::default().with_url(&ch_url).with_user("app").with_password("app-dev-only");
+    let ch_db = format!("bench_{}", std::process::id());
+    match admin.query(&format!("CREATE DATABASE IF NOT EXISTS {ch_db}")).execute().await {
+        Err(e) => {
+            out.insert("clickhouse".into(), json!({"skipped": format!("ClickHouse not reachable at {ch_url}: {e}")}));
+        }
+        Ok(()) => {
+            let ch = admin.clone().with_database(&ch_db);
+            app_analytics::schema::migrate(&ch).await.map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            let sink = app_analytics::ClickHouseSink::start(
+                ch.clone(),
+                app_analytics::SinkConfig {
+                    batch_size: 100_000,
+                    flush_interval: Duration::from_secs(1),
+                    buffer_capacity: n as usize,
+                    insert_attempts: 3,
+                },
+            );
+            let t = Instant::now();
+            for i in 0..n {
+                app_analytics::AnalyticsSink::record(sink.as_ref(), row(i));
+            }
+            let record_s = t.elapsed().as_secs_f64();
+            sink.shutdown().await;
+            let ingest_s = t.elapsed().as_secs_f64();
+            let stored: u64 = ch.query("SELECT count() FROM events").fetch_one().await?;
+            let mut tenant = Vec::new();
+            let mut tenant_rollup = Vec::new();
+            for r in 0..runs {
+                let org = orgs[r % orgs.len()];
+                let t = Instant::now();
+                let _: Vec<(u16, u64, f64)> = ch
+                    .query("SELECT toDate(ts) AS d, count(), sum(value) FROM events WHERE organization_id = ? AND event = 'run_created' AND ts >= now() - INTERVAL 30 DAY GROUP BY d ORDER BY d")
+                    .bind(org)
+                    .fetch_all()
+                    .await?;
+                tenant.push(t.elapsed().as_secs_f64() * 1000.0);
+                let t = Instant::now();
+                let _: Vec<(u16, u64, f64)> = ch
+                    .query("SELECT day, sum(events), sum(value) FROM events_daily WHERE organization_id = ? AND event = 'run_created' AND day >= today() - 30 GROUP BY day ORDER BY day")
+                    .bind(org)
+                    .fetch_all()
+                    .await?;
+                tenant_rollup.push(t.elapsed().as_secs_f64() * 1000.0);
+            }
+            let mut global = Vec::new();
+            for _ in 0..runs.min(10) {
+                let t = Instant::now();
+                let _: Vec<(u16, String, u64)> = ch
+                    .query("SELECT toDate(ts) AS d, event, count() FROM events GROUP BY d, event ORDER BY d, event")
+                    .fetch_all()
+                    .await?;
+                global.push(t.elapsed().as_secs_f64() * 1000.0);
+            }
+            let bytes: u64 = ch
+                .query("SELECT sum(bytes_on_disk) FROM system.parts WHERE database = currentDatabase() AND table = 'events' AND active")
+                .fetch_one()
+                .await?;
+            out.insert("clickhouse".into(), json!({
+                "stored": stored, "record_s": record_s, "ingest_s": ingest_s, "ingest_rows_per_sec": n as f64 / ingest_s,
+                "tenant_30d_daily_raw": lat_summary(tenant), "tenant_30d_daily_rollup": lat_summary(tenant_rollup),
+                "all_tenants_daily_by_event": lat_summary(global), "events_bytes_on_disk": bytes,
+            }));
+            let _ = admin.query(&format!("DROP DATABASE IF EXISTS {ch_db}")).execute().await;
+        }
+    }
+
+    // PostgreSQL with the equivalent index (organization_id, event, ts)
+    let pg = sqlx::postgres::PgPoolOptions::new().max_connections(4).connect(&db_url).await?;
+    sqlx::query("DROP TABLE IF EXISTS bench_events").execute(&pg).await?;
+    sqlx::query("CREATE TABLE bench_events (ts timestamptz NOT NULL, event text NOT NULL, organization_id uuid NOT NULL, user_id uuid, request_id text NOT NULL DEFAULT '', properties jsonb NOT NULL DEFAULT '{}', value float8 NOT NULL)").execute(&pg).await?;
+    let t = Instant::now();
+    sqlx::query(
+        "INSERT INTO bench_events (ts, event, organization_id, request_id, value)
+         SELECT $1::timestamptz + make_interval(secs => random() * 60 * 86400),
+                CASE WHEN random() < 0.25 THEN 'run_finished' ELSE 'run_created' END,
+                ('a0000000-0000-7000-8000-0000000000' || lpad(to_hex((random() * 99.999)::int), 2, '0'))::uuid,
+                md5(g::text),
+                floor(random() * 1000)::float8
+         FROM generate_series(0, $2::bigint - 1) g",
+    )
+    .bind(start)
+    .bind(n as i64)
+    .execute(&pg)
+    .await?;
+    let load_s = t.elapsed().as_secs_f64();
+    let t = Instant::now();
+    sqlx::query("CREATE INDEX bench_events_org_event_ts ON bench_events (organization_id, event, ts)")
+        .execute(&pg)
+        .await?;
+    sqlx::query("ANALYZE bench_events").execute(&pg).await?;
+    let index_s = t.elapsed().as_secs_f64();
+    let mut tenant = Vec::new();
+    for r in 0..runs {
+        let org = orgs[r % orgs.len()];
+        let t = Instant::now();
+        sqlx::query("SELECT date_trunc('day', ts) AS d, count(*), sum(value) FROM bench_events WHERE organization_id = $1 AND event = 'run_created' AND ts >= now() - interval '30 days' GROUP BY d ORDER BY d")
+            .bind(org)
+            .fetch_all(&pg)
+            .await?;
+        tenant.push(t.elapsed().as_secs_f64() * 1000.0);
+    }
+    let mut global = Vec::new();
+    for _ in 0..runs.min(10) {
+        let t = Instant::now();
+        sqlx::query(
+            "SELECT date_trunc('day', ts) AS d, event, count(*) FROM bench_events GROUP BY d, event ORDER BY d, event",
+        )
+        .fetch_all(&pg)
+        .await?;
+        global.push(t.elapsed().as_secs_f64() * 1000.0);
+    }
+    let pg_bytes: i64 = sqlx::query_scalar("SELECT pg_total_relation_size('bench_events')").fetch_one(&pg).await?;
+    out.insert("postgres".into(), json!({
+        "bulk_load_s": load_s, "index_s": index_s, "load_rows_per_sec_set_based": n as f64 / load_s,
+        "tenant_30d_daily": lat_summary(tenant), "all_tenants_daily_by_event": lat_summary(global), "table_and_index_bytes": pg_bytes,
+        "note": "set-based INSERT ... SELECT (an upper bound for row-at-a-time application inserts)",
+    }));
+    sqlx::query("DROP TABLE bench_events").execute(&pg).await?;
+    Ok(Value::Object(out))
+}
+
 struct NoopJob(Arc<std::sync::atomic::AtomicU64>);
 
 #[async_trait::async_trait]
@@ -337,6 +500,7 @@ async fn queue_bench(smoke: bool) -> anyhow::Result<Value> {
             db: pool.clone(),
             events: Arc::new(app_messaging::LocalEventBus::default()),
             providers: app_networking::ProviderRegistry::default(),
+            analytics: Arc::new(app_analytics::NoopSink),
         };
         let mut cfg = app_workers::WorkerConfig::new("bench", consumers);
         cfg.poll_interval = Duration::from_millis(100);
@@ -664,6 +828,7 @@ async fn main() -> anyhow::Result<()> {
         Some("ensure-db") => ensure_db().await?,
         Some("span-cost") => span_cost(),
         Some("queue") => queue_bench(smoke).await?,
+        Some("analytics") => analytics_bench(smoke).await?,
         _ => anyhow::bail!("usage: app-bench outbound|db [--smoke]"),
     };
     println!("{}", serde_json::to_string_pretty(&v)?);

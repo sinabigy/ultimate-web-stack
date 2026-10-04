@@ -483,3 +483,24 @@ pub fn rfc3339(t: time::OffsetDateTime) -> String {
 pub fn enum_str<T: Serialize>(v: &T) -> String {
     serde_json::to_value(v).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default()
 }
+
+/// One day of an analytics series (from ClickHouse).
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct AnalyticsPoint {
+    /// `YYYY-MM-DD` (UTC).
+    pub day: String,
+    #[ts(type = "number")]
+    pub events: u64,
+    pub value: f64,
+}
+
+/// Run activity for one organisation: runs created (value = calls requested) and runs
+/// finished (value = calls succeeded) per day.
+#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct RunAnalytics {
+    pub days: u32,
+    pub created: Vec<AnalyticsPoint>,
+    pub finished: Vec<AnalyticsPoint>,
+}

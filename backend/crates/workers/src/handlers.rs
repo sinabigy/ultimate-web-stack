@@ -122,6 +122,12 @@ impl JobHandler for ExecuteRun {
         app_db::runs::job_finish(&svc.db, run.organization_id, run.id, status)
             .await
             .map_err(|e| JobError::Retryable(e.to_string()))?;
+        svc.analytics.record(
+            app_analytics::EventRow::new("run_finished", run.organization_id)
+                .user((run.owner_id != Uuid::nil()).then_some(run.owner_id))
+                .value(f64::from(ok))
+                .properties(&serde_json::json!({"status": status, "failed": failed, "requested": run.requested})),
+        );
         svc.events
             .publish(RealtimeEvent::RunFinished {
                 run_id: run.id,

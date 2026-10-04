@@ -61,6 +61,10 @@ pub struct AppInner {
     pub provider_health: Option<ProviderHealthFn>,
     /// Response/aggregate cache (in-memory by default; Redis/Dragonfly in the performance profile).
     pub cache: app_cache::CacheLayer,
+    /// Analytics events (never blocks; no-op when analytics is disabled).
+    pub analytics: Arc<dyn app_analytics::AnalyticsSink>,
+    /// Tenant-scoped analytics reads (ClickHouse), when enabled.
+    pub analytics_query: Option<Arc<app_analytics::AnalyticsQuery>>,
 }
 
 pub type ProviderHealthFn = Arc<dyn Fn(&str) -> Option<crate::dto::ProviderHealth> + Send + Sync>;
@@ -89,6 +93,8 @@ pub struct AppStateBuilder {
     services: Option<Arc<crate::services::Services>>,
     provider_health: Option<ProviderHealthFn>,
     cache: Option<app_cache::CacheLayer>,
+    analytics: Option<Arc<dyn app_analytics::AnalyticsSink>>,
+    analytics_query: Option<Arc<app_analytics::AnalyticsQuery>>,
 }
 
 impl AppState {
@@ -103,6 +109,8 @@ impl AppState {
             services: None,
             provider_health: None,
             cache: None,
+            analytics: None,
+            analytics_query: None,
         }
     }
 }
@@ -132,6 +140,14 @@ impl AppStateBuilder {
         self.cache = Some(c);
         self
     }
+    pub fn analytics(mut self, s: Arc<dyn app_analytics::AnalyticsSink>) -> Self {
+        self.analytics = Some(s);
+        self
+    }
+    pub fn analytics_query(mut self, q: Arc<app_analytics::AnalyticsQuery>) -> Self {
+        self.analytics_query = Some(q);
+        self
+    }
     pub fn provider_health(mut self, f: ProviderHealthFn) -> Self {
         self.provider_health = Some(f);
         self
@@ -156,6 +172,8 @@ impl AppStateBuilder {
             cache,
             services: self.services,
             provider_health: self.provider_health,
+            analytics: self.analytics.unwrap_or_else(|| Arc::new(app_analytics::NoopSink)),
+            analytics_query: self.analytics_query,
         }))
     }
 }

@@ -99,10 +99,17 @@ impl TestApp {
                 burst: cfg.rate_limit.burst,
             }))
         });
+        let analytics = if cfg.analytics.enabled { Some(app_analytics::start(&cfg.analytics).await) } else { None };
         let mut builder = AppState::builder(cfg, BuildInfo { name: "t", version: "0", git_sha: "t", profile: "debug" })
             .services(Arc::new(services));
         if let Some(l) = limiter {
             builder = builder.rate_limiter(l);
+        }
+        if let Some(a) = analytics {
+            builder = builder.analytics(a.sink.clone());
+            if let Some(q) = a.query.clone() {
+                builder = builder.analytics_query(q);
+            }
         }
         let state = builder.build();
         let router = app_api::build_router(state.clone());

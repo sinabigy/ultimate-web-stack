@@ -8,7 +8,11 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+app-analytics.workspace = true
 anyhow.workspace = true
+time.workspace = true
+uuid.workspace = true
+clickhouse.workspace = true
 app-workers.workspace = true
 app-messaging = { workspace = true, features = ["nats"] }
 async-nats.workspace = true

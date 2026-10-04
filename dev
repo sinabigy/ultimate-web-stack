@@ -169,6 +169,7 @@ def cmd_up(a) -> None:
         services += svcs
     observability = "prometheus" in services
     nats = "nats" in services
+    clickhouse = "clickhouse" in services
     if a.identity == "zitadel":
         profiles.append("identity")
         services.append("zitadel")
@@ -182,6 +183,10 @@ def cmd_up(a) -> None:
         return
     app_env = dict(ENV)
     app_env.update({"APP__DATABASE__URL": ENV["DATABASE_URL"], "APP__HTTP__BENCH_ENDPOINTS": "true"})
+    if clickhouse:
+        app_env.update({"APP__ANALYTICS__ENABLED": "true",
+                        "APP__ANALYTICS__CLICKHOUSE_URL": "http://127.0.0.1:" + os.environ.get("DEV_CLICKHOUSE_PORT", "58123"),
+                        "APP__ANALYTICS__PASSWORD": os.environ.get("APP__ANALYTICS__PASSWORD", "app-dev-only")})
     if nats:
         app_env.update({"APP__MESSAGING__ENABLED": "true",
                         "APP__MESSAGING__NATS_URL": "nats://127.0.0.1:" + os.environ.get("DEV_NATS_PORT", "54222")})

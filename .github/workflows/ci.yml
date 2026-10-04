@@ -37,6 +37,11 @@ jobs:
         image: docker.dragonflydb.io/dragonflydb/dragonfly:v2.0.0
         ports: ["56380:6379"]
         options: --ulimit memlock=-1 --health-cmd "redis-cli ping" --health-interval 2s --health-retries 30
+      clickhouse:
+        image: clickhouse/clickhouse-server:26.3.25.2
+        env: { CLICKHOUSE_DB: app, CLICKHOUSE_USER: app, CLICKHOUSE_PASSWORD: app-dev-only, CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1" }
+        ports: ["58123:8123"]
+        options: --ulimit nofile=262144:262144 --health-cmd "wget -qO- http://localhost:8123/ping" --health-interval 2s --health-retries 30
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }  # full history for the secret scan
@@ -63,7 +68,7 @@ jobs:
         run: >
           python3 tools/ai-validate --strict --keep-going --report ai-validate-backend.json
           --only rust-fmt --only rust-clippy --only sqlx-offline-fresh --only rust-audit --only rust-deny --only secret-scan --only config-check
-          --only rust-test --only rust-test-cedar --only rust-test-cache --only rust-test-nats --only ts-bindings-fresh
+          --only rust-test --only rust-test-cedar --only rust-test-cache --only rust-test-nats --only rust-test-clickhouse --only ts-bindings-fresh
       - if: always()
         uses: actions/upload-artifact@v4
         with: { name: ai-validate-backend, path: ai-validate-backend.json }

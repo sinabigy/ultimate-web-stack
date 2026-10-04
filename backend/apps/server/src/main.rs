@@ -125,6 +125,11 @@ async fn main() -> anyhow::Result<()> {
         .await
         .map_err(anyhow::Error::msg)
         .context("starting event bus")?;
+    let analytics = app_analytics::start(&config.analytics).await;
+    if let Some(q) = &analytics.query {
+        builder = builder.health_check(Arc::new(AnalyticsCheck(q.clone()))).analytics_query(q.clone());
+    }
+    builder = builder.analytics(analytics.sink.clone());
     let health_registry = providers.clone();
     builder = builder
         .health_check(Arc::new(app_api::services::DbCheck(pool.clone())))
@@ -151,7 +156,12 @@ async fn main() -> anyhow::Result<()> {
     let worker = config.jobs.run_in_process.then(|| {
         let mut wc = app_workers::WorkerConfig::new("runs", config.jobs.concurrency);
         wc.poll_interval = Duration::from_millis(config.jobs.poll_interval_ms);
-        let svc = app_workers::JobServices { db: pool.clone(), events: events.clone(), providers: providers.clone() };
+        let svc = app_workers::JobServices {
+            db: pool.clone(),
+            events: events.clone(),
+            providers: providers.clone(),
+            analytics: analytics.sink.clone(),
+        };
         let w =
             app_workers::PgWorker::new(wc, svc, vec![Arc::new(app_workers::handlers::ExecuteRun { parallelism: 16 })]);
         tokio::spawn(w.run(state.lifecycle.shutdown.clone()))
@@ -164,7 +174,24 @@ async fn main() -> anyhow::Result<()> {
     if let Some(w) = worker {
         let _ = w.await; // the worker drains in-flight jobs (bounded) on the same shutdown signal
     }
+    analytics.shutdown().await; // flush buffered analytics events
     Ok(())
+}
+
+/// ClickHouse analytics is never critical: failures report "degraded".
+struct AnalyticsCheck(Arc<app_analytics::AnalyticsQuery>);
+
+#[async_trait::async_trait]
+impl app_api::health::HealthCheck for AnalyticsCheck {
+    fn name(&self) -> &'static str {
+        "analytics"
+    }
+    fn critical(&self) -> bool {
+        false
+    }
+    async fn check(&self) -> Result<(), String> {
+        self.0.ping().await.map_err(|e| e.to_string())
+    }
 }
 
 /// Redis is a performance optimisation, never critical: failures report "degraded".

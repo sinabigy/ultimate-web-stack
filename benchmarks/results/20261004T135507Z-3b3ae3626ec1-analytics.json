@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "repeat": 3,
+  "server_env_overrides": {},
+  "started_at": "2026-10-04T13:55:07+00:00",
+  "smoke": false,
+  "environment": {
+    "host": "Mac",
+    "os": "macOS 26.5.1",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "logical_cores": 10,
+    "memory_gb": 16.0,
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "oha": "oha 1.16.0",
+    "git_sha": "3b3ae3626ec1",
+    "git_dirty": true,
+    "build_profile": "release (lto=thin, codegen-units=1)",
+    "container_runtime": "2 cpus, 4094447616 bytes, Ubuntu 24.04.4 LTS, aarch64",
+    "notes": "Load generator and server share the host; services (PostgreSQL/Redis/Dragonfly) run in the container VM."
+  },
+  "suites": {
+    "analytics": {
+      "status": "ok",
+      "wall_s": 13.6,
+      "data": {
+        "clickhouse": {
+          "all_tenants_daily_by_event": {
+            "max_ms": 27.624416,
+            "p50_ms": 24.418708000000002,
+            "p95_ms": 27.624416,
+            "runs": 10
+          },
+          "events_bytes_on_disk": 45749053,
+          "ingest_rows_per_sec": 721913.1675254792,
+          "ingest_s": 2.770416291,
+          "record_s": 0.234205291,
+          "stored": 2000000,
+          "tenant_30d_daily_raw": {
+            "max_ms": 7.46325,
+            "p50_ms": 3.347334,
+            "p95_ms": 5.335917,
+            "runs": 30
+          },
+          "tenant_30d_daily_rollup": {
+            "max_ms": 3.9905410000000003,
+            "p50_ms": 2.674083,
+            "p95_ms": 3.236792,
+            "runs": 30
+          }
+        },
+        "days": 60,
+        "events": 2000000,
+        "organizations": 100,
+        "postgres": {
+          "all_tenants_daily_by_event": {
+            "max_ms": 601.179167,
+            "p50_ms": 583.278208,
+            "p95_ms": 601.179167,
+            "runs": 10
+          },
+          "bulk_load_s": 2.756243208,
+          "index_s": 1.432044292,
+          "load_rows_per_sec_set_based": 725625.370865313,
+          "note": "set-based INSERT ... SELECT (an upper bound for row-at-a-time application inserts)",
+          "table_and_index_bytes": 352280576,
+          "tenant_30d_daily": {
+            "max_ms": 14.7905,
+            "p50_ms": 6.3707080000000005,
+            "p95_ms": 10.547208000000001,
+            "runs": 30
+          }
+        }
+      }
+    }
+  },
+  "finished_at": "2026-10-04T13:55:21+00:00"
+}

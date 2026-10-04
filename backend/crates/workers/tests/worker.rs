@@ -101,7 +101,12 @@ fn provider(url: String) -> ProviderRegistry {
 }
 
 async fn services(pool: &PgPool, url: String) -> JobServices {
-    JobServices { db: pool.clone(), events: PgEventBus::start(pool.clone()).await.unwrap(), providers: provider(url) }
+    JobServices {
+        db: pool.clone(),
+        events: PgEventBus::start(pool.clone()).await.unwrap(),
+        providers: provider(url),
+        analytics: Arc::new(app_analytics::NoopSink),
+    }
 }
 
 fn worker(svc: JobServices, poll: Duration) -> PgWorker {

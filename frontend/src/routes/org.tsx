@@ -18,6 +18,7 @@ import { reauthenticate, useSession } from "../auth/session";
 import {
   ActivityFeed,
   AsyncView,
+  BarChart,
   DataTable,
   DateRangePicker,
   LineChart,
@@ -116,8 +117,16 @@ export function OrgOverviewPage() {
     () => [params.slug, days()] as const,
     ([s, d]) => api.orgs.overview(s as string, d),
   );
+  // Optional analytics module: hidden (not an error) when the endpoint is not available.
+  const [analytics, { refetch: refetchAnalytics }] = createResource(
+    () => [params.slug, days()] as const,
+    ([s, d]) => api.orgs.runAnalytics(s as string, d).catch(() => null),
+  );
   const off = subscribe((e) => {
-    if (e.type === "run_finished" || e.type === "run_created") refetch();
+    if (e.type === "run_finished" || e.type === "run_created") {
+      refetch();
+      refetchAnalytics();
+    }
   });
   onCleanup(off);
   return (
@@ -153,6 +162,16 @@ export function OrgOverviewPage() {
                         { name: "Failed", values: u().map((p) => p.failed), color: "var(--chart-4)" },
                       ]}
                       area
+                    />
+                  </Card>
+                )}
+              </Show>
+              <Show when={analytics()?.finished.length ? analytics() : null}>
+                {(a) => (
+                  <Card title="Analytics">
+                    <BarChart
+                      title="Calls succeeded per day (ClickHouse)"
+                      items={a().finished.map((p) => ({ label: p.day.slice(5), value: p.value }))}
                     />
                   </Card>
                 )}

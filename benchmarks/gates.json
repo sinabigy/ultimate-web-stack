@@ -84,6 +84,12 @@
       "path": "suites.messaging.data.jetstream.processed",
       "min": 1,
       "equals_path": "suites.messaging.data.jobs"
+    },
+    {
+      "name": "analytics: no events lost by the ClickHouse sink",
+      "path": "suites.analytics.data.clickhouse.stored",
+      "min": 1,
+      "equals_path": "suites.analytics.data.events"
     }
   ],
   "regressions": [
@@ -165,6 +171,12 @@
       "path": "suites.messaging.data.jetstream.drain_per_sec",
       "better": "higher",
       "tolerance": 0.3
+    },
+    {
+      "name": "ClickHouse tenant daily query p50",
+      "path": "suites.analytics.data.clickhouse.tenant_30d_daily_raw.p50_ms",
+      "better": "lower",
+      "tolerance": 0.5
     }
   ]
 }

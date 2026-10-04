@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+app-analytics.workspace = true
 anyhow.workspace = true
 app-api.workspace = true
 app-config.workspace = true

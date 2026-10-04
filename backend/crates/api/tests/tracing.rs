@@ -71,8 +71,12 @@ async fn create_run(app: &TestApp, b: &Browser, slug: &str, traceparent: Option<
 /// Runs the queued job with a real worker until the provider has seen `calls` requests.
 async fn run_worker_until(app: &TestApp, up: &Running, calls: u64) {
     let providers = ProviderRegistry::from_config(&app.state.config.providers).unwrap();
-    let svc =
-        JobServices { db: app.pool.clone(), events: PgEventBus::start(app.pool.clone()).await.unwrap(), providers };
+    let svc = JobServices {
+        db: app.pool.clone(),
+        events: PgEventBus::start(app.pool.clone()).await.unwrap(),
+        providers,
+        analytics: Arc::new(app_analytics::NoopSink),
+    };
     let mut cfg = WorkerConfig::new("runs", 2);
     cfg.poll_interval = Duration::from_millis(50);
     let stop = CancellationToken::new();

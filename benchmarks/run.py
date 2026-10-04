@@ -14,6 +14,7 @@ Suites:
   outbound  outbound engine vs a naive client against a simulated provider (app-bench)
   db        PostgreSQL workloads and pool behaviour (app-bench)
   messaging PostgreSQL job queue vs NATS JetStream: publish and drain rates (app-bench queue)
+  analytics ClickHouse vs PostgreSQL: sink ingest, tenant and cross-tenant aggregates, storage
 
 Output: benchmarks/results/<UTC timestamp>-<git sha>[-label].json and benchmarks/results/latest.json.
 Then: `python3 benchmarks/compare.py` (regression gates) and `python3 benchmarks/report.py` (docs).
@@ -47,7 +48,7 @@ REDIS_URL = os.environ.get("BENCH_REDIS_URL", "redis://127.0.0.1:56379")
 DRAGONFLY_URL = os.environ.get("BENCH_DRAGONFLY_URL", "redis://127.0.0.1:56380")
 APP_PORT, IDP_PORT = 18090, 59083
 APP = f"http://127.0.0.1:{APP_PORT}"
-SUITES = ["http", "auth", "cache", "outbound", "db", "messaging"]
+SUITES = ["http", "auth", "cache", "outbound", "db", "messaging", "analytics"]
 
 
 def log(msg: str) -> None:
@@ -398,6 +399,8 @@ def main() -> int:
                     data = suite_cache(a.smoke)
                 elif s == "messaging":
                     data = suite_tool("queue", a.smoke)
+                elif s == "analytics":
+                    data = suite_tool("analytics", a.smoke)
                 else:
                     data = suite_tool(s if s == "db" else "outbound", a.smoke)
                 entry = {"status": "ok", "wall_s": round(time.time() - t, 1), "data": data}

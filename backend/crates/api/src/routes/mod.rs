@@ -64,6 +64,7 @@ pub fn api_routes(admin_enabled: bool) -> Router<AppState> {
         .route("/api/v1/orgs/{slug}/service-clients", post(orgs::register_service_client))
         .route("/api/v1/orgs/{slug}/billing", get(orgs::billing))
         .route("/api/v1/orgs/{slug}/runs", get(orgs::list_runs).post(orgs::create_run))
+        .route("/api/v1/orgs/{slug}/analytics/runs", get(orgs::run_analytics))
         .route("/api/v1/orgs/{slug}/runs/{id}", get(orgs::get_run).delete(orgs::delete_run));
     if admin_enabled {
         r = r

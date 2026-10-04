@@ -35,6 +35,7 @@ import type { ProviderInfo } from "./generated/ProviderInfo";
 import type { RoleRow } from "./generated/RoleRow";
 import type { RolesModelResponse } from "./generated/RolesModelResponse";
 import type { Run } from "./generated/Run";
+import type { RunAnalytics } from "./generated/RunAnalytics";
 import type { SecurityResponse } from "./generated/SecurityResponse";
 import type { SessionItem } from "./generated/SessionItem";
 import type { SessionResponse } from "./generated/SessionResponse";
@@ -97,6 +98,9 @@ export const api = {
       http.patch<OrgRow>(o(slug), b),
     remove: (slug: string) => http.del<void>(o(slug)),
     overview: (slug: string, days = 14) => http.get<OrgOverview>(`${o(slug)}/overview${qs({ days })}`),
+    /** ClickHouse-backed run analytics; 404 when the analytics module is off. */
+    runAnalytics: (slug: string, days = 30) =>
+      http.get<RunAnalytics>(`${o(slug)}/analytics/runs${qs({ days })}`),
     leave: (slug: string) => http.post<void>(`${o(slug)}/leave`),
     members: (slug: string) => http.get<ListResponse<MemberRow>>(`${o(slug)}/members`),
     changeRole: (slug: string, userId: string, role_id: string) =>

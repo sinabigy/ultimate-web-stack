@@ -951,6 +951,12 @@ pub async fn create_run(
     .api()?;
     app_db::audit::insert(&mut *tx, &ev(&state, &o, &meta, "run.created").target("run", run.id)).await.api()?;
     tx.commit().await.api()?;
+    state.analytics.record(
+        app_analytics::EventRow::new("run_created", run.organization_id)
+            .user(owner)
+            .request_id(meta.request_id.as_deref())
+            .value(f64::from(run.requested)),
+    );
     state
         .events
         .publish(RealtimeEvent::RunCreated {
@@ -986,4 +992,34 @@ pub async fn delete_run(
     app_db::audit::insert(&mut *tx, &ev(&state, &o, &meta, "run.deleted").target("run", id)).await.api()?;
     tx.commit().await.api()?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnalyticsParams {
+    days: Option<u32>,
+}
+
+/// Daily run activity from ClickHouse. 404 when the analytics module is off.
+pub async fn run_analytics(
+    State(state): State<AppState>,
+    o: Org,
+    Query(q): Query<AnalyticsParams>,
+) -> Result<Json<dto::RunAnalytics>, ApiError> {
+    o.access.require(P::RunsRead).api()?;
+    let Some(analytics) = state.analytics_query.clone() else { return Err(ApiError::NotFound) };
+    let days = q.days.unwrap_or(30).clamp(1, 365);
+    let (created, finished) = tokio::try_join!(
+        analytics.daily(&o.access, "run_created", days),
+        analytics.daily(&o.access, "run_finished", days)
+    )
+    .map_err(|e| {
+        tracing::warn!(error = %e, "analytics query failed");
+        ApiError::Unavailable("analytics")
+    })?;
+    let points = |v: Vec<app_analytics::DailyPoint>| {
+        v.into_iter()
+            .map(|p| dto::AnalyticsPoint { day: p.day.to_string(), events: p.events, value: p.value })
+            .collect::<Vec<_>>()
+    };
+    Ok(Json(dto::RunAnalytics { days, created: points(created), finished: points(finished) }))
 }

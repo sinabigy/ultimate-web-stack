@@ -28,7 +28,8 @@ async fn main() -> anyhow::Result<()> {
 
     let mut wc = app_workers::WorkerConfig::new("runs", config.jobs.concurrency);
     wc.poll_interval = Duration::from_millis(config.jobs.poll_interval_ms);
-    let svc = app_workers::JobServices { db: pool.clone(), events, providers };
+    let analytics = app_analytics::start(&config.analytics).await;
+    let svc = app_workers::JobServices { db: pool.clone(), events, providers, analytics: analytics.sink.clone() };
     let worker =
         app_workers::PgWorker::new(wc, svc, vec![Arc::new(app_workers::handlers::ExecuteRun { parallelism: 16 })]);
     tracing::info!(id = worker.id(), "app-worker starting");
@@ -68,6 +69,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("shutdown requested: draining jobs");
     shutdown.cancel();
     let _ = runner.await;
+    analytics.shutdown().await; // flush buffered analytics events
     let _ = server.await;
     Ok(())
 }

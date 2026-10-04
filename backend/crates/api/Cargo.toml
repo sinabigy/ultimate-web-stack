@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+app-analytics.workspace = true
 rand.workspace = true
 app-cache.workspace = true
 ts-rs.workspace = true
@@ -43,6 +44,7 @@ uuid.workspace = true
 cedar = ["app-authz/cedar"]
 
 [dev-dependencies]
+clickhouse.workspace = true
 app-workers.workspace = true
 app-networking.workspace = true
 fake-upstream.workspace = true

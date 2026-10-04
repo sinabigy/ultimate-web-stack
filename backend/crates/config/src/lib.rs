@@ -544,9 +544,10 @@ impl Default for AnalyticsConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            clickhouse_url: "http://127.0.0.1:8123".into(),
+            // Development defaults match infra/docker/compose.yaml (profile `analytics`).
+            clickhouse_url: "http://127.0.0.1:58123".into(),
             database: "app".into(),
-            user: "default".into(),
+            user: "app".into(),
             password: Secret::default(),
             batch_size: 10_000,
             flush_interval_ms: 1_000,
