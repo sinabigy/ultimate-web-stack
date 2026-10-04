@@ -2,7 +2,9 @@
 //!
 //! Algorithm (per provider), tuned to be conservative:
 //! - **Overload signals**: 429, 503, 504, timeouts, or *sustained* latency above
-//!   `latency_tolerance × baseline` (both the sample and a fast EWMA must exceed it).
+//!   `latency_tolerance × baseline` (both the sample and a fast EWMA must exceed it) *and*
+//!   at least `latency_min_excess` above it (sub-millisecond jitter on fast links is noise:
+//!   on loopback a 0.3ms baseline made 0.6ms count as "2× slower" and shrank the limit to 2).
 //!   Response: `limit = max(min, limit × decrease_factor)`, at most once per *drain epoch*:
 //!   after a decrease, the requests that were already in flight (admitted under the old limit)
 //!   must complete before the next decrease. One burst of concurrent failures caused by one
@@ -33,6 +35,7 @@ pub struct AdaptiveConfig {
     pub initial: usize,
     pub decrease_factor: f64,
     pub latency_tolerance: f64,
+    pub latency_min_excess: Duration,
     pub max_queue: usize,
     pub cooldown_min: Duration,
 }
@@ -45,6 +48,7 @@ impl Default for AdaptiveConfig {
             initial: 32,
             decrease_factor: 0.75,
             latency_tolerance: 2.0,
+            latency_min_excess: Duration::from_millis(5),
             max_queue: 10_000,
             cooldown_min: Duration::from_millis(100),
         }
@@ -267,8 +271,9 @@ impl AdaptiveLimiter {
                     Some(b) => 0.995 * b + 0.005 * ms,
                 });
                 let base = s.baseline_ms.unwrap_or(ms).max(0.05);
-                let sustained_slow = ms > base * self.cfg.latency_tolerance
-                    && s.fast_ms.unwrap_or(0.0) > base * self.cfg.latency_tolerance;
+                let threshold =
+                    (base * self.cfg.latency_tolerance).max(base + self.cfg.latency_min_excess.as_secs_f64() * 1000.0);
+                let sustained_slow = ms > threshold && s.fast_ms.unwrap_or(0.0) > threshold;
                 if sustained_slow {
                     self.decrease(s);
                 } else if s.inflight as f64 + 1.0 >= 0.8 * s.limit {

@@ -14,6 +14,17 @@ use std::{
 #[error("rate budget would exceed the request deadline")]
 pub struct WouldExceedDeadline;
 
+/// How far ahead `acquire` commits a slot (see [`RateLimiter::reserve_within`]).
+const RESERVE_HORIZON: Duration = Duration::from_millis(50);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reservation {
+    /// Slot reserved; proceed after this delay.
+    Granted(Duration),
+    /// Nothing reserved; ask again after this delay.
+    NotYet(Duration),
+}
+
 pub struct RateLimiter {
     params: Mutex<(Option<f64>, f64)>, // (seconds per unit of cost = 1/rate or None, burst tolerance τ seconds)
     state: Mutex<(Instant, Option<Instant>)>, // (theoretical arrival time, paused until)
@@ -31,8 +42,20 @@ impl RateLimiter {
     }
 
     /// Change the rate at runtime (adaptive rate control). `per_second` ≤ 0 = unlimited.
+    /// The outstanding backlog (theoretical arrival time ahead of now) is rescaled to the new
+    /// rate, so the change takes effect immediately rather than after the old backlog drains.
     pub fn set_rate(&self, per_second: f64, burst: f64) {
-        *self.params.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Self::params(per_second, burst);
+        let new = Self::params(per_second, burst);
+        let mut p = self.params.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut g = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let now = Instant::now();
+        if g.0 > now {
+            g.0 = match (p.0, new.0) {
+                (Some(old_t), Some(new_t)) => now + (g.0 - now).mul_f64(new_t / old_t),
+                _ => now,
+            };
+        }
+        *p = new;
     }
 
     /// Current rate (requests/s) or None when unlimited.
@@ -46,12 +69,27 @@ impl RateLimiter {
 
     /// Reserve `cost` units; returns the delay to wait before proceeding.
     pub fn reserve(&self, cost: f64, deadline: Instant) -> Result<Duration, WouldExceedDeadline> {
+        match self.reserve_within(cost, deadline, Duration::MAX)? {
+            Reservation::Granted(wait) | Reservation::NotYet(wait) => Ok(wait),
+        }
+    }
+
+    /// Like [`reserve`](Self::reserve) but only commits a slot that starts within `horizon`;
+    /// otherwise returns when to ask again. Keeping reservations short-range means a rate change
+    /// (adaptive control) applies to waiting callers within `horizon`, instead of everyone
+    /// keeping a slot computed at the old rate.
+    pub fn reserve_within(
+        &self,
+        cost: f64,
+        deadline: Instant,
+        horizon: Duration,
+    ) -> Result<Reservation, WouldExceedDeadline> {
         let now = Instant::now();
         let (emission, tau) = *self.params.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut g = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let paused = g.1.filter(|p| *p > now).unwrap_or(now);
         let Some(t) = emission else {
-            return if paused > deadline { Err(WouldExceedDeadline) } else { Ok(paused - now) };
+            return if paused > deadline { Err(WouldExceedDeadline) } else { Ok(Reservation::Granted(paused - now)) };
         };
         let tat = g.0.max(now);
         let increment = Duration::from_secs_f64(t * cost.max(0.0));
@@ -60,8 +98,11 @@ impl RateLimiter {
         if earliest > deadline {
             return Err(WouldExceedDeadline);
         }
+        if earliest - now > horizon {
+            return Ok(Reservation::NotYet(earliest - now - horizon));
+        }
         g.0 = tat.max(earliest) + increment;
-        Ok(earliest - now)
+        Ok(Reservation::Granted(earliest - now))
     }
 
     /// Pause everyone until `until` (e.g. after a 429 with `Retry-After`).
@@ -75,11 +116,17 @@ impl RateLimiter {
     }
 
     pub async fn acquire(&self, cost: f64, deadline: Instant) -> Result<(), WouldExceedDeadline> {
-        let wait = self.reserve(cost, deadline)?;
-        if !wait.is_zero() {
-            tokio::time::sleep(wait).await;
+        loop {
+            match self.reserve_within(cost, deadline, RESERVE_HORIZON)? {
+                Reservation::Granted(wait) => {
+                    if !wait.is_zero() {
+                        tokio::time::sleep(wait).await;
+                    }
+                    return Ok(());
+                }
+                Reservation::NotYet(wait) => tokio::time::sleep(wait.max(Duration::from_millis(1))).await,
+            }
         }
-        Ok(())
     }
 }
 
@@ -114,6 +161,21 @@ mod tests {
         assert!(r.reserve(1000.0, far).unwrap().is_zero());
         let w = r.reserve(500.0, far).unwrap();
         assert!(w >= Duration::from_millis(4900) && w <= Duration::from_millis(5100), "{w:?}");
+    }
+
+    #[test]
+    fn short_horizon_reservations_follow_rate_changes() {
+        let r = RateLimiter::new(10.0, 1.0);
+        let far = Instant::now() + Duration::from_secs(60);
+        let h = Duration::from_millis(50);
+        assert_eq!(r.reserve_within(1.0, far, h).unwrap(), Reservation::Granted(Duration::ZERO));
+        // Next slot is ~100ms away at 10/s: not committed.
+        assert!(matches!(r.reserve_within(1.0, far, h).unwrap(), Reservation::NotYet(_)));
+        // Raise the rate: the next slot moves closer because nothing was committed at the old rate.
+        r.set_rate(1000.0, 1.0);
+        assert!(
+            matches!(r.reserve_within(1.0, far, h).unwrap(), Reservation::Granted(w) if w < Duration::from_millis(101))
+        );
     }
 
     #[test]

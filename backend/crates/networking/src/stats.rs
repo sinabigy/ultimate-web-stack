@@ -36,6 +36,8 @@ pub struct HealthSnapshot {
     pub p99_ms: f64,
     pub throughput_rps: f64,
     pub paused_for_ms: u64,
+    /// Current request-rate cap (learned or configured); None = unlimited.
+    pub rate_cap_rps: Option<f64>,
 }
 
 pub struct Stats {

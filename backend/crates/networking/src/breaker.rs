@@ -1,8 +1,9 @@
 //! Circuit breaker: stop sending to a failing provider, probe for recovery.
 //!
 //! Closed: outcomes counted over a rolling window; opens when ≥ `min_requests` samples and
-//! either *hard* failures (500/502, transport errors, timeouts) reach `failure_ratio`, or hard +
-//! *soft* failures (503/504 backpressure) reach `unavailable_ratio` (a real outage). Partial
+//! either *hard* failures (500/502, transport errors, timeouts) reach `failure_ratio` over the
+//! window, or hard + *soft* failures (503/504 backpressure) reach `unavailable_ratio` over the
+//! most recent `soft_min_span` (a real outage). Partial
 //! overload (many 503s, some successes) is left to the adaptive concurrency controller. Open: calls fail fast for `open_for` (doubling on each
 //! consecutive re-open, capped). Half-open: up to `probes` trial calls; all succeed → closed,
 //! any failure → open again. Rate limiting (429) is *not* a failure (the AIMD controller and
@@ -135,11 +136,22 @@ impl CircuitBreaker {
                 }
                 let total = win.len() as f64;
                 let hard = win.iter().filter(|(_, h)| *h == Health::Hard).count() as f64;
-                let soft = win.iter().filter(|(_, h)| *h == Health::Soft).count() as f64;
                 let span = win.front().map_or(Duration::ZERO, |(t, _)| now.duration_since(*t));
-                let broken = hard / total >= self.cfg.failure_ratio;
-                let unavailable = (hard + soft) / total >= self.cfg.unavailable_ratio && span >= self.cfg.soft_min_span;
-                (win.len() >= self.cfg.min_requests && (broken || unavailable)).then(|| self.open(0))
+                let broken = win.len() >= self.cfg.min_requests && hard / total >= self.cfg.failure_ratio;
+                // Outage: judged over the most recent `soft_min_span` only, so healthy traffic
+                // earlier in the window does not dilute it (measured: with the whole 10s window a
+                // total outage after 1s of healthy traffic took ~19s to open the circuit).
+                let recent: Vec<Health> = win
+                    .iter()
+                    .rev()
+                    .take_while(|(t, _)| now.duration_since(*t) <= self.cfg.soft_min_span)
+                    .map(|(_, h)| *h)
+                    .collect();
+                let recent_bad = recent.iter().filter(|h| **h != Health::Success).count() as f64;
+                let unavailable = span >= self.cfg.soft_min_span
+                    && recent.len() >= self.cfg.min_requests
+                    && recent_bad / recent.len() as f64 >= self.cfg.unavailable_ratio;
+                (broken || unavailable).then(|| self.open(0))
             }
             S::Open { .. } => None,
             S::HalfOpen { ok, opens, .. } => {
@@ -223,8 +235,23 @@ mod tests {
         }
         assert_eq!(b.state(), CircuitState::Closed, "... but not yet sustained");
         std::thread::sleep(Duration::from_millis(35));
-        b.record(Health::Soft);
+        for _ in 0..4 {
+            b.record(Health::Soft);
+        }
         assert_eq!(b.state(), CircuitState::Open, "sustained total unavailability is an outage");
+    }
+
+    #[test]
+    fn outage_after_healthy_traffic_is_not_diluted_by_the_window() {
+        let b = CircuitBreaker::new(BreakerConfig { soft_min_span: Duration::from_millis(30), ..quick() });
+        for _ in 0..200 {
+            b.record(Health::Success);
+        }
+        std::thread::sleep(Duration::from_millis(35));
+        for _ in 0..10 {
+            b.record(Health::Soft);
+        }
+        assert_eq!(b.state(), CircuitState::Open, "last 30ms all failing although the 10s window is 95% healthy");
     }
 
     #[test]

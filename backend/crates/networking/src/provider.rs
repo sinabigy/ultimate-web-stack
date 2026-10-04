@@ -172,8 +172,27 @@ pub struct Provider {
 #[derive(Debug, Clone, Copy)]
 struct RateCtl {
     last_429: Option<Instant>,
+    /// Growth is credited only for time after this instant (never for time spent paused).
     last_increase: Instant,
+    /// When the measurement window for "what the provider accepts" starts (after a pause).
+    window_start: Instant,
+    /// Cap that was in force at the last 429 event: the provider's limit is at or below it.
+    ceiling: Option<f64>,
+    ceiling_at: Instant,
 }
+
+/// Rate-AIMD tuning. Every 429 event costs a provider-directed pause (`Retry-After`), which is
+/// far more expensive than running slightly below the limit, so after learning a ceiling the
+/// controller holds just below it and only probes upward slowly.
+const RATE_BACKOFF: f64 = 0.85;
+const RATE_HOLD_FRACTION: f64 = 0.95;
+const RATE_HOLD_FOR: Duration = Duration::from_secs(30);
+const RATE_PROBE_PER_SEC: f64 = 0.01;
+/// Growth per 100ms below the hold level / with no ceiling learned yet (slow start).
+const RATE_GROWTH: f64 = 1.05;
+const RATE_GROWTH_UNKNOWN: f64 = 1.15;
+/// Minimum un-paused time to trust an accepted-rate measurement.
+const RATE_MIN_SAMPLE: Duration = Duration::from_millis(250);
 
 impl Provider {
     pub fn new(name: &str, settings: ProviderSettings) -> Result<Self, BuildError> {
@@ -208,7 +227,10 @@ impl Provider {
             breaker: CircuitBreaker::new(settings.breaker),
             budget: RetryBudget::new(settings.retry),
             stats: Stats::new(Duration::from_secs(30)),
-            rate_ctl: std::sync::Mutex::new(RateCtl { last_429: None, last_increase: Instant::now() }),
+            rate_ctl: std::sync::Mutex::new({
+                let now = Instant::now();
+                RateCtl { last_429: None, last_increase: now, window_start: now, ceiling: None, ceiling_at: now }
+            }),
             client,
             settings,
         })
@@ -243,31 +265,53 @@ impl Provider {
                 .rate
                 .paused_until()
                 .map_or(0, |p| p.saturating_duration_since(Instant::now()).as_millis() as u64),
+            rate_cap_rps: self.rate.rate(),
         }
     }
 
-    /// Rate-AIMD. On a 429 burst (one *event*, debounced to one decrease per 500ms): cap the
-    /// send rate at ~90% of what the provider accepted over the last second, or 75% of the
-    /// current cap if that is lower; never above the configured contract rate. While calm,
-    /// the cap grows ×1.05 per 100ms of elapsed time (see `on_success_rate`).
-    fn on_rate_limited(&self) {
+    /// Rate-AIMD, one decrease per 429 *event* (debounced to 500ms).
+    ///
+    /// On an event the provider's limit is estimated as the rate it actually accepted since
+    /// the last pause ended (successes / un-paused time, needs ≥250ms of data). The ceiling is
+    /// min(current cap, that estimate) and the cap drops to 85% of it. While calm, the cap grows
+    /// ×1.05 per 100ms of *un-paused* time up to 95% of the ceiling, holds there for 30s, then
+    /// probes upward at 1% of the ceiling per second (limits get raised). With no ceiling yet,
+    /// or once 1.5× above it, growth is ×1.15 per 100ms (slow start). Never above the
+    /// configured contract rate. Measured in `benchmarks/` (rate_limited scenario).
+    fn on_rate_limited(&self, pause_end: Instant) {
         let now = Instant::now();
         let Ok(mut c) = self.rate_ctl.lock() else { return };
         let fresh_event = c.last_429.is_none_or(|t| now.duration_since(t) >= Duration::from_millis(500));
         c.last_429 = Some(now);
+        c.last_increase = c.last_increase.max(pause_end);
         if !fresh_event {
             return;
         }
-        let accepted = self.stats.successes_within(Duration::from_secs(1)) as f64;
-        let mut target = (accepted * 0.9).max(1.0);
-        if let Some(current) = self.rate.rate() {
-            target = target.min(current * 0.75).max(1.0);
+        // Most recent ≤500ms: while ramping, older samples were taken below the limit and would
+        // bias the estimate low (measured: 87% of the true limit with a 1s window).
+        let span = now.saturating_duration_since(c.window_start).min(Duration::from_millis(500));
+        let accepted = (span >= RATE_MIN_SAMPLE)
+            .then(|| self.stats.successes_within(span) as f64 / span.as_secs_f64())
+            .filter(|r| *r >= 1.0);
+        c.window_start = pause_end;
+        let mut target = match (self.rate.rate(), accepted) {
+            // Reliable: a ceiling to hold below.
+            (cap, Some(acc)) => {
+                let ceiling = cap.map_or(acc, |cap| cap.min(acc));
+                c.ceiling = Some(ceiling);
+                c.ceiling_at = now;
+                ceiling * RATE_BACKOFF
+            }
+            (Some(cap), None) => cap * RATE_BACKOFF,
+            // Too little data (e.g. the first burst at startup measures the provider's burst
+            // allowance, not its rate): restart low and let fast growth find the limit.
+            (None, None) => self.stats.successes_within(Duration::from_secs(1)).max(1) as f64,
         }
+        .max(1.0);
         if self.settings.requests_per_second > 0.0 {
             target = target.min(self.settings.requests_per_second);
         }
         self.rate.set_rate(target, (target * 0.05).max(1.0));
-        c.last_increase = now;
         metrics::gauge!("app_provider_learned_rps", "provider" => self.name.clone()).set(target);
     }
 
@@ -276,23 +320,40 @@ impl Provider {
         let Ok(mut c) = self.rate_ctl.lock() else { return };
         let now = Instant::now();
         let calm = c.last_429.is_none_or(|t| now.duration_since(t) > Duration::from_millis(500));
-        let since = now.duration_since(c.last_increase);
-        if calm && since >= Duration::from_millis(100) {
-            c.last_increase = now;
-            let configured = self.settings.requests_per_second;
-            // Time-based growth (×1.05 per 100ms elapsed, up to 2s worth): recovery speed does not
-            // depend on the current rate, so a cap that fell low climbs back quickly.
-            let steps = (since.as_secs_f64() / 0.1).min(20.0);
-            let next = current * 1.05f64.powf(steps);
-            if configured > 0.0 {
-                let r = next.min(configured);
-                self.rate.set_rate(
-                    r,
-                    if r >= configured { f64::from(self.settings.burst.max(1)) } else { (r * 0.05).max(1.0) },
-                );
-            } else {
-                self.rate.set_rate(next, (next * 0.05).max(1.0));
+        let since = now.saturating_duration_since(c.last_increase);
+        if !calm || since < Duration::from_millis(100) {
+            return;
+        }
+        c.last_increase = now;
+        // Grow only while the cap is actually the constraint (≥70% used over the last 500ms);
+        // growing an unused cap teaches nothing and ends in a burst far above the limit.
+        if (self.stats.successes_within(Duration::from_millis(500)) as f64) * 2.0 < current * 0.7 {
+            return;
+        }
+        // Time-based (up to 2s worth per update): recovery speed does not depend on traffic.
+        let steps = (since.as_secs_f64() / 0.1).min(20.0);
+        let next = match c.ceiling {
+            Some(ceiling) if current > ceiling * 1.5 => {
+                c.ceiling = None;
+                current * RATE_GROWTH_UNKNOWN.powf(steps)
             }
+            Some(ceiling) => {
+                let hold = ceiling * RATE_HOLD_FRACTION;
+                if current < hold {
+                    (current * RATE_GROWTH.powf(steps)).min(hold)
+                } else if now.duration_since(c.ceiling_at) < RATE_HOLD_FOR {
+                    current
+                } else {
+                    current + ceiling * RATE_PROBE_PER_SEC * since.as_secs_f64().min(2.0)
+                }
+            }
+            None => current * RATE_GROWTH_UNKNOWN.powf(steps),
+        };
+        let configured = self.settings.requests_per_second;
+        if configured > 0.0 && next >= configured {
+            self.rate.set_rate(configured, f64::from(self.settings.burst.max(1)));
+        } else if next != current {
+            self.rate.set_rate(next, (next * 0.05).max(1.0));
         }
     }
 
@@ -437,7 +498,9 @@ impl Provider {
                     return Ok(CallResponse { status, body, attempts: 1, latency });
                 }
                 let (kind, outcome, breaker) = match status {
-                    StatusCode::TOO_MANY_REQUESTS => (Kind::RateLimited, Outcome::Overload, None),
+                    // A rate limit is not a concurrency signal: the rate controller handles it.
+                    // Shrinking concurrency too would compound the backoff (observed: limit → 1).
+                    StatusCode::TOO_MANY_REQUESTS => (Kind::RateLimited, Outcome::Error, None),
                     StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT => {
                         (Kind::ServerError, Outcome::Overload, Some(Health::Soft))
                     }
@@ -449,7 +512,7 @@ impl Provider {
                     // Everyone waits: hammering a rate-limited provider only earns more 429s.
                     let pause = retry_after.unwrap_or(Duration::from_millis(500));
                     self.rate.pause_until(Instant::now() + pause);
-                    self.on_rate_limited();
+                    self.on_rate_limited(Instant::now() + pause);
                 }
                 Err((CallError::Status { status, attempts: 1 }, retry_after))
             }
