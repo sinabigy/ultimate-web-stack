@@ -48,6 +48,10 @@ time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macr
 figment = { version = "0.10.19", features = ["env", "toml"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["http-proto", "reqwest-blocking-client", "trace"] }
+tracing-opentelemetry = { version = "0.34", default-features = false }
 metrics = "0.24"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "uuid", "time", "json", "ipnet", "macros", "migrate", "derive"] }
 ipnet = "2"

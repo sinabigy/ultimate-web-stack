@@ -1,0 +1,27 @@
+# cargo-deny policy (run: cargo deny check). Part of canonical validation (`rust-deny`).
+
+[graph]
+all-features = true
+
+[advisories]
+# Every ignore needs a reason that explains why the advisory cannot affect this codebase.
+ignore = [
+    { id = "RUSTSEC-2023-0071", reason = "rsa (via jsonwebtoken, openidconnect): Marvin timing attack on RSA private-key operations (decryption/signing). Production code only verifies RSA signatures (public key). The only private-key use is apps/mock-oidc, a test double. Revisit when rsa ships a constant-time release." },
+]
+
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause",
+    "ISC", "Zlib", "Unicode-3.0", "CDLA-Permissive-2.0", "CC0-1.0", "BSL-1.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

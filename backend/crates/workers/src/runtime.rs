@@ -4,6 +4,7 @@ use app_db::jobs;
 use sqlx::postgres::PgListener;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument as _;
 
 use crate::{JobContext, JobError, JobHandler, JobServices};
 
@@ -139,11 +140,26 @@ impl PgWorker {
     }
 
     async fn process(&self, job: jobs::JobRow, shutdown: CancellationToken) {
+        let span = tracing::info_span!("job", id = %job.id, kind = %job.kind, attempt = job.attempts,
+            request_id = job.trace_context.as_ref().and_then(|t| t["request_id"].as_str()).unwrap_or(""),
+            trace_id = tracing::field::Empty);
+        // Continue the producer's trace (the request that enqueued this job).
+        if let Some(obj) = job.trace_context.as_ref().and_then(|t| t.as_object()) {
+            let map: HashMap<String, String> =
+                obj.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect();
+            app_telemetry::propagation::set_parent_from_map(&span, &map);
+        }
+        if let Some(id) = app_telemetry::propagation::trace_id(&span) {
+            span.record("trace_id", id);
+        }
+        // `instrument`, not `span.enter()`: an entered guard held across `.await` would leak this
+        // span into whatever else runs on the thread while the job is suspended.
+        self.process_in_span(job, shutdown).instrument(span).await;
+    }
+
+    async fn process_in_span(&self, job: jobs::JobRow, shutdown: CancellationToken) {
         let started = std::time::Instant::now();
         let kind = job.kind.clone();
-        let span = tracing::info_span!("job", id = %job.id, kind = %kind, attempt = job.attempts,
-            request_id = job.trace_context.as_ref().and_then(|t| t["request_id"].as_str()).unwrap_or(""));
-        let _e = span.enter();
         metrics::gauge!("app_jobs_inflight", "queue" => self.cfg.queue.clone()).increment(1.0);
         // Heartbeat: extend the lease while the handler runs.
         let hb = {

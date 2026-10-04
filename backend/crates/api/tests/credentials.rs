@@ -163,6 +163,6 @@ async fn service_accounts_use_verified_jwts_and_are_not_users(pool: PgPool) {
     let unregistered = app.service_token("svc-unregistered", "runs:read").await;
     assert_eq!(app.bearer(&unregistered, Method::GET, &runs, None).await.status, StatusCode::UNAUTHORIZED);
     // alg=none / HS256 tokens are refused outright
-    let none = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJzdmMtcmVwb3J0aW5nIn0.";
+    let none = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJzdmMtcmVwb3J0aW5nIn0."; // gitleaks:allow (unsigned test token)
     assert_eq!(app.bearer(none, Method::GET, &runs, None).await.status, StatusCode::UNAUTHORIZED);
 }

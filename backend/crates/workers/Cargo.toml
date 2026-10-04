@@ -12,6 +12,7 @@ app-db.workspace = true
 app-domain.workspace = true
 app-messaging.workspace = true
 app-networking.workspace = true
+app-telemetry.workspace = true
 async-trait.workspace = true
 futures.workspace = true
 metrics.workspace = true

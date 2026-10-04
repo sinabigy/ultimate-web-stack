@@ -53,7 +53,8 @@ async fn main() -> anyhow::Result<()> {
         return check_config(args.iter().any(|a| a == "--online")).await;
     }
     let config = AppConfig::load().context("loading configuration")?;
-    app_telemetry::init_tracing(&config.log.filter, config.log.format)?;
+    // Kept until main returns: dropping it flushes pending trace exports.
+    let _telemetry = app_telemetry::init_tracing(&config.log.filter, config.log.format, &config.telemetry)?;
     let build = BuildInfo {
         name: env!("CARGO_PKG_NAME"),
         version: env!("CARGO_PKG_VERSION"),

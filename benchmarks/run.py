@@ -151,6 +151,7 @@ class Stack:
             "APP__AUTH__REDIRECT_URL": f"{APP}/auth/callback",
             "APP__AUTH__POST_LOGOUT_REDIRECT_URL": f"{APP}/login",
         })
+        env.update(EXTRA_ENV)
         env.update(self.extra)
         self.server = subprocess.Popen([str(BIN / "app-server")], cwd=BACKEND, env=env,
                                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
@@ -201,6 +202,7 @@ class Sampler(threading.Thread):
 
 
 REPEAT = 1  # set from --repeat; measured points run this many times and report the median
+EXTRA_ENV: dict[str, str] = {}  # set from --env; applied to every app-server started
 
 
 def oha(url: str, duration: str, conc: int, headers: dict[str, str] | None = None, pid: int | None = None) -> dict:
@@ -356,10 +358,17 @@ def main() -> int:
     ap.add_argument("--label", default="", help="suffix for the result file")
     ap.add_argument("--no-build", action="store_true")
     ap.add_argument("--repeat", type=int, default=None, help="runs per HTTP point, median reported (default 3; smoke 1)")
+    ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
+                    help="extra app-server environment for A/B runs (recorded in the result)")
     a = ap.parse_args()
     suites = [s.strip() for s in a.suite.split(",") if s.strip()]
     global REPEAT
     REPEAT = a.repeat if a.repeat is not None else (1 if a.smoke else 3)
+    for kv in a.env:
+        k, sep, v = kv.partition("=")
+        if not sep or not k.startswith("APP__"):
+            ap.error(f"--env expects APP__KEY=VALUE, got {kv!r}")
+        EXTRA_ENV[k] = v
     unknown = set(suites) - set(SUITES)
     if unknown:
         ap.error(f"unknown suites: {sorted(unknown)}")
@@ -372,7 +381,7 @@ def main() -> int:
     ensure_database()
 
     started = dt.datetime.now(dt.timezone.utc)
-    result: dict = {"schema": 1, "repeat": REPEAT, "started_at": started.isoformat(timespec="seconds"), "smoke": a.smoke,
+    result: dict = {"schema": 1, "repeat": REPEAT, "server_env_overrides": EXTRA_ENV, "started_at": started.isoformat(timespec="seconds"), "smoke": a.smoke,
                     "environment": environment(), "suites": {}}
     for s in suites:
         log(f"suite {s}…")

@@ -944,7 +944,7 @@ pub async fn create_run(
             run_at: None,
             idempotency_key: Some(&key),
             organization_id: Some(run.organization_id),
-            trace_context: meta.request_id.as_ref().map(|r| json!({"request_id": r})),
+            trace_context: Some(crate::audit::job_trace_context(meta.request_id.as_deref())),
         },
     )
     .await

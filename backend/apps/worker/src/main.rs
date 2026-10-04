@@ -12,7 +12,11 @@ use tokio_util::sync::CancellationToken;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = AppConfig::load().context("loading configuration")?;
-    app_telemetry::init_tracing(&config.log.filter, config.log.format)?;
+    let mut telemetry_cfg = config.telemetry.clone();
+    if telemetry_cfg.service_name == "app" {
+        telemetry_cfg.service_name = "app-worker".into();
+    }
+    let _telemetry = app_telemetry::init_tracing(&config.log.filter, config.log.format, &telemetry_cfg)?;
     let metrics = app_telemetry::init_metrics(&config.telemetry)?;
     let pool = app_db::connect(&config.database, "app-worker").await?;
     let providers = app_networking::ProviderRegistry::from_config(&config.providers)?;

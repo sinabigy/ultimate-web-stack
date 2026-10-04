@@ -632,11 +632,20 @@ pub struct TelemetryConfig {
     pub trace_sample_ratio: f64,
     /// Serve Prometheus metrics at `/metrics`.
     pub metrics: bool,
+    /// Create and propagate W3C trace context (request → job → provider) even when nothing is
+    /// exported, so logs carry `trace_id` and downstream services join the trace.
+    pub trace_propagation: bool,
 }
 
 impl Default for TelemetryConfig {
     fn default() -> Self {
-        Self { service_name: "app".into(), otlp_endpoint: String::new(), trace_sample_ratio: 1.0, metrics: true }
+        Self {
+            service_name: "app".into(),
+            otlp_endpoint: String::new(),
+            trace_sample_ratio: 1.0,
+            metrics: true,
+            trace_propagation: true,
+        }
     }
 }
 

@@ -36,3 +36,16 @@ pub async fn best_effort(db: impl PgExecutor<'_>, e: &AuditEvent) {
         tracing::error!(error = %err, action = e.action, "failed to write audit event");
     }
 }
+
+/// Trace context stored with a queued job: the W3C context of the current span (so the worker
+/// continues the request's trace) plus the request id (log correlation without tracing).
+pub fn job_trace_context(request_id: Option<&str>) -> serde_json::Value {
+    let mut map: serde_json::Map<String, serde_json::Value> = app_telemetry::propagation::current_context_map()
+        .into_iter()
+        .map(|(k, v)| (k, serde_json::Value::String(v)))
+        .collect();
+    if let Some(r) = request_id {
+        map.insert("request_id".into(), r.into());
+    }
+    serde_json::Value::Object(map)
+}

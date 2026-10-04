@@ -39,6 +39,7 @@ jobs:
         options: --ulimit memlock=-1 --health-cmd "redis-cli ping" --health-interval 2s --health-retries 30
     steps:
       - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }  # full history for the secret scan
       - name: Rust toolchain (pinned by backend/rust-toolchain.toml)
         working-directory: backend
         run: rustup show active-toolchain || rustup toolchain install
@@ -46,13 +47,20 @@ jobs:
         with: { workspaces: backend }
       - name: sqlx-cli
         run: cargo install sqlx-cli --locked --no-default-features --features rustls,postgres
+      - name: Supply-chain tools
+        uses: taiki-e/install-action@v2
+        with: { tool: "cargo-deny,cargo-audit" }
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
       - name: Migrate the schema used by `cargo sqlx prepare --check`
         working-directory: backend
         run: cargo sqlx migrate run --source migrations
       - name: Validate (backend)
         run: >
           python3 tools/ai-validate --strict --keep-going --report ai-validate-backend.json
-          --only rust-fmt --only rust-clippy --only sqlx-offline-fresh --only config-check
+          --only rust-fmt --only rust-clippy --only sqlx-offline-fresh --only rust-audit --only rust-deny --only secret-scan --only config-check
           --only rust-test --only rust-test-cedar --only rust-test-cache --only ts-bindings-fresh
       - if: always()
         uses: actions/upload-artifact@v4
@@ -67,7 +75,7 @@ jobs:
       - name: Validate (frontend)
         run: >
           python3 tools/ai-validate --strict --keep-going
-          --only web-install --only web-typecheck --only web-lint --only web-test --only web-build --only web-bundle-budget
+          --only web-install --only web-audit --only web-typecheck --only web-lint --only web-test --only web-build --only web-bundle-budget
 
   e2e:
     runs-on: ubuntu-24.04

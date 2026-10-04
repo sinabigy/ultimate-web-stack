@@ -85,6 +85,59 @@
         "note": "Fails if .sqlx query metadata is stale relative to the schema/queries. Needs PostgreSQL (./dev up)."
       },
       {
+        "id": "rust-audit",
+        "stage": "lint",
+        "cmd": "cargo audit",
+        "cwd": "backend",
+        "requires": [
+          "cargo",
+          "cargo-audit"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 600,
+        "note": "RustSec advisories. Ignores live in backend/deny.toml with a reason (mirrored in backend/.cargo/audit.toml)."
+      },
+      {
+        "id": "rust-deny",
+        "stage": "lint",
+        "cmd": "cargo deny check",
+        "cwd": "backend",
+        "requires": [
+          "cargo",
+          "cargo-deny"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 600,
+        "note": "Advisories, licence allowlist, crate sources (crates.io only), wildcard bans."
+      },
+      {
+        "id": "web-audit",
+        "stage": "lint",
+        "cmd": "npm audit --audit-level=high",
+        "cwd": "frontend",
+        "requires": [
+          "npm"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 300
+      },
+      {
+        "id": "secret-scan",
+        "stage": "lint",
+        "cmd": "gitleaks git --redact --no-banner .",
+        "requires": [
+          "gitleaks",
+          "git"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 300,
+        "note": "Scans all committed history. Reviewed false positives are listed by fingerprint in .gitleaksignore with a reason."
+      },
+      {
         "id": "config-check",
         "stage": "other",
         "cmd": "SQLX_OFFLINE=true cargo run -q -p app-server -- check-config",

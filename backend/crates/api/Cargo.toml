@@ -43,6 +43,9 @@ uuid.workspace = true
 cedar = ["app-authz/cedar"]
 
 [dev-dependencies]
+app-workers.workspace = true
+app-networking.workspace = true
+fake-upstream.workspace = true
 time.workspace = true
 mock-oidc.workspace = true
 reqwest.workspace = true

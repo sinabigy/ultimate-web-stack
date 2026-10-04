@@ -121,7 +121,12 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
 fn make_span(req: &Request) -> tracing::Span {
     let request_id = req.headers().get("x-request-id").and_then(|v| v.to_str().ok()).unwrap_or("-");
     let route = req.extensions().get::<axum::extract::MatchedPath>().map_or("unmatched", |p| p.as_str());
-    tracing::info_span!("http", method = %req.method(), route, request_id, status = tracing::field::Empty)
+    let span = tracing::info_span!("http", method = %req.method(), route, request_id, trace_id = tracing::field::Empty);
+    app_telemetry::propagation::set_parent_from_headers(&span, req.headers());
+    if let Some(id) = app_telemetry::propagation::trace_id(&span) {
+        span.record("trace_id", id);
+    }
+    span
 }
 
 fn cors(state: &AppState) -> CorsLayer {

@@ -8,6 +8,8 @@ use std::{
 use bytes::Bytes;
 use http::{HeaderValue, Method, StatusCode, header};
 
+use tracing::Instrument as _;
+
 use crate::{
     adaptive::{AcquireError, AdaptiveConfig, AdaptiveLimiter, Outcome},
     breaker::{BreakerConfig, CircuitBreaker, Health},
@@ -364,6 +366,13 @@ impl Provider {
 
     #[tracing::instrument(name = "provider.call", skip_all, fields(provider = %self.name, path = %req.path, attempts = tracing::field::Empty))]
     pub async fn call(&self, req: CallRequest) -> Result<CallResponse, CallError> {
+        // One client span per logical call (retries included); `traceparent` is injected per attempt.
+        let span =
+            tracing::info_span!("provider.call", provider = %self.name, method = %req.method, otel.kind = "client");
+        self.call_in_span(req).instrument(span).await
+    }
+
+    async fn call_in_span(&self, req: CallRequest) -> Result<CallResponse, CallError> {
         if !req.path.starts_with('/')
             || req.path.starts_with("//")
             || req.path.contains("://")
@@ -466,6 +475,9 @@ impl Provider {
         if let Some(k) = &req.idempotency_key {
             rb = rb.header("idempotency-key", k);
         }
+        let mut trace_headers = reqwest::header::HeaderMap::new();
+        app_telemetry::propagation::inject_headers(&tracing::Span::current(), &mut trace_headers);
+        rb = rb.headers(trace_headers);
         if let Some(b) = &req.body {
             rb = rb.json(b);
         }

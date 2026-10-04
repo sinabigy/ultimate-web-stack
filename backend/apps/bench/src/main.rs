@@ -261,6 +261,61 @@ async fn outage_open_loop(use_engine: bool) -> anyhow::Result<Value> {
     }))
 }
 
+/// Per-request tracing cost: time to create, enter and close spans shaped like the HTTP request
+/// span (with W3C parent extraction), with and without the OpenTelemetry layer.
+fn span_cost() -> Value {
+    use opentelemetry::trace::TracerProvider as _;
+    use tracing_subscriber::layer::SubscriberExt as _;
+    const N: u32 = 300_000;
+    let run = |label: &str, dispatch: tracing::Dispatch| {
+        tracing::dispatcher::with_default(&dispatch, || {
+            let headers = {
+                let mut h = reqwest::header::HeaderMap::new();
+                h.insert(
+                    "traceparent",
+                    "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                        .parse()
+                        .unwrap_or_else(|_| unreachable!()),
+                );
+                h
+            };
+            for _ in 0..N / 10 {
+                let s = tracing::info_span!("warmup");
+                drop(s.enter());
+            }
+            let t = Instant::now();
+            for _ in 0..N {
+                let span = tracing::info_span!(
+                    "http",
+                    method = "GET",
+                    route = "/x",
+                    request_id = "r",
+                    trace_id = tracing::field::Empty
+                );
+                app_telemetry::propagation::set_parent_from_headers(&span, &headers);
+                if let Some(id) = app_telemetry::propagation::trace_id(&span) {
+                    span.record("trace_id", id);
+                }
+                let _e = span.enter();
+                let child = tracing::info_span!("db");
+                drop(child.enter());
+            }
+            let ns = t.elapsed().as_nanos() as f64 / f64::from(N);
+            json!({"config": label, "ns_per_request_two_spans": (ns * 10.0).round() / 10.0})
+        })
+    };
+    opentelemetry::global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
+    let plain = tracing::Dispatch::new(tracing_subscriber::registry());
+    let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder().build();
+    let otel = tracing::Dispatch::new(
+        tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(provider.tracer("bench"))),
+    );
+    let a = run("registry only (trace_propagation = false)", plain);
+    let b = run("registry + OpenTelemetry layer, no exporter (default)", otel);
+    let _ = provider.shutdown();
+    json!({"iterations": N, "results": [a, b], "note": "two spans per request (http + one child), parent extracted from traceparent"})
+}
+
 /// Create the benchmark database (name taken from BENCH_DATABASE_URL) if it does not exist.
 async fn ensure_db() -> anyhow::Result<Value> {
     let admin = std::env::var("BENCH_PG_ADMIN_URL")
@@ -450,6 +505,7 @@ async fn main() -> anyhow::Result<()> {
         Some("trace-rate") => trace_rate().await?,
         Some("seed-http") => seed_http().await?,
         Some("ensure-db") => ensure_db().await?,
+        Some("span-cost") => span_cost(),
         _ => anyhow::bail!("usage: app-bench outbound|db [--smoke]"),
     };
     println!("{}", serde_json::to_string_pretty(&v)?);

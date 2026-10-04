@@ -74,6 +74,8 @@ pub struct Stats {
     pub inflight: u64,
     pub peak_inflight: u64,
     pub distinct_idempotency_keys: u64,
+    /// Distinct W3C trace ids received in `traceparent` headers.
+    pub trace_ids: Vec<String>,
 }
 
 struct Inner {
@@ -88,6 +90,7 @@ struct Inner {
     inflight: AtomicU64,
     peak: AtomicU64,
     keys: Mutex<HashSet<String>>,
+    trace_ids: Mutex<HashSet<String>>,
 }
 
 #[derive(Clone)]
@@ -108,6 +111,7 @@ impl Upstream {
             inflight: AtomicU64::new(0),
             peak: AtomicU64::new(0),
             keys: Mutex::new(HashSet::new()),
+            trace_ids: Mutex::new(HashSet::new()),
         }))
     }
 
@@ -132,6 +136,7 @@ impl Upstream {
             inflight: i.inflight.load(Ordering::Relaxed),
             peak_inflight: i.peak.load(Ordering::Relaxed),
             distinct_idempotency_keys: i.keys.lock().map(|k| k.len() as u64).unwrap_or(0),
+            trace_ids: i.trace_ids.lock().map(|t| t.iter().cloned().collect()).unwrap_or_default(),
         }
     }
 
@@ -208,6 +213,12 @@ impl Drop for InflightGuard<'_> {
 async fn echo(State(u): State<Upstream>, headers: HeaderMap, body: Option<Json<EchoBody>>) -> Response {
     let i = &u.0;
     i.requests.fetch_add(1, Ordering::Relaxed);
+    // traceparent = version-traceid-spanid-flags
+    if let Some(tid) = headers.get("traceparent").and_then(|v| v.to_str().ok()).and_then(|v| v.split('-').nth(1))
+        && let Ok(mut ids) = i.trace_ids.lock()
+    {
+        ids.insert(tid.to_string());
+    }
     if let Some(k) = headers.get("idempotency-key").and_then(|v| v.to_str().ok())
         && let Ok(mut keys) = i.keys.lock()
     {
