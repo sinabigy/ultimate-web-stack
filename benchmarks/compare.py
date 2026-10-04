@@ -31,10 +31,13 @@ def resolve(doc, path: str):
     cur = doc
     for part in re.findall(r"[^.\[\]]+|\[[^\]]+\]", path):
         if part.startswith("["):
-            key, _, want = part[1:-1].partition("=")
+            conds = [c.partition("=")[::2] for c in part[1:-1].split(",")]
             if not isinstance(cur, list):
                 return MISSING
-            cur = next((e for e in cur if isinstance(e, dict) and str(e.get(key)) == want), MISSING)
+            hits = [e for e in cur if isinstance(e, dict) and all(str(e.get(k)) == v for k, v in conds)]
+            if len(hits) != 1:  # ambiguous selectors are an error, not "first match"
+                return MISSING
+            cur = hits[0]
         elif isinstance(cur, dict):
             cur = cur.get(part, MISSING)
         else:

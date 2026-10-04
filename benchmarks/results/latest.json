@@ -1,0 +1,859 @@
+{
+  "schema": 1,
+  "started_at": "2026-10-04T11:43:57+00:00",
+  "smoke": false,
+  "environment": {
+    "host": "Mac",
+    "os": "macOS 26.5.1",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "logical_cores": 10,
+    "memory_gb": 16.0,
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "oha": "oha 1.16.0",
+    "git_sha": "23e824900844",
+    "git_dirty": false,
+    "build_profile": "release (lto=thin, codegen-units=1)",
+    "container_runtime": "2 cpus, 4094447616 bytes, Ubuntu 24.04.4 LTS, aarch64",
+    "notes": "Load generator and server share the host; services (PostgreSQL/Redis/Dragonfly) run in the container VM."
+  },
+  "suites": {
+    "http": {
+      "status": "ok",
+      "wall_s": 104.8,
+      "data": {
+        "duration_per_point": "10s",
+        "plaintext": [
+          {
+            "url_path": "/bench/plaintext",
+            "concurrency": 16,
+            "duration_s": 10.0,
+            "requests": 1179047,
+            "rps": 117866.7,
+            "success_rps": 117866.7,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 1179047
+            },
+            "errors": {},
+            "p50_ms": 0.124,
+            "p95_ms": 0.222,
+            "p99_ms": 0.345,
+            "p999_ms": 0.756,
+            "server_rss_mb_max": 49.8,
+            "server_cpu_pct_avg": 363.7,
+            "success_rps_per_server_core": 32407.7,
+            "success_rps_per_gb_rss": 2423604.4
+          },
+          {
+            "url_path": "/bench/plaintext",
+            "concurrency": 64,
+            "duration_s": 10.0,
+            "requests": 1298479,
+            "rps": 129789.0,
+            "success_rps": 129789.0,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 1298479
+            },
+            "errors": {},
+            "p50_ms": 0.443,
+            "p95_ms": 0.88,
+            "p99_ms": 1.418,
+            "p999_ms": 5.115,
+            "server_rss_mb_max": 77.6,
+            "server_cpu_pct_avg": 335.4,
+            "success_rps_per_server_core": 38696.8,
+            "success_rps_per_gb_rss": 1712679.6
+          },
+          {
+            "url_path": "/bench/plaintext",
+            "concurrency": 256,
+            "duration_s": 10.01,
+            "requests": 1377479,
+            "rps": 137678.2,
+            "success_rps": 137678.2,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 1377479
+            },
+            "errors": {},
+            "p50_ms": 1.64,
+            "p95_ms": 3.649,
+            "p99_ms": 5.886,
+            "p999_ms": 16.747,
+            "server_rss_mb_max": 104.6,
+            "server_cpu_pct_avg": 333.8,
+            "success_rps_per_server_core": 41245.7,
+            "success_rps_per_gb_rss": 1347824.8
+          }
+        ],
+        "json": [
+          {
+            "url_path": "/bench/json",
+            "concurrency": 16,
+            "duration_s": 10.0,
+            "requests": 853047,
+            "rps": 85273.4,
+            "success_rps": 85273.4,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 853047
+            },
+            "errors": {},
+            "p50_ms": 0.146,
+            "p95_ms": 0.362,
+            "p99_ms": 0.811,
+            "p999_ms": 3.326,
+            "server_rss_mb_max": 41.3,
+            "server_cpu_pct_avg": 249.3,
+            "success_rps_per_server_core": 34205.1,
+            "success_rps_per_gb_rss": 2114284.8
+          },
+          {
+            "url_path": "/bench/json",
+            "concurrency": 64,
+            "duration_s": 10.0,
+            "requests": 1073087,
+            "rps": 107277.1,
+            "success_rps": 107277.1,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 1073087
+            },
+            "errors": {},
+            "p50_ms": 0.498,
+            "p95_ms": 1.115,
+            "p99_ms": 2.466,
+            "p999_ms": 9.172,
+            "server_rss_mb_max": 29.9,
+            "server_cpu_pct_avg": 275.3,
+            "success_rps_per_server_core": 38967.3,
+            "success_rps_per_gb_rss": 3673971.6
+          },
+          {
+            "url_path": "/bench/json",
+            "concurrency": 256,
+            "duration_s": 10.0,
+            "requests": 1284264,
+            "rps": 128391.5,
+            "success_rps": 128391.5,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 1284264
+            },
+            "errors": {},
+            "p50_ms": 1.761,
+            "p95_ms": 3.974,
+            "p99_ms": 6.391,
+            "p999_ms": 14.711,
+            "server_rss_mb_max": 44.8,
+            "server_cpu_pct_avg": 317.4,
+            "success_rps_per_server_core": 40451.0,
+            "success_rps_per_gb_rss": 2934662.9
+          }
+        ],
+        "db": {
+          "url_path": "/bench/db",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 95663,
+          "rps": 9563.1,
+          "success_rps": 9563.1,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 95663
+          },
+          "errors": {},
+          "p50_ms": 6.0,
+          "p95_ms": 10.159,
+          "p99_ms": 18.002,
+          "p999_ms": 77.952,
+          "server_rss_mb_max": 33.8,
+          "server_cpu_pct_avg": 75.5,
+          "success_rps_per_server_core": 12666.4,
+          "success_rps_per_gb_rss": 289722.3
+        },
+        "updates": {
+          "url_path": "/bench/updates",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 70922,
+          "rps": 7090.5,
+          "success_rps": 7090.5,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 70922
+          },
+          "errors": {},
+          "p50_ms": 8.555,
+          "p95_ms": 13.145,
+          "p99_ms": 17.852,
+          "p999_ms": 26.446,
+          "server_rss_mb_max": 23.8,
+          "server_cpu_pct_avg": 57.3,
+          "success_rps_per_server_core": 12374.3,
+          "success_rps_per_gb_rss": 305070.3
+        },
+        "cached": {
+          "url_path": "/bench/cached",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 1073060,
+          "rps": 107276.3,
+          "success_rps": 107276.3,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 1073060
+          },
+          "errors": {},
+          "p50_ms": 0.514,
+          "p95_ms": 1.077,
+          "p99_ms": 1.955,
+          "p999_ms": 9.238,
+          "server_rss_mb_max": 30.4,
+          "server_cpu_pct_avg": 292.7,
+          "success_rps_per_server_core": 36650.6,
+          "success_rps_per_gb_rss": 3613517.5
+        },
+        "healthz": {
+          "url_path": "/healthz",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 1091404,
+          "rps": 109106.3,
+          "success_rps": 109106.3,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 1091404
+          },
+          "errors": {},
+          "p50_ms": 0.5,
+          "p95_ms": 1.068,
+          "p99_ms": 1.965,
+          "p999_ms": 9.867,
+          "server_rss_mb_max": 30.8,
+          "server_cpu_pct_avg": 284.9,
+          "success_rps_per_server_core": 38296.3,
+          "success_rps_per_gb_rss": 3627430.2
+        }
+      }
+    },
+    "auth": {
+      "status": "ok",
+      "wall_s": 47.7,
+      "data": {
+        "duration_per_point": "10s",
+        "fixture": {
+          "org_slug": "bench-http",
+          "runs_in_org": 1000
+        },
+        "profile": {
+          "db_queries": 2,
+          "url_path": "/api/v1/account/profile",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 42527,
+          "rps": 4251.5,
+          "success_rps": 4251.5,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 42527
+          },
+          "errors": {},
+          "p50_ms": 14.297,
+          "p95_ms": 20.927,
+          "p99_ms": 29.208,
+          "p999_ms": 38.12,
+          "server_rss_mb_max": 22.8,
+          "server_cpu_pct_avg": 60.0,
+          "success_rps_per_server_core": 7085.8,
+          "success_rps_per_gb_rss": 190944.6
+        },
+        "session": {
+          "db_queries": 3,
+          "url_path": "/api/v1/session",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 28289,
+          "rps": 2828.3,
+          "success_rps": 2828.3,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 28289
+          },
+          "errors": {},
+          "p50_ms": 21.633,
+          "p95_ms": 30.891,
+          "p99_ms": 38.823,
+          "p999_ms": 47.756,
+          "server_rss_mb_max": 22.9,
+          "server_cpu_pct_avg": 55.7,
+          "success_rps_per_server_core": 5077.7,
+          "success_rps_per_gb_rss": 126470.7
+        },
+        "org_runs_page": {
+          "db_queries": 3,
+          "url_path": "/api/v1/orgs/bench-http/runs?limit=20",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 23778,
+          "rps": 2376.9,
+          "success_rps": 2376.9,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 23778
+          },
+          "errors": {},
+          "p50_ms": 25.785,
+          "p95_ms": 36.403,
+          "p99_ms": 47.486,
+          "p999_ms": 63.601,
+          "server_rss_mb_max": 23.7,
+          "server_cpu_pct_avg": 56.7,
+          "success_rps_per_server_core": 4192.1,
+          "success_rps_per_gb_rss": 102698.1
+        },
+        "unauthenticated_401": {
+          "db_queries": 0,
+          "url_path": "/api/v1/dashboard",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 1279713,
+          "rps": 127946.9,
+          "success_rps": 0.0,
+          "success_rate": 0.0,
+          "status_codes": {
+            "401": 1279713
+          },
+          "errors": {},
+          "p50_ms": 0.456,
+          "p95_ms": 0.866,
+          "p99_ms": 1.359,
+          "p999_ms": 4.459,
+          "server_rss_mb_max": 43.4,
+          "server_cpu_pct_avg": 369.2,
+          "success_rps_per_server_core": 0.0,
+          "success_rps_per_gb_rss": 0.0
+        },
+        "cross_tenant_404": {
+          "url_path": "/api/v1/orgs/not-a-member-org/runs",
+          "concurrency": 16,
+          "duration_s": 5.0,
+          "requests": 27076,
+          "rps": 5414.0,
+          "success_rps": 0.0,
+          "success_rate": 0.0,
+          "status_codes": {
+            "404": 27076
+          },
+          "errors": {},
+          "p50_ms": 2.745,
+          "p95_ms": 4.918,
+          "p99_ms": 6.654,
+          "p999_ms": 9.857,
+          "server_rss_mb_max": 27.8,
+          "server_cpu_pct_avg": 72.9,
+          "success_rps_per_server_core": 0.0,
+          "success_rps_per_gb_rss": 0.0
+        }
+      }
+    },
+    "cache": {
+      "status": "ok",
+      "wall_s": 37.6,
+      "data": {
+        "duration_per_point": "10s",
+        "endpoint": "/bench/cached (hot set of 100 keys, read-through to PostgreSQL)",
+        "memory": {
+          "url_path": "/bench/cached",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 1293793,
+          "rps": 129336.4,
+          "success_rps": 129336.4,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 1293793
+          },
+          "errors": {},
+          "p50_ms": 0.458,
+          "p95_ms": 0.837,
+          "p99_ms": 1.241,
+          "p999_ms": 4.04,
+          "server_rss_mb_max": 55.0,
+          "server_cpu_pct_avg": 388.5,
+          "success_rps_per_server_core": 33291.2,
+          "success_rps_per_gb_rss": 2408008.6
+        },
+        "redis": {
+          "url_path": "/bench/cached",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 604167,
+          "rps": 60396.8,
+          "success_rps": 60396.8,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 604167
+          },
+          "errors": {},
+          "p50_ms": 1.034,
+          "p95_ms": 1.446,
+          "p99_ms": 1.759,
+          "p999_ms": 2.58,
+          "server_rss_mb_max": 37.7,
+          "server_cpu_pct_avg": 244.7,
+          "success_rps_per_server_core": 24682.0,
+          "success_rps_per_gb_rss": 1640486.0
+        },
+        "dragonfly": {
+          "url_path": "/bench/cached",
+          "concurrency": 64,
+          "duration_s": 10.0,
+          "requests": 566487,
+          "rps": 56628.4,
+          "success_rps": 56628.4,
+          "success_rate": 1.0,
+          "status_codes": {
+            "200": 566487
+          },
+          "errors": {},
+          "p50_ms": 1.098,
+          "p95_ms": 1.554,
+          "p99_ms": 1.931,
+          "p999_ms": 3.079,
+          "server_rss_mb_max": 37.1,
+          "server_cpu_pct_avg": 228.9,
+          "success_rps_per_server_core": 24739.4,
+          "success_rps_per_gb_rss": 1563004.9
+        }
+      }
+    },
+    "outbound": {
+      "status": "ok",
+      "wall_s": 56.3,
+      "data": {
+        "concurrency_sweep_5ms": [
+          {
+            "concurrency": 1,
+            "p50_ms": 6.877125,
+            "p95_ms": 6.938625,
+            "p999_ms": 7.973833,
+            "p99_ms": 6.999459000000001,
+            "requests": 800,
+            "succeeded": 800,
+            "success_rate": 1.0,
+            "useful_rps": 146.78806161685765,
+            "wall_s": 5.4500345
+          },
+          {
+            "concurrency": 8,
+            "p50_ms": 6.915084,
+            "p95_ms": 7.015208,
+            "p999_ms": 7.176875,
+            "p99_ms": 7.071625,
+            "requests": 800,
+            "succeeded": 800,
+            "success_rate": 1.0,
+            "useful_rps": 1184.5179067643746,
+            "wall_s": 0.67538025
+          },
+          {
+            "concurrency": 32,
+            "p50_ms": 7.022625000000001,
+            "p95_ms": 7.344708,
+            "p999_ms": 7.907374999999999,
+            "p99_ms": 7.6420840000000005,
+            "requests": 2560,
+            "succeeded": 2560,
+            "success_rate": 1.0,
+            "useful_rps": 4605.013303496685,
+            "wall_s": 0.555915875
+          },
+          {
+            "concurrency": 128,
+            "p50_ms": 6.818125,
+            "p95_ms": 8.002125000000001,
+            "p999_ms": 11.4205,
+            "p99_ms": 9.156208000000001,
+            "requests": 10240,
+            "succeeded": 10240,
+            "success_rate": 1.0,
+            "useful_rps": 16803.688934836475,
+            "wall_s": 0.60939
+          },
+          {
+            "concurrency": 512,
+            "p50_ms": 16.05175,
+            "p95_ms": 19.816958999999997,
+            "p999_ms": 31.840833,
+            "p99_ms": 23.97475,
+            "requests": 40000,
+            "succeeded": 40000,
+            "success_rate": 1.0,
+            "useful_rps": 21856.399222431275,
+            "wall_s": 1.830127625
+          }
+        ],
+        "connection_reuse": {
+          "fresh_connections": {
+            "p50_ms": 1.821292,
+            "p95_ms": 2.503166,
+            "p999_ms": 6.150625,
+            "p99_ms": 3.011916,
+            "requests": 10000,
+            "succeeded": 10000,
+            "success_rate": 1.0,
+            "upstream": {
+              "connection_reuse": 0.0,
+              "connections": 10000,
+              "errors_500": 0,
+              "rejected_429": 0,
+              "rejected_503": 0,
+              "sent": 10000,
+              "waste_ratio": 0.0
+            },
+            "useful_rps": 26204.117386406466,
+            "wall_s": 0.381619417
+          },
+          "pooled_keepalive": {
+            "p50_ms": 0.9432499999999999,
+            "p95_ms": 1.494459,
+            "p999_ms": 5.499833,
+            "p99_ms": 3.152334,
+            "requests": 10000,
+            "succeeded": 10000,
+            "success_rate": 1.0,
+            "upstream": {
+              "connection_reuse": 0.9936,
+              "connections": 64,
+              "errors_500": 0,
+              "rejected_429": 0,
+              "rejected_503": 0,
+              "sent": 10000,
+              "waste_ratio": 0.0
+            },
+            "useful_rps": 35090.602514523096,
+            "wall_s": 0.284976583
+          }
+        },
+        "outage_open_loop_engine": {
+          "amplification_during_outage": 0.47875,
+          "duration_s": 6,
+          "offered": 2400,
+          "offered_rps": 400,
+          "outage_window_s": [
+            1.0,
+            3.0
+          ],
+          "recovery_s": 0.462630916,
+          "succeeded": 1416,
+          "upstream_rejected_503": 383,
+          "upstream_requests_until_recovery": 784
+        },
+        "outage_open_loop_naive": {
+          "amplification_during_outage": 21.00875,
+          "duration_s": 6,
+          "offered": 2400,
+          "offered_rps": 400,
+          "outage_window_s": [
+            1.0,
+            3.0
+          ],
+          "recovery_s": 0.004694792,
+          "succeeded": 1600,
+          "upstream_rejected_503": 16807,
+          "upstream_requests_until_recovery": 17200
+        },
+        "overloaded_capacity16": {
+          "engine": {
+            "final_concurrency_limit": 39,
+            "p50_ms": 163.56554200000002,
+            "p95_ms": 165.874083,
+            "p999_ms": 302.0185,
+            "p99_ms": 166.954083,
+            "requests": 15000,
+            "succeeded": 15000,
+            "success_rate": 1.0,
+            "upstream": {
+              "connection_reuse": 0.9967394197498004,
+              "connections": 49,
+              "errors_500": 0,
+              "rejected_429": 0,
+              "rejected_503": 28,
+              "sent": 15028,
+              "waste_ratio": 0.0018631887143997872
+            },
+            "useful_rps": 1562.127781073975,
+            "wall_s": 9.602287458
+          },
+          "naive": {
+            "p50_ms": 49.72170800000001,
+            "p95_ms": 68.212041,
+            "p999_ms": 93.299,
+            "p99_ms": 75.938125,
+            "requests": 15000,
+            "succeeded": 3915,
+            "success_rate": 0.261,
+            "upstream": {
+              "connection_reuse": 0.9990612969442841,
+              "connections": 257,
+              "errors_500": 0,
+              "rejected_429": 0,
+              "rejected_503": 269867,
+              "sent": 273782,
+              "waste_ratio": 0.9857003016998926
+            },
+            "useful_rps": 1546.0003977545084,
+            "wall_s": 2.532340875
+          }
+        },
+        "rate_limited_500rps": {
+          "engine": {
+            "p50_ms": 266.58095799999995,
+            "p95_ms": 1273.2902909999998,
+            "p999_ms": 2441.634667,
+            "p99_ms": 1829.3592090000002,
+            "requests": 7500,
+            "succeeded": 7500,
+            "success_rate": 1.0,
+            "upstream": {
+              "connection_reuse": 0.9958082263557768,
+              "connections": 32,
+              "errors_500": 0,
+              "rejected_429": 134,
+              "rejected_503": 0,
+              "sent": 7634,
+              "waste_ratio": 0.0175530521351847
+            },
+            "useful_rps": 374.7077482467921,
+            "wall_s": 20.015598917
+          },
+          "naive": {
+            "p50_ms": 12.142792,
+            "p95_ms": 32.501292,
+            "p999_ms": 47.336625,
+            "p99_ms": 43.621874999999996,
+            "requests": 7500,
+            "succeeded": 745,
+            "success_rate": 0.09933333333333333,
+            "upstream": {
+              "connection_reuse": 0.9991240739254861,
+              "connections": 131,
+              "errors_500": 0,
+              "rejected_429": 148811,
+              "rejected_503": 0,
+              "sent": 149556,
+              "waste_ratio": 0.9950185883548637
+            },
+            "useful_rps": 534.087826851812,
+            "wall_s": 1.394901667
+          }
+        }
+      }
+    },
+    "db": {
+      "status": "ok",
+      "wall_s": 131.7,
+      "data": {
+        "duration_s": 8.0,
+        "results": [
+          {
+            "concurrency": 64,
+            "ops": 36302,
+            "ops_per_sec": 4537.75,
+            "p50_ms": 13.541625,
+            "p999_ms": 37.975750000000005,
+            "p99_ms": 25.738917,
+            "pool_size": 8,
+            "pool_wait_p50_ms": 12.936042,
+            "pool_wait_p99_ms": 24.542583,
+            "query": "pk_read"
+          },
+          {
+            "concurrency": 64,
+            "ops": 54927,
+            "ops_per_sec": 6865.875,
+            "p50_ms": 8.866667,
+            "p999_ms": 27.319416999999998,
+            "p99_ms": 18.713417,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 7.436708,
+            "pool_wait_p99_ms": 15.781375,
+            "query": "pk_read"
+          },
+          {
+            "concurrency": 256,
+            "ops": 64410,
+            "ops_per_sec": 8051.25,
+            "p50_ms": 29.633042,
+            "p999_ms": 65.219167,
+            "p99_ms": 54.099957999999994,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 28.368707999999998,
+            "pool_wait_p99_ms": 51.824000000000005,
+            "query": "pk_read"
+          },
+          {
+            "concurrency": 256,
+            "ops": 71285,
+            "ops_per_sec": 8910.625,
+            "p50_ms": 27.196250000000003,
+            "p999_ms": 130.944875,
+            "p99_ms": 49.001083,
+            "pool_size": 64,
+            "pool_wait_p50_ms": 25.153334,
+            "pool_wait_p99_ms": 45.095083,
+            "query": "pk_read"
+          },
+          {
+            "concurrency": 64,
+            "ops": 37739,
+            "ops_per_sec": 4717.375,
+            "p50_ms": 13.279292,
+            "p999_ms": 23.978459,
+            "p99_ms": 19.843374999999998,
+            "pool_size": 8,
+            "pool_wait_p50_ms": 12.6695,
+            "pool_wait_p99_ms": 19.016916,
+            "query": "tenant_list_20"
+          },
+          {
+            "concurrency": 64,
+            "ops": 60888,
+            "ops_per_sec": 7611.0,
+            "p50_ms": 7.949583,
+            "p999_ms": 26.263375,
+            "p99_ms": 17.468709,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 6.623083,
+            "pool_wait_p99_ms": 14.582583,
+            "query": "tenant_list_20"
+          },
+          {
+            "concurrency": 256,
+            "ops": 60552,
+            "ops_per_sec": 7569.0,
+            "p50_ms": 32.2425,
+            "p999_ms": 66.410833,
+            "p99_ms": 57.810584,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 30.864333000000002,
+            "pool_wait_p99_ms": 55.5215,
+            "query": "tenant_list_20"
+          },
+          {
+            "concurrency": 256,
+            "ops": 62108,
+            "ops_per_sec": 7763.5,
+            "p50_ms": 31.994542,
+            "p999_ms": 93.038834,
+            "p99_ms": 55.862542,
+            "pool_size": 64,
+            "pool_wait_p50_ms": 29.643791999999998,
+            "pool_wait_p99_ms": 50.7965,
+            "query": "tenant_list_20"
+          },
+          {
+            "concurrency": 64,
+            "ops": 33338,
+            "ops_per_sec": 4167.25,
+            "p50_ms": 14.397542,
+            "p999_ms": 42.403999999999996,
+            "p99_ms": 31.329792,
+            "pool_size": 8,
+            "pool_wait_p50_ms": 13.725583,
+            "pool_wait_p99_ms": 29.807333,
+            "query": "session_auth_lookup"
+          },
+          {
+            "concurrency": 64,
+            "ops": 56307,
+            "ops_per_sec": 7038.375,
+            "p50_ms": 8.487166,
+            "p999_ms": 35.472083000000005,
+            "p99_ms": 20.099167,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 7.046958,
+            "pool_wait_p99_ms": 16.668208,
+            "query": "session_auth_lookup"
+          },
+          {
+            "concurrency": 256,
+            "ops": 57284,
+            "ops_per_sec": 7160.5,
+            "p50_ms": 34.496834,
+            "p999_ms": 100.860167,
+            "p99_ms": 66.005833,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 33.057875,
+            "pool_wait_p99_ms": 62.97987500000001,
+            "query": "session_auth_lookup"
+          },
+          {
+            "concurrency": 256,
+            "ops": 59243,
+            "ops_per_sec": 7405.375,
+            "p50_ms": 32.404167,
+            "p999_ms": 123.605125,
+            "p99_ms": 65.705833,
+            "pool_size": 64,
+            "pool_wait_p50_ms": 29.965917,
+            "pool_wait_p99_ms": 58.845541000000004,
+            "query": "session_auth_lookup"
+          },
+          {
+            "concurrency": 64,
+            "ops": 31770,
+            "ops_per_sec": 3971.25,
+            "p50_ms": 14.276375,
+            "p999_ms": 98.302667,
+            "p99_ms": 33.564792000000004,
+            "pool_size": 8,
+            "pool_wait_p50_ms": 13.384,
+            "pool_wait_p99_ms": 31.717542,
+            "query": "update_one"
+          },
+          {
+            "concurrency": 64,
+            "ops": 44826,
+            "ops_per_sec": 5603.25,
+            "p50_ms": 11.059292,
+            "p999_ms": 28.259417,
+            "p99_ms": 20.526625,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 7.857665999999999,
+            "pool_wait_p99_ms": 15.020166999999999,
+            "query": "update_one"
+          },
+          {
+            "concurrency": 256,
+            "ops": 57257,
+            "ops_per_sec": 7157.125,
+            "p50_ms": 31.655124999999998,
+            "p999_ms": 197.9865,
+            "p99_ms": 80.94475,
+            "pool_size": 32,
+            "pool_wait_p50_ms": 29.48275,
+            "pool_wait_p99_ms": 75.186,
+            "query": "update_one"
+          },
+          {
+            "concurrency": 256,
+            "ops": 68232,
+            "ops_per_sec": 8529.0,
+            "p50_ms": 29.138542,
+            "p999_ms": 54.278375,
+            "p99_ms": 47.195875,
+            "pool_size": 64,
+            "pool_wait_p50_ms": 24.798834,
+            "pool_wait_p99_ms": 40.198,
+            "query": "update_one"
+          }
+        ]
+      }
+    }
+  },
+  "finished_at": "2026-10-04T11:50:15+00:00"
+}

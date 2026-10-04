@@ -1,5 +1,5 @@
 {
-  "$comment": "Benchmark gates. `invariants` are machine-independent properties checked on every run (smoke included). `regressions` compare against a baseline recorded on the SAME machine fingerprint; on a different machine they are reported as not comparable instead of failing. Paths: dotted keys; `[key=value]` selects a list element.",
+  "$comment": "Benchmark gates. `invariants` are machine-independent properties checked on every run (smoke included). `regressions` compare against a baseline recorded on the SAME machine fingerprint; on a different machine they are reported as not comparable instead of failing. Paths: dotted keys; `[key=value,...]` selects exactly one list element.",
   "invariants": [
     { "name": "plaintext: no errors", "path": "suites.http.data.plaintext[concurrency=64].success_rate", "min": 0.9999 },
     { "name": "db read: no errors", "path": "suites.http.data.db.success_rate", "min": 0.999 },
@@ -27,6 +27,6 @@
     { "name": "authenticated tenant page p99", "path": "suites.auth.data.org_runs_page.p99_ms", "better": "lower", "tolerance": 0.4 },
     { "name": "server memory under load", "path": "suites.http.data.plaintext[concurrency=64].server_rss_mb_max", "better": "lower", "tolerance": 0.3 },
     { "name": "engine rate-limited completion time", "path": "suites.outbound.data.rate_limited_500rps.engine.wall_s", "better": "lower", "tolerance": 0.25 },
-    { "name": "session lookup ops/s", "path": "suites.db.data.results[query=session_auth_lookup].ops_per_sec", "better": "higher", "tolerance": 0.2 }
+    { "name": "session lookup ops/s", "path": "suites.db.data.results[query=session_auth_lookup,pool_size=32,concurrency=64].ops_per_sec", "better": "higher", "tolerance": 0.2 }
   ]
 }

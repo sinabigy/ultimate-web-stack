@@ -200,7 +200,24 @@ class Sampler(threading.Thread):
 # ── load generation ──────────────────────────────────────────────────────────────────────────
 
 
+REPEAT = 1  # set from --repeat; measured points run this many times and report the median
+
+
 def oha(url: str, duration: str, conc: int, headers: dict[str, str] | None = None, pid: int | None = None) -> dict:
+    """Median (by success req/s) of REPEAT runs, with the spread recorded. Single 10 s samples on
+    a shared host varied by ±20% between identical runs, so one sample cannot gate regressions."""
+    if pid is None or REPEAT <= 1:
+        return oha_once(url, duration, conc, headers, pid)
+    runs = sorted((oha_once(url, duration, conc, headers, pid) for _ in range(REPEAT)), key=lambda r: r["success_rps"])
+    med = dict(runs[len(runs) // 2])
+    samples = [r["success_rps"] for r in runs]
+    med["repeats"] = len(runs)
+    med["success_rps_samples"] = samples
+    med["success_rps_spread"] = round((samples[-1] - samples[0]) / med["success_rps"], 4) if med["success_rps"] else None
+    return med
+
+
+def oha_once(url: str, duration: str, conc: int, headers: dict[str, str] | None = None, pid: int | None = None) -> dict:
     cmd = ["oha", "-z", duration, "-c", str(conc), "--no-tui", "--output-format", "json", url]
     for k, v in (headers or {}).items():
         cmd[1:1] = ["-H", f"{k}: {v}"]
@@ -248,7 +265,7 @@ def oha(url: str, duration: str, conc: int, headers: dict[str, str] | None = Non
 
 
 def suite_http(smoke: bool) -> dict:
-    d = "3s" if smoke else "10s"
+    d = "3s" if smoke else "6s"
     sweep = [64] if smoke else [16, 64, 256]
     out: dict = {"duration_per_point": d}
     with Stack() as st:
@@ -267,7 +284,7 @@ def seed_http() -> dict:
 
 
 def suite_auth(smoke: bool) -> dict:
-    d = "3s" if smoke else "10s"
+    d = "3s" if smoke else "6s"
     fx = seed_http()
     cookie = {"Cookie": f"app_session={fx['cookie_value']}"}
     out: dict = {"duration_per_point": d, "fixture": {"org_slug": fx["org_slug"], "runs_in_org": 1000}}
@@ -284,7 +301,7 @@ def suite_auth(smoke: bool) -> dict:
         # Rejection cost: no credentials → 401 problem+json.
         out["unauthenticated_401"] = {"db_queries": 0, **oha(f"{APP}/api/v1/dashboard", d, 64, None, pid)}
         # Cross-tenant probe → 404 (membership check fails; audited).
-        out["cross_tenant_404"] = oha(f"{APP}/api/v1/orgs/not-a-member-org/runs", "2s" if smoke else "5s", 16, cookie, pid)
+        out["cross_tenant_404"] = oha(f"{APP}/api/v1/orgs/not-a-member-org/runs", "2s" if smoke else "4s", 16, cookie, pid)
     return out
 
 
@@ -299,7 +316,7 @@ def redis_ping(url: str) -> bool:
 
 
 def suite_cache(smoke: bool) -> dict:
-    d = "3s" if smoke else "10s"
+    d = "3s" if smoke else "6s"
     out: dict = {"duration_per_point": d, "endpoint": "/bench/cached (hot set of 100 keys, read-through to PostgreSQL)"}
     backends = {"memory": None, "redis": REDIS_URL, "dragonfly": DRAGONFLY_URL}
     for name, url in backends.items():
@@ -338,8 +355,11 @@ def main() -> int:
     ap.add_argument("--smoke", action="store_true", help="short durations (CI)")
     ap.add_argument("--label", default="", help="suffix for the result file")
     ap.add_argument("--no-build", action="store_true")
+    ap.add_argument("--repeat", type=int, default=None, help="runs per HTTP point, median reported (default 3; smoke 1)")
     a = ap.parse_args()
     suites = [s.strip() for s in a.suite.split(",") if s.strip()]
+    global REPEAT
+    REPEAT = a.repeat if a.repeat is not None else (1 if a.smoke else 3)
     unknown = set(suites) - set(SUITES)
     if unknown:
         ap.error(f"unknown suites: {sorted(unknown)}")
@@ -352,7 +372,7 @@ def main() -> int:
     ensure_database()
 
     started = dt.datetime.now(dt.timezone.utc)
-    result: dict = {"schema": 1, "started_at": started.isoformat(timespec="seconds"), "smoke": a.smoke,
+    result: dict = {"schema": 1, "repeat": REPEAT, "started_at": started.isoformat(timespec="seconds"), "smoke": a.smoke,
                     "environment": environment(), "suites": {}}
     for s in suites:
         log(f"suite {s}…")
@@ -387,7 +407,10 @@ def main() -> int:
     name = f"{started:%Y%m%dT%H%M%SZ}-{sha}{'-smoke' if a.smoke else ''}{'-' + a.label if a.label else ''}.json"
     text = json.dumps(result, indent=2) + "\n"
     (RESULTS / name).write_text(text)
-    (RESULTS / ("latest-smoke.json" if a.smoke else "latest.json")).write_text(text)
+    # `latest.json` is the most recent *complete* run (what reports and gates read by default);
+    # subsets and smoke runs get their own alias so they never replace it.
+    alias = "latest-smoke.json" if a.smoke else ("latest.json" if set(suites) == set(SUITES) else "latest-partial.json")
+    (RESULTS / alias).write_text(text)
     log(f"wrote benchmarks/results/{name}")
     return 0 if all(v["status"] == "ok" for v in result["suites"].values()) else 1
 
