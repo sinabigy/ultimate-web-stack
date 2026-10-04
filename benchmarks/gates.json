@@ -25,7 +25,7 @@
     { "name": "cached read throughput", "path": "suites.http.data.cached.success_rps", "better": "higher", "tolerance": 0.15 },
     { "name": "authenticated tenant page throughput", "path": "suites.auth.data.org_runs_page.success_rps", "better": "higher", "tolerance": 0.2 },
     { "name": "authenticated tenant page p99", "path": "suites.auth.data.org_runs_page.p99_ms", "better": "lower", "tolerance": 0.4 },
-    { "name": "server memory under load", "path": "suites.http.data.plaintext[concurrency=64].server_rss_mb_max", "better": "lower", "tolerance": 0.3 },
+    { "name": "server memory under load", "path": "suites.http.data.plaintext[concurrency=64].server_rss_mb_max", "better": "lower", "tolerance": 0.6, "note": "peak RSS varied 35% between identical runs (allocator retention); this gate catches leaks and doublings, not drift" },
     { "name": "engine rate-limited completion time", "path": "suites.outbound.data.rate_limited_500rps.engine.wall_s", "better": "lower", "tolerance": 0.25 },
     { "name": "session lookup ops/s", "path": "suites.db.data.results[query=session_auth_lookup,pool_size=32,concurrency=64].ops_per_sec", "better": "higher", "tolerance": 0.2 }
   ]

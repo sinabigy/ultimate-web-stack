@@ -54,6 +54,25 @@ Prerequisites: `./dev up --no-app` (PostgreSQL; Redis and Dragonfly for the cach
 - **Useful throughput** (completed work per second) is the outbound metric, not raw request
   rate: a client that sends 50,000 requests to get 700 successes is not fast.
 
+## Measured noise
+
+Run-to-run variation decides how tight a gate can be. It was measured with two consecutive full
+runs on the reference machine (`results/*-noise-a.json`, `*-noise-b.json`, 3 repeats per point,
+median reported):
+
+| metric | difference between runs |
+|---|---|
+| HTTP throughput (plaintext, json, cached, db) | 0.3–4.5% |
+| authenticated tenant page throughput | 7.6% |
+| p99 latencies | 0.8–14% |
+| outbound engine completion time | 0.7% |
+| PostgreSQL session lookup ops/s | 4.9% |
+| server peak RSS | 35% |
+
+Single 10 s samples, without repeats, differed by up to 23%. Hence the repeats, and tolerances of
+15–20% for throughput, 35–40% for p99 and 60% for peak RSS. Re-measure noise on any new
+reference machine before trusting its gates.
+
 ## Regression gates
 
 `gates.json` has two kinds of gate:

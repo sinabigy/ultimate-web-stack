@@ -124,6 +124,17 @@
         "note": "Cedar engine conformance + RBAC/Cedar differential property test."
       },
       {
+        "id": "bench-gates-selftest",
+        "stage": "unit",
+        "cmd": "python3 -m unittest benchmarks/test_compare.py",
+        "requires": [
+          "python3"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "note": "Benchmark regression gates: a synthetic slowdown fails, noise within tolerance passes, other machines are not compared, invariants always apply."
+      },
+      {
         "id": "rust-test-cache",
         "stage": "integration",
         "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache",

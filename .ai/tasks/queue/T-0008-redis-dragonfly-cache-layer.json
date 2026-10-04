@@ -17,7 +17,7 @@
   "likely_files": [],
   "constraints": [],
   "validation": [
-    "cargo test -p blueprint-cache -- --include-ignored"
+    "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache"
   ],
   "risk": "medium",
   "task_class": "feature",
