@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+"""Developer CLI. One entry point for the whole stack; standard library only.
+
+  ./dev setup                 one-time: git hooks, toolchain/npm deps, Playwright browser
+  ./dev doctor                show which tools/services are available (what will be skipped)
+  ./dev up [--identity mock|zitadel] [--no-app]
+                              start services for the enabled modules (from .ai/config/project.json
+                              → architecture.modules), migrate, and run backend + frontend dev servers
+  ./dev down [--volumes]      stop everything (and delete data volumes)
+  ./dev status                containers and app health
+  ./dev check [--auth] [--strict]
+                              canonical validation (tools/ai-validate) + optional identity checks
+  ./dev test [--e2e] [--zitadel]
+                              backend + frontend tests; optional browser suites
+  ./dev benchmark [--smoke]   benchmark suite (benchmarks/run.py)
+  ./dev types                 regenerate TypeScript bindings from Rust API types
+  ./dev db migrate|reset|prepare|psql
+  ./dev logs [service]
+
+Validation commands are NOT duplicated here: `check` delegates to tools/ai-validate, which runs
+the confirmed commands in .ai/config/project.json.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+COMPOSE = ["docker-compose"] if shutil.which("docker-compose") else ["docker", "compose"]
+COMPOSE_FILE = ROOT / "infra/docker/compose.yaml"
+ENV = dict(os.environ)
+ENV["PATH"] = f"{Path.home()}/.cargo/bin:{ENV.get('PATH', '')}"
+ENV.setdefault("DATABASE_URL", "postgres://app:app-dev-only@localhost:55432/app")
+PIDS = ROOT / "var/dev-pids.json"
+
+# module name → compose profile/services it needs
+MODULE_SERVICES = {
+    "cache": ("cache", ["redis"]),
+    "messaging": ("messaging", ["nats"]),
+    "analytics": ("analytics", ["clickhouse"]),
+    "observability": ("observability", ["prometheus", "grafana", "otel-collector"]),
+}
+
+
+def sh(cmd: list[str] | str, cwd: Path = ROOT, check: bool = True, env: dict | None = None, quiet: bool = False) -> int:
+    if not quiet:
+        print(f"$ {cmd if isinstance(cmd, str) else ' '.join(cmd)}", flush=True)
+    r = subprocess.run(cmd, cwd=cwd, env=env or ENV, shell=isinstance(cmd, str))
+    if check and r.returncode != 0:
+        sys.exit(r.returncode)
+    return r.returncode
+
+
+def compose(*args: str, profiles: list[str] | None = None, check: bool = True) -> int:
+    cmd = COMPOSE + ["-f", str(COMPOSE_FILE)]
+    for p in profiles or []:
+        cmd += ["--profile", p]
+    return sh(cmd + list(args), check=check)
+
+
+def project() -> dict:
+    return json.loads((ROOT / ".ai/config/project.json").read_text())
+
+
+def enabled_modules() -> list[str]:
+    mods = (project().get("architecture") or {}).get("modules") or {}
+    return [m for m, v in mods.items() if isinstance(v, dict) and v.get("enabled")]
+
+
+def wait_http(url: str, seconds: int = 60) -> bool:
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as r:
+                if r.status < 500:
+                    return True
+        except Exception:
+            time.sleep(1)
+    return False
+
+
+def wait_healthy(container: str, seconds: int = 120) -> bool:
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        r = subprocess.run(["docker", "inspect", "-f", "{{.State.Health.Status}}", container], capture_output=True, text=True)
+        if r.stdout.strip() == "healthy":
+            return True
+        time.sleep(1)
+    return False
+
+
+def load_env_file(path: Path) -> dict[str, str]:
+    out = {}
+    if path.is_file():
+        for line in path.read_text().splitlines():
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                out[k.strip()] = v.strip()
+    return out
+
+
+# ------------------------------------------------------------------ commands
+
+def cmd_setup(_a) -> None:
+    sh(["git", "config", "core.hooksPath", ".githooks"])
+    if not shutil.which("cargo", path=ENV["PATH"]):
+        print("Rust not found: install with https://rustup.rs (the toolchain is pinned in backend/rust-toolchain.toml)")
+    else:
+        sh(["cargo", "fetch", "-q"], cwd=ROOT / "backend")
+    if shutil.which("npm"):
+        sh(["npm", "ci", "--no-audit", "--no-fund"], cwd=ROOT / "frontend")
+        sh(["npx", "playwright", "install", "chromium"], cwd=ROOT / "frontend", check=False)
+    if not (ROOT / ".env").exists() and (ROOT / ".env.example").exists():
+        shutil.copy(ROOT / ".env.example", ROOT / ".env")
+        print("created .env from .env.example (development defaults)")
+    print("setup complete. Next: ./dev up")
+
+
+def cmd_doctor(_a) -> None:
+    tools = ["cargo", "cargo-sqlx", "node", "npm", "docker", "python3", "oha", "git"]
+    for t in tools:
+        path = shutil.which(t, path=ENV["PATH"])
+        print(f"  {'✓' if path else '✗'} {t:<12} {path or 'missing'}")
+    r = subprocess.run(["docker", "info"], capture_output=True)
+    print(f"  {'✓' if r.returncode == 0 else '✗'} docker daemon")
+    print(f"  enabled modules: {', '.join(enabled_modules()) or 'core only'}")
+
+
+def cmd_up(a) -> None:
+    profiles, services = [], ["postgres"]
+    for m in enabled_modules():
+        if m in MODULE_SERVICES:
+            p, svcs = MODULE_SERVICES[m]
+            profiles.append(p)
+            services += svcs
+    if a.identity == "zitadel":
+        profiles.append("identity")
+        services.append("zitadel")
+    compose("up", "-d", *services, profiles=profiles)
+    if not wait_healthy(f"{os.environ.get('COMPOSE_PROJECT_NAME', 'uwsb')}-postgres-1"):
+        sys.exit("postgres did not become healthy")
+    sh(["cargo", "sqlx", "migrate", "run", "--source", "migrations"], cwd=ROOT / "backend")
+    if a.identity == "zitadel":
+        sh([sys.executable, "scripts/zitadel_bootstrap.py"])
+    if a.no_app:
+        return
+    app_env = dict(ENV)
+    app_env.update({"APP__DATABASE__URL": ENV["DATABASE_URL"], "APP__HTTP__BENCH_ENDPOINTS": "true"})
+    procs = {}
+    if a.identity == "mock":
+        sh(["cargo", "build", "-q", "-p", "mock-oidc", "-p", "app-server"], cwd=ROOT / "backend")
+        procs["mock-oidc"] = subprocess.Popen([str(ROOT / "backend/target/debug/mock-oidc")], cwd=ROOT, env=app_env)
+        app_env.update({"APP__AUTH__PROVIDER": "oidc", "APP__AUTH__ISSUER_URL": "http://127.0.0.1:59081", "APP__AUTH__CLIENT_ID": "app-web"})
+    else:
+        sh(["cargo", "build", "-q", "-p", "app-server"], cwd=ROOT / "backend")
+        app_env.update(load_env_file(ROOT / ".env.zitadel"))
+    app_env.update(load_env_file(ROOT / ".env"))
+    procs["app-server"] = subprocess.Popen([str(ROOT / "backend/target/debug/app-server")], cwd=ROOT / "backend", env=app_env)
+    procs["vite"] = subprocess.Popen(["npm", "run", "-s", "dev"], cwd=ROOT / "frontend", env=app_env)
+    PIDS.parent.mkdir(exist_ok=True)
+    PIDS.write_text(json.dumps({k: p.pid for k, p in procs.items()}))
+    ok = wait_http("http://localhost:8080/readyz", 60) and wait_http("http://localhost:5190/", 60)
+    print(f"\n{'ready' if ok else 'started (not all endpoints answered yet)'}:  app http://localhost:5190   api http://localhost:8080"
+          f"   identity: {a.identity}{' (any email on the mock login page)' if a.identity == 'mock' else ' (alice@example.com / see .env.zitadel)'}")
+    print("Ctrl-C stops the app processes (services keep running; ./dev down stops them).")
+    try:
+        while all(p.poll() is None for p in procs.values()):
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        for p in procs.values():
+            if p.poll() is None:
+                p.send_signal(signal.SIGTERM)
+        for p in procs.values():
+            try:
+                p.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                p.kill()
+        PIDS.unlink(missing_ok=True)
+
+
+def cmd_down(a) -> None:
+    if PIDS.exists():
+        for pid in json.loads(PIDS.read_text()).values():
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        PIDS.unlink(missing_ok=True)
+    args = ["down", "--remove-orphans"] + (["--volumes"] if a.volumes else [])
+    compose(*args, profiles=["cache", "messaging", "analytics", "identity", "observability", "dragonfly"])
+
+
+def cmd_status(_a) -> None:
+    compose("ps", profiles=["cache", "messaging", "analytics", "identity", "observability", "dragonfly"], check=False)
+    for url in ["http://localhost:8080/readyz", "http://localhost:5190/"]:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as r:
+                print(f"  {url}: {r.status}")
+        except Exception as e:
+            print(f"  {url}: down ({e.__class__.__name__})")
+
+
+def ensure_postgres() -> None:
+    compose("up", "-d", "postgres", check=True)
+    if not wait_healthy(f"{os.environ.get('COMPOSE_PROJECT_NAME', 'uwsb')}-postgres-1"):
+        sys.exit("postgres did not become healthy")
+
+
+def cmd_check(a) -> None:
+    ensure_postgres()
+    args = [sys.executable, "tools/ai-validate", "--keep-going"] + (["--strict"] if a.strict else [])
+    code = sh(args, check=False)
+    if a.auth:
+        env = dict(ENV)
+        env.update(load_env_file(ROOT / ".env.zitadel"))
+        code |= sh(["cargo", "run", "-q", "-p", "app-server", "--", "check-config", "--online"], cwd=ROOT / "backend", env=env, check=False)
+    sys.exit(code)
+
+
+def cmd_test(a) -> None:
+    ensure_postgres()
+    code = sh(["cargo", "test", "--workspace"], cwd=ROOT / "backend", check=False)
+    code |= sh(["npm", "test"], cwd=ROOT / "frontend", check=False)
+    if a.e2e:
+        code |= sh("node scripts/e2e-prepare.mjs && npx playwright test", cwd=ROOT / "frontend", check=False)
+    if a.zitadel:
+        compose("up", "-d", "zitadel", profiles=["identity"])
+        sh([sys.executable, "scripts/zitadel_bootstrap.py"])
+        code |= sh("node scripts/e2e-prepare.mjs && npx playwright test -c playwright.zitadel.config.ts", cwd=ROOT / "frontend", check=False)
+    sys.exit(code)
+
+
+def cmd_benchmark(a) -> None:
+    sys.exit(sh([sys.executable, "benchmarks/run.py"] + (["--smoke"] if a.smoke else []) + a.extra, check=False))
+
+
+def cmd_types(_a) -> None:
+    sh(["cargo", "test", "-q", "--workspace", "export_bindings"], cwd=ROOT / "backend")
+    print("TypeScript bindings written to frontend/src/api/generated")
+
+
+def cmd_db(a) -> None:
+    ensure_postgres()
+    b = ROOT / "backend"
+    if a.action == "migrate":
+        sh(["cargo", "sqlx", "migrate", "run", "--source", "migrations"], cwd=b)
+    elif a.action == "reset":
+        sh(["cargo", "sqlx", "database", "reset", "-y", "--source", "migrations"], cwd=b)
+    elif a.action == "prepare":
+        sh(["cargo", "sqlx", "prepare", "--workspace"], cwd=b)
+    elif a.action == "psql":
+        sh(["docker", "exec", "-it", f"{os.environ.get('COMPOSE_PROJECT_NAME', 'uwsb')}-postgres-1", "psql", "-U", "app", "-d", "app"])
+
+
+def cmd_logs(a) -> None:
+    compose("logs", "-f", *([a.service] if a.service else []), profiles=["cache", "messaging", "analytics", "identity", "observability"], check=False)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="./dev", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("setup").set_defaults(fn=cmd_setup)
+    sub.add_parser("doctor").set_defaults(fn=cmd_doctor)
+    up = sub.add_parser("up")
+    up.add_argument("--identity", choices=["mock", "zitadel"], default="mock")
+    up.add_argument("--no-app", action="store_true", help="only start services and migrate")
+    up.set_defaults(fn=cmd_up)
+    dn = sub.add_parser("down")
+    dn.add_argument("--volumes", action="store_true")
+    dn.set_defaults(fn=cmd_down)
+    sub.add_parser("status").set_defaults(fn=cmd_status)
+    ck = sub.add_parser("check")
+    ck.add_argument("--auth", action="store_true", help="also validate the identity provider online (.env.zitadel)")
+    ck.add_argument("--strict", action="store_true", help="skipped checks fail")
+    ck.set_defaults(fn=cmd_check)
+    te = sub.add_parser("test")
+    te.add_argument("--e2e", action="store_true")
+    te.add_argument("--zitadel", action="store_true")
+    te.set_defaults(fn=cmd_test)
+    be = sub.add_parser("benchmark")
+    be.add_argument("--smoke", action="store_true")
+    be.add_argument("extra", nargs=argparse.REMAINDER)
+    be.set_defaults(fn=cmd_benchmark)
+    sub.add_parser("types").set_defaults(fn=cmd_types)
+    db = sub.add_parser("db")
+    db.add_argument("action", choices=["migrate", "reset", "prepare", "psql"])
+    db.set_defaults(fn=cmd_db)
+    lg = sub.add_parser("logs")
+    lg.add_argument("service", nargs="?")
+    lg.set_defaults(fn=cmd_logs)
+    a = ap.parse_args()
+    a.fn(a)
+
+
+if __name__ == "__main__":
+    main()
