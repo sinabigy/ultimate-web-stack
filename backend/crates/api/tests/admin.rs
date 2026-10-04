@@ -63,6 +63,27 @@ async fn auditor_reads_but_cannot_manage(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "app_db::MIGRATOR")]
+async fn mutating_admin_actions_require_recent_authentication(pool: PgPool) {
+    let app = TestApp::with_config(pool, |c| c.auth.require_mfa_for_system_admin = false).await;
+    let root = app.login("root@r.example").await;
+    app.set_system_role(root.user_id, "system_admin").await;
+    let user = app.login("u@r.example").await;
+    // Session is valid, but the login was an hour ago.
+    sqlx::query("UPDATE sessions SET auth_time = now() - interval '1 hour' WHERE user_id = $1")
+        .bind(root.user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(app.get(&root, "/api/v1/admin/users").await.status, StatusCode::OK, "reads need no step-up");
+    let r = app.patch(&root, &format!("/api/v1/admin/users/{}", user.user_id), json!({"status": "suspended"})).await;
+    assert_eq!(r.code(), "reauth_required");
+    let r = app.post(&root, &format!("/api/v1/admin/users/{}/revoke-sessions", user.user_id), json!({})).await;
+    assert_eq!(r.code(), "reauth_required");
+    assert_eq!(app.get(&user, "/api/v1/dashboard").await.status, StatusCode::OK, "nothing changed");
+    assert!(app.audit_count("admin.access_denied").await >= 2);
+}
+
+#[sqlx::test(migrator = "app_db::MIGRATOR")]
 async fn admin_actions_take_effect_and_are_audited(pool: PgPool) {
     let app = TestApp::with_config(pool, |c| c.auth.require_mfa_for_system_admin = false).await;
     let root = app.login("root@t.example").await;

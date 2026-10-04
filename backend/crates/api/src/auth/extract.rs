@@ -114,7 +114,12 @@ pub async fn require_system(
     meta: &ReqMeta,
 ) -> Result<(), ApiError> {
     let svc = state.svc()?;
-    let ctx = Context { require_mfa_for_system: state.config.auth.require_mfa_for_system_admin, max_auth_age: None };
+    // Mutating platform actions need a recent login (step-up), not just a valid session.
+    let mutating =
+        matches!(perm, SystemPermission::UsersManage | SystemPermission::OrgsManage | SystemPermission::JobsManage);
+    let max_auth_age =
+        mutating.then(|| std::time::Duration::from_secs(state.config.auth.reauth_window_minutes.saturating_mul(60)));
+    let ctx = Context { require_mfa_for_system: state.config.auth.require_mfa_for_system_admin, max_auth_age };
     match svc.authz.authorize_system(&principal.actor(), perm, &ctx) {
         Ok(()) => Ok(()),
         Err(d) => {

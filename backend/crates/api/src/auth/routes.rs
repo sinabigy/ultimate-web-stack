@@ -22,6 +22,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
 };
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::Deserialize;
 use serde_json::json;
 use time::OffsetDateTime;
@@ -62,14 +63,17 @@ async fn begin(state: &AppState, intent: Intent, q: BeginQuery) -> Response {
             return login_error("idp_unavailable");
         }
     };
+    let state_hash = tokens::token_hash(&pending.state);
+    // The verifier is the secret half of PKCE: encrypted at rest, bound to this flow's state.
+    let sealed = svc.cipher.encrypt(pending.pkce_verifier.as_bytes(), &state_hash);
     let flow = sessions::OidcFlow {
         nonce: pending.nonce,
-        pkce_verifier: pending.pkce_verifier,
+        pkce_verifier: URL_SAFE_NO_PAD.encode(sealed),
         return_to: safe_return_to(q.return_to.as_deref()),
         intent: intent.as_str().into(),
     };
     let expires = OffsetDateTime::now_utc() + time::Duration::minutes(10);
-    if let Err(e) = sessions::save_flow(&svc.db, &tokens::token_hash(&pending.state), &flow, expires).await {
+    if let Err(e) = sessions::save_flow(&svc.db, &state_hash, &flow, expires).await {
         return crate::errors::db(e).into_response();
     }
     let mut res = Redirect::to(&pending.authorize_url).into_response();
@@ -143,12 +147,19 @@ pub async fn callback(
     if !tokens::ct_eq(&cookie_state, &st) {
         return fail("state_mismatch").await;
     }
-    let flow = match sessions::take_flow(&svc.db, &tokens::token_hash(&st)).await {
+    let state_hash = tokens::token_hash(&st);
+    let flow = match sessions::take_flow(&svc.db, &state_hash).await {
         Ok(Some(f)) => f,
         Ok(None) => return fail("flow_expired").await,
         Err(e) => return crate::errors::db(e).into_response(),
     };
-    let login = match svc.oidc.complete(&code, &flow.nonce, &flow.pkce_verifier).await {
+    let verifier = URL_SAFE_NO_PAD
+        .decode(&flow.pkce_verifier)
+        .ok()
+        .and_then(|sealed| svc.cipher.decrypt(&sealed, &state_hash).ok())
+        .and_then(|v| String::from_utf8(v).ok());
+    let Some(verifier) = verifier else { return fail("flow_expired").await };
+    let login = match svc.oidc.complete(&code, &flow.nonce, &verifier).await {
         Ok(l) => l,
         Err(app_auth::oidc::OidcError::Unavailable(_)) => return fail("idp_unavailable").await,
         Err(e) => {

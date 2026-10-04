@@ -207,6 +207,11 @@ async fn pkce_and_prompt_parameters_sent(pool: PgPool) {
     let q: std::collections::HashMap<_, _> = u.query_pairs().into_owned().collect();
     assert_eq!(q["code_challenge_method"], "S256");
     assert!(q.contains_key("nonce") && q.contains_key("state"));
+    // The verifier is not stored in plaintext: if it were, S256(stored) would equal the challenge.
+    let stored: String = sqlx::query_scalar("SELECT pkce_verifier FROM oidc_flows").fetch_one(&app.pool).await.unwrap();
+    use base64::Engine as _;
+    let s256 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(app_auth::tokens::sha256(stored.as_bytes()));
+    assert_ne!(s256, q["code_challenge"], "PKCE verifier must be encrypted at rest");
     let (u, _) = app.begin("/auth/register").await;
     assert!(u.query_pairs().any(|(k, v)| k == "prompt" && v == "create"));
     let (u, _) = app.begin("/auth/reauth").await;

@@ -4,6 +4,7 @@ import { A, useNavigate, useParams } from "@solidjs/router";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
+import { reauthenticate } from "../auth/session";
 import { AsyncView, BarChart, DataTable, MetricCard, Pagination, SearchInput } from "../components/data";
 import { Alert, Badge, Button, Card, ConfirmDialog, PageHeader } from "../components/ui";
 import { fmtDateTime, fmtNumber, fmtRelative } from "../lib/format";
@@ -15,6 +16,12 @@ const crumbs = (label?: string) => [
   ...(label ? [{ label }] : []),
 ];
 const errMsg = (e: unknown) => (e instanceof ApiError ? e.friendly : "Something went wrong.");
+
+/** Mutating admin actions need a recent sign-in (and MFA when configured): step up instead of failing. */
+function actionFailed(title: string, e: unknown) {
+  if (e instanceof ApiError && (e.code === "reauth_required" || e.code === "mfa_required")) reauthenticate();
+  else toast(title, { body: errMsg(e), tone: "danger" });
+}
 
 export function AdminOverviewPage() {
   const [o, { refetch }] = createResource(api.admin.overview);
@@ -182,7 +189,7 @@ export function AdminUserDetailPage() {
       }
       refetch();
     } catch (e) {
-      toast("Action failed", { body: errMsg(e), tone: "danger" });
+      actionFailed("Action failed", e);
     }
     setConfirm(null);
   };
@@ -192,7 +199,7 @@ export function AdminUserDetailPage() {
       toast("System role updated; the user must sign in again", { tone: "success" });
       refetch();
     } catch (e) {
-      toast("Role not changed", { body: errMsg(e), tone: "danger" });
+      actionFailed("Role not changed", e);
     }
   };
   return (
@@ -591,7 +598,7 @@ export function AdminJobsPage() {
                               await api.admin.retryJob(j.id);
                               refetch();
                             } catch (e) {
-                              toast("Retry failed", { body: errMsg(e), tone: "danger" });
+                              actionFailed("Retry failed", e);
                             }
                           }}
                         >
