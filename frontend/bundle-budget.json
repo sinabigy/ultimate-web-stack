@@ -1,0 +1,8 @@
+{
+  "note": "gzip bytes. Measured 2026-10-04: initial ~35 KB, largest route ~8 KB. Budgets leave ~25% headroom; raise deliberately.",
+  "max": {
+    "initial_gzip_bytes": 45000,
+    "largest_route_gzip_bytes": 12000,
+    "total_gzip_bytes": 80000
+  }
+}

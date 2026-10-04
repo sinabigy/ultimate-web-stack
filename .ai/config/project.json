@@ -181,6 +181,18 @@
         "confirmed": true
       },
       {
+        "id": "web-bundle-budget",
+        "stage": "build",
+        "cmd": "node scripts/bundle-size.mjs",
+        "cwd": "frontend",
+        "requires": [
+          "node"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "note": "Gzip budget for initial load and largest route chunk (frontend/bundle-budget.json)."
+      },
+      {
         "id": "e2e",
         "stage": "e2e",
         "cmd": "node scripts/e2e-prepare.mjs && npx playwright test",
