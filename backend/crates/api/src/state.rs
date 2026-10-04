@@ -59,6 +59,8 @@ pub struct AppInner {
     pub services: Option<Arc<crate::services::Services>>,
     /// Live outbound-provider health (set when the provider engine is running).
     pub provider_health: Option<ProviderHealthFn>,
+    /// Response/aggregate cache (in-memory by default; Redis/Dragonfly in the performance profile).
+    pub cache: app_cache::CacheLayer,
 }
 
 pub type ProviderHealthFn = Arc<dyn Fn(&str) -> Option<crate::dto::ProviderHealth> + Send + Sync>;
@@ -86,6 +88,7 @@ pub struct AppStateBuilder {
     rate_limiter: Option<Arc<dyn RateLimiter>>,
     services: Option<Arc<crate::services::Services>>,
     provider_health: Option<ProviderHealthFn>,
+    cache: Option<app_cache::CacheLayer>,
 }
 
 impl AppState {
@@ -99,6 +102,7 @@ impl AppState {
             rate_limiter: None,
             services: None,
             provider_health: None,
+            cache: None,
         }
     }
 }
@@ -124,12 +128,22 @@ impl AppStateBuilder {
         self.services = Some(s);
         self
     }
+    pub fn cache(mut self, c: app_cache::CacheLayer) -> Self {
+        self.cache = Some(c);
+        self
+    }
     pub fn provider_health(mut self, f: ProviderHealthFn) -> Self {
         self.provider_health = Some(f);
         self
     }
     pub fn build(self) -> AppState {
         let inflight = Arc::new(Semaphore::new(self.config.http.max_inflight));
+        let cache = self.cache.unwrap_or_else(|| {
+            app_cache::CacheLayer::new(
+                Arc::new(app_cache::memory::MemoryCache::new(self.config.cache.memory_max_entries)),
+                &self.config.cache.namespace,
+            )
+        });
         AppState(Arc::new(AppInner {
             events: self.events.unwrap_or_else(|| Arc::new(app_messaging::LocalEventBus::default())),
             config: self.config,
@@ -139,6 +153,7 @@ impl AppStateBuilder {
             rate_limiter: self.rate_limiter,
             lifecycle: Lifecycle::default(),
             inflight,
+            cache,
             services: self.services,
             provider_health: self.provider_health,
         }))

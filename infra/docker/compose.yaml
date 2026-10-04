@@ -30,6 +30,33 @@ services:
       timeout: 3s
       retries: 30
 
+  # ---------------------------------------------------------------- cache profile
+  # Redis is the default shared cache/rate-limit store. Dragonfly (RESP-compatible, multi-threaded)
+  # runs side by side on its own port for compatibility tests and benchmarks.
+  redis:
+    profiles: ["cache"]
+    image: redis:8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports: ["127.0.0.1:${DEV_REDIS_PORT:-56379}:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  dragonfly:
+    profiles: ["cache", "dragonfly"]
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    command: ["--maxmemory=512mb", "--proactor_threads=2", "--dbfilename="]  # Dragonfly needs >= 256MiB per thread
+    ulimits:
+      memlock: -1
+    ports: ["127.0.0.1:${DEV_DRAGONFLY_PORT:-56380}:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
   # ---------------------------------------------------------------- identity profile
   # Self-hosted ZITADEL (default identity provider). Uses the same PostgreSQL server with its own
   # database and role (created by ZITADEL's init with the admin credentials below).

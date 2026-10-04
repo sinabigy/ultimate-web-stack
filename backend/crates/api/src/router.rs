@@ -64,7 +64,12 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
         ordinary = ordinary.route("/metrics", get(ops::metrics));
     }
     if cfg.bench_endpoints {
-        ordinary = ordinary.route("/bench/plaintext", get(bench::plaintext)).route("/bench/json", get(bench::json));
+        ordinary = ordinary
+            .route("/bench/plaintext", get(bench::plaintext))
+            .route("/bench/json", get(bench::json))
+            .route("/bench/db", get(bench::db_read))
+            .route("/bench/updates", get(bench::db_write))
+            .route("/bench/cached", get(bench::cached_read));
     }
     let ordinary = ordinary.layer(
         ServiceBuilder::new()

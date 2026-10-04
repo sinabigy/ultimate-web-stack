@@ -15,6 +15,8 @@ path = "src/main.rs"
 cedar = ["app-api/cedar"]
 
 [dependencies]
+async-trait.workspace = true
+app-cache.workspace = true
 app-networking.workspace = true
 app-workers.workspace = true
 app-domain.workspace = true

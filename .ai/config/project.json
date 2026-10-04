@@ -124,6 +124,19 @@
         "note": "Cedar engine conformance + RBAC/Cedar differential property test."
       },
       {
+        "id": "rust-test-cache",
+        "stage": "integration",
+        "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1200,
+        "note": "Redis 8 and Dragonfly integration (TTL, locks, shared GCRA, cross-process stampede, outage degradation). Needs ./dev up with the cache module."
+      },
+      {
         "id": "ts-bindings-fresh",
         "stage": "typecheck",
         "cmd": "cargo test --workspace export_bindings -q >/dev/null && git diff --quiet --exit-code -- ../frontend/src/api/generated && test -z \"$(git ls-files --others --exclude-standard ../frontend/src/api/generated)\"",

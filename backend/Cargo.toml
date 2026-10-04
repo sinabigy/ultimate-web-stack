@@ -25,6 +25,7 @@ mock-oidc = { path = "apps/mock-oidc" }
 fake-upstream = { path = "apps/fake-upstream" }
 app-networking = { path = "crates/networking" }
 app-workers = { path = "crates/workers" }
+app-cache = { path = "crates/cache" }
 
 # core runtime
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "signal", "net", "time", "sync"] }
@@ -50,6 +51,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fm
 metrics = "0.24"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "uuid", "time", "json", "ipnet", "macros", "migrate", "derive"] }
 ipnet = "2"
+redis = { version = "1.7", default-features = false, features = ["tokio-comp", "connection-manager", "script"] }
+moka = { version = "0.12", features = ["future"] }
 base64 = "0.22"
 sha2 = "0.11"
 hmac = "0.13"

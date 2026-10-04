@@ -110,7 +110,7 @@ pub async fn delete(db: impl PgExecutor<'_>, access: &OrgAccess, id: Uuid) -> Db
     if r.rows_affected() == 0 { Err(DbError::NotFound) } else { Ok(()) }
 }
 
-#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export)]
 pub struct RunStats {
     #[ts(type = "number")]

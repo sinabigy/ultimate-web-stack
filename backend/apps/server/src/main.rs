@@ -5,7 +5,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use app_api::{AppState, BuildInfo};
-use app_config::AppConfig;
+use app_config::{AppConfig, CacheBackend};
 use app_rate_limit::{MemoryRateLimiter, Quota};
 
 /// `app-server check-config [--online]`: validate configuration without starting the server.
@@ -66,13 +66,46 @@ async fn main() -> anyhow::Result<()> {
     if config.telemetry.metrics {
         builder = builder.metrics(app_telemetry::init_metrics(&config.telemetry)?);
     }
+    // Cache: in-memory (core) or Redis/Dragonfly (performance profile). Redis is optional
+    // infrastructure: if it is down at startup we log and continue with the in-memory cache.
+    let redis = if config.cache.backend == CacheBackend::Redis || config.rate_limit.backend == CacheBackend::Redis {
+        match app_cache::redis::RedisCache::connect(config.cache.redis_url.expose()).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                tracing::error!(error = %e, "Redis unavailable at startup; using in-memory cache/limits");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let cache_backend: Arc<dyn app_cache::Cache> = match (&redis, config.cache.backend) {
+        (Some(r), CacheBackend::Redis) => Arc::new(r.clone()),
+        _ => Arc::new(app_cache::memory::MemoryCache::new(config.cache.memory_max_entries)),
+    };
+    if let Some(r) = &redis {
+        builder = builder.health_check(Arc::new(RedisCheck(r.clone())));
+    }
+    builder = builder.cache(app_cache::CacheLayer::new(cache_backend, &config.cache.namespace));
     if config.rate_limit.enabled {
-        let limiter = Arc::new(MemoryRateLimiter::new(Quota {
-            per_second: config.rate_limit.per_client_rps,
-            burst: config.rate_limit.burst,
-        }));
-        limiter.spawn_janitor(Duration::from_secs(60));
-        builder = builder.rate_limiter(limiter);
+        match (&redis, config.rate_limit.backend) {
+            (Some(r), CacheBackend::Redis) => {
+                builder = builder.rate_limiter(Arc::new(app_cache::redis::RedisRateLimiter::new(
+                    r,
+                    &config.cache.namespace,
+                    config.rate_limit.per_client_rps,
+                    config.rate_limit.burst,
+                )));
+            }
+            _ => {
+                let limiter = Arc::new(MemoryRateLimiter::new(Quota {
+                    per_second: config.rate_limit.per_client_rps,
+                    burst: config.rate_limit.burst,
+                }));
+                limiter.spawn_janitor(Duration::from_secs(60));
+                builder = builder.rate_limiter(limiter);
+            }
+        }
     }
     // PostgreSQL is the core of every profile.
     let pool = app_db::connect(&config.database, "app-server").await?;
@@ -128,4 +161,20 @@ async fn main() -> anyhow::Result<()> {
         let _ = w.await; // the worker drains in-flight jobs (bounded) on the same shutdown signal
     }
     Ok(())
+}
+
+/// Redis is a performance optimisation, never critical: failures report "degraded".
+struct RedisCheck(app_cache::redis::RedisCache);
+
+#[async_trait::async_trait]
+impl app_api::health::HealthCheck for RedisCheck {
+    fn name(&self) -> &'static str {
+        "redis"
+    }
+    fn critical(&self) -> bool {
+        false
+    }
+    async fn check(&self) -> Result<(), String> {
+        app_cache::Cache::ping(&self.0).await.map_err(|e| e.to_string())
+    }
 }

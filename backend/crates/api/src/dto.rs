@@ -245,7 +245,7 @@ pub struct OrgDetail {
     pub permissions: Vec<String>,
 }
 
-#[derive(Debug, Serialize, TS)]
+#[derive(Debug, Serialize, serde::Deserialize, TS)]
 #[ts(export)]
 pub struct UsagePoint {
     pub date: String,

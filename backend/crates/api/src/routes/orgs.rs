@@ -188,15 +188,24 @@ pub async fn overview(
     let since = OffsetDateTime::now_utc() - time::Duration::days(i64::from(days));
     let mut widgets = dto::OrgWidgets::default();
     if o.access.can(P::RunsRead) {
-        widgets.runs = Some(runs::stats(&svc.db, &o.access, since).await.api()?);
-        widgets.usage = Some(
-            runs::daily_counts(&svc.db, &o.access, days)
-                .await
-                .api()?
-                .into_iter()
-                .map(|(d, ok, err)| dto::UsagePoint { date: d.to_string(), succeeded: ok, failed: err })
-                .collect(),
-        );
+        // Cached aggregate (15s, jittered). The cache key covers only authorization-independent
+        // data (org + range); permission gating happens after retrieval, never via the key.
+        let key = state.cache.key("org-usage", 1, &[&o.access.org_id().to_string(), &days.to_string()]);
+        let (stats, usage): (app_db::runs::RunStats, Vec<dto::UsagePoint>) = state
+            .cache
+            .get_or_load(&key, std::time::Duration::from_secs(15), || async {
+                let stats = runs::stats(&svc.db, &o.access, since).await?;
+                let usage = runs::daily_counts(&svc.db, &o.access, days)
+                    .await?
+                    .into_iter()
+                    .map(|(d, ok, err)| dto::UsagePoint { date: d.to_string(), succeeded: ok, failed: err })
+                    .collect();
+                Ok::<_, app_db::DbError>((stats, usage))
+            })
+            .await
+            .api()?;
+        widgets.runs = Some(stats);
+        widgets.usage = Some(usage);
     }
     if o.access.can(P::MembersRead) {
         widgets.members = Some(orgs::list_members(&svc.db, &o.access).await.api()?.len());
