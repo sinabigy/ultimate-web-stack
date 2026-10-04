@@ -1,0 +1,29 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0007",
+  "outcome": "completed",
+  "summary": "Benchmark harness (benchmarks/run.py + app-bench) producing results/*.json with rps, success rps, p50/p95/p99/p99.9, server CPU and RSS, environment fingerprint; median-of-3 with recorded spread; gates (invariants everywhere, regressions vs same-machine baseline); report.py renders docs/benchmarks/latest.md; CI perf-smoke and manual benchmark workflows. Benchmarks found and drove fixes for 7 outbound-engine controller bugs. Unresolved: frontend perf benchmarks (startup, large list, realtime) and messaging throughput (comes with NATS, T-0009).",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "python3 -m unittest benchmarks/test_compare.py: 6 passed (synthetic slowdown flagged)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "./dev benchmark --smoke: all invariants PASS (2026-10-04)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "benchmarks/baseline.json = results/20261004T121126Z-4ec088c960a7.json (clean tree, all suites ok); noise-b run passes all regression gates against it",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T12:26:19Z"
+}

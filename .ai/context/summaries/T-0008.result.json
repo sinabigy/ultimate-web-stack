@@ -1,0 +1,29 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0008",
+  "outcome": "completed",
+  "summary": "CacheLayer (single-flight, cross-process lock, TTL jitter) over memory/Redis/Dragonfly; Redis outage degrades to uncached operation (tested); shared Redis GCRA rate limiter. Cached-read benchmark recorded: memory 125k, Redis 57k, Dragonfly 54k req/s (baseline). Redis session cache deliberately not enabled (ADR 0004, evidence: sessions are 1 of 2-3 DB round trips; revocation must be immediate), so the fail-open criterion holds by construction.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache: 8 passed (2026-10-04)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "benchmarks/baseline.json suites.cache: memory/redis/dragonfly measured",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": ".ai/knowledge/DECISIONS/0004-no-redis-session-cache.md",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T12:26:19Z"
+}
