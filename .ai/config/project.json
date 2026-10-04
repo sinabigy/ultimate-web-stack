@@ -254,5 +254,200 @@
   "policies": {
     "allow_parallel_active": false,
     "max_shim_lines_warning": 40
+  },
+  "architecture": {
+    "origin": {
+      "name": "ultimate-web-stack-blueprint",
+      "version": "0.1.0",
+      "source": null,
+      "generated_at": null
+    },
+    "profile": "core",
+    "components": {
+      "frontend": "solidjs-typescript-vite",
+      "backend": "rust-axum-tokio",
+      "database": "postgresql-sqlx",
+      "api_contract": "ts-rs-generated-types",
+      "identity_provider": "zitadel",
+      "auth_profile": "b2b",
+      "session_strategy": "bff-opaque-httponly-cookie-postgres",
+      "authorization": "rbac-default-deny",
+      "admin_model": "system-trust-level-separate-from-org-roles",
+      "tenancy": "organizations-shared-schema",
+      "jobs": "postgres-skip-locked-queue",
+      "outbound": "adaptive-engine",
+      "observability": "tracing-prometheus"
+    },
+    "modules": {
+      "identity": {
+        "enabled": true,
+        "adapter": "zitadel",
+        "paths": [
+          "backend/crates/auth",
+          "scripts/zitadel_bootstrap.py",
+          "docs/authentication"
+        ],
+        "reason": "OIDC + PKCE BFF; generic OIDC adapter available (auth.provider = oidc). Passkeys, MFA, social, SAML and M2M via the IdP.",
+        "evidence": [
+          "frontend/tests/zitadel/zitadel.spec.ts",
+          "backend/crates/api/tests/auth_flow.rs"
+        ]
+      },
+      "organizations": {
+        "enabled": true,
+        "adapter": "organizations",
+        "paths": [
+          "backend/crates/db/src/orgs.rs",
+          "docs/multitenancy"
+        ],
+        "reason": "B2B profile: organisations, members, teams, invitations, custom roles, billing hooks, scoped audit.",
+        "evidence": [
+          "backend/crates/api/tests/tenancy.rs"
+        ]
+      },
+      "authorization": {
+        "enabled": true,
+        "adapter": "rbac",
+        "paths": [
+          "backend/crates/authz",
+          "docs/authorization"
+        ],
+        "reason": "Default-deny RBAC with OrgAccess proof type; ownership, escalation and last-owner rules.",
+        "evidence": [
+          "backend/crates/authz/tests/conformance.rs"
+        ]
+      },
+      "cedar": {
+        "enabled": false,
+        "adapter": "cedar-policy",
+        "paths": [
+          "backend/crates/authz/src/cedar.rs",
+          "backend/crates/authz/policies/base.cedar"
+        ],
+        "reason": "Optional engine behind cargo feature `cedar` (authorization.engine = cedar); RBAC is the default. Differential tests prove identical decisions.",
+        "evidence": [
+          "backend/crates/authz/tests/conformance.rs"
+        ]
+      },
+      "sessions": {
+        "enabled": true,
+        "adapter": "postgres",
+        "paths": [
+          "backend/crates/db/src/sessions.rs"
+        ],
+        "reason": "Sessions read from PostgreSQL on every request (immediate revocation); no Redis session cache.",
+        "evidence": [
+          ".ai/knowledge/DECISIONS/0004-no-redis-session-cache.md",
+          "benchmarks/baseline.json"
+        ]
+      },
+      "admin": {
+        "enabled": true,
+        "adapter": "system-console",
+        "paths": [
+          "backend/crates/api/src/routes/admin.rs",
+          "frontend/src/routes/admin.tsx",
+          "docs/admin"
+        ],
+        "reason": "System admin/auditor separate from org roles; MFA and step-up re-auth for mutations; all actions audited.",
+        "evidence": [
+          "backend/crates/api/tests/admin.rs"
+        ]
+      },
+      "api_keys": {
+        "enabled": true,
+        "adapter": "hmac-peppered",
+        "paths": [
+          "backend/crates/auth/src/api_keys.rs",
+          "backend/crates/db/src/api_keys.rs"
+        ],
+        "reason": "Organisation API keys and registered service accounts (M2M JWT).",
+        "evidence": [
+          "backend/crates/api/tests/credentials.rs"
+        ]
+      },
+      "cache": {
+        "enabled": true,
+        "adapter": "memory",
+        "paths": [
+          "backend/crates/cache"
+        ],
+        "reason": "CacheLayer default in-process; Redis/Dragonfly adapters available (cache.backend = redis). Shared state across instances needs Redis.",
+        "evidence": [
+          "benchmarks/baseline.json"
+        ]
+      },
+      "jobs": {
+        "enabled": true,
+        "adapter": "postgres",
+        "paths": [
+          "backend/crates/workers",
+          "backend/apps/worker"
+        ],
+        "reason": "Durable job queue in PostgreSQL (no extra infrastructure); NATS/JetStream is the scale-out option.",
+        "evidence": [
+          "backend/crates/workers/tests/worker.rs"
+        ]
+      },
+      "outbound_engine": {
+        "enabled": true,
+        "adapter": "adaptive",
+        "paths": [
+          "backend/crates/networking",
+          "docs/architecture/outbound-engine.md"
+        ],
+        "reason": "Maximises useful throughput to external APIs.",
+        "evidence": [
+          "benchmarks/baseline.json",
+          ".ai/knowledge/DECISIONS/0005-outbound-engine-controllers.md"
+        ]
+      },
+      "benchmarks": {
+        "enabled": true,
+        "adapter": "oha+app-bench",
+        "paths": [
+          "benchmarks",
+          "backend/apps/bench"
+        ],
+        "reason": "Evidence base and regression gates.",
+        "evidence": [
+          ".ai/knowledge/DECISIONS/0003-benchmark-harness-and-gates.md"
+        ]
+      },
+      "messaging_nats": {
+        "enabled": false,
+        "adapter": "nats-jetstream",
+        "reason": "Planned (T-0009): durable streams, DLQ, idempotent consumers."
+      },
+      "analytics_clickhouse": {
+        "enabled": false,
+        "adapter": "clickhouse",
+        "reason": "Planned (T-0010)."
+      },
+      "gateway_pingora": {
+        "enabled": false,
+        "adapter": "pingora",
+        "reason": "Hyperscale profile; adopted only with benchmark evidence (T-0012)."
+      },
+      "runtime_monoio": {
+        "enabled": false,
+        "adapter": "monoio-io_uring",
+        "reason": "Extreme profile experiment; only with benchmark evidence (T-0013)."
+      }
+    },
+    "deployment": {
+      "target": "dev-compose",
+      "notes": "Tiers planned in T-0014: VPS/systemd, containers, Kubernetes/bare metal."
+    },
+    "knowledge": [
+      ".ai/knowledge/ARCHITECTURE.md",
+      ".ai/knowledge/DECISIONS",
+      "docs/authentication/README.md",
+      "docs/authorization/README.md",
+      "docs/multitenancy/README.md",
+      "docs/admin/README.md",
+      "docs/architecture/outbound-engine.md",
+      "benchmarks/README.md"
+    ]
   }
 }
