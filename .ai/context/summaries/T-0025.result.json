@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0025",
+  "outcome": "completed",
+  "summary": "Self-hosted ZITADEL compose profile + idempotent bootstrap (project, roles, confidential OIDC client, users, service account) writing .env.zitadel; real-browser E2E proves hosted login, IdP-managed system roles, MFA step-up, ZITADEL v2 IdentityAdmin, RP logout and M2M client credentials. ZITADEL Cloud: same OIDC config with cloud issuer (documented in T-0026). check-config validates identity configuration offline/online.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "npx playwright test -c playwright.zitadel.config.ts: 3 passed (2026-10-04)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "app-server check-config --online: identity provider OK; rejects cross-origin redirect URI and insecure production cookies",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T10:12:27Z"
+}
