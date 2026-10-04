@@ -162,9 +162,11 @@ impl PgWorker {
         let kind = job.kind.clone();
         metrics::gauge!("app_jobs_inflight", "queue" => self.cfg.queue.clone()).increment(1.0);
         // Heartbeat: extend the lease while the handler runs.
+        // Aborted on drop: if this future is cancelled the lease must lapse so another worker
+        // can reclaim the job.
         let hb = {
             let (db, id, worker, lease) = (self.services.db.clone(), job.id, self.id.clone(), self.cfg.lease);
-            tokio::spawn(async move {
+            app_messaging::AbortOnDrop(tokio::spawn(async move {
                 let mut t = tokio::time::interval(lease / 3);
                 t.tick().await;
                 loop {
@@ -174,13 +176,13 @@ impl PgWorker {
                         return;
                     }
                 }
-            })
+            }))
         };
         let result = match self.handlers.get(kind.as_str()) {
             Some(h) => h.handle(&JobContext { services: &self.services, job: &job, shutdown }).await,
             None => Err(JobError::Permanent(format!("no handler for job kind {kind}"))),
         };
-        hb.abort();
+        drop(hb);
         let label = match &result {
             Ok(()) => {
                 if let Err(e) = jobs::complete(&self.services.db, job.id, &self.id).await {

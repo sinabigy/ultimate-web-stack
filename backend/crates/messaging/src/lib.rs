@@ -9,6 +9,9 @@
 //! events (`Lagged`) rather than slowing producers. Anything that must not be lost belongs
 //! in PostgreSQL or a JetStream job, with the realtime event as a notification only.
 
+#[cfg(feature = "nats")]
+pub mod nats;
+
 use app_domain::RealtimeEvent;
 use tokio::sync::broadcast;
 
@@ -18,6 +21,15 @@ pub trait EventBus: Send + Sync {
     async fn publish(&self, event: RealtimeEvent);
     /// Subscribe to events delivered to *this* instance.
     fn subscribe(&self) -> broadcast::Receiver<RealtimeEvent>;
+}
+
+/// Aborts the task when dropped (background helpers whose owner may be cancelled).
+pub struct AbortOnDrop<T>(pub tokio::task::JoinHandle<T>);
+
+impl<T> Drop for AbortOnDrop<T> {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 pub struct LocalEventBus {

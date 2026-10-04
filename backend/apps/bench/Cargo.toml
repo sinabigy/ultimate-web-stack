@@ -9,6 +9,12 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+app-workers.workspace = true
+app-messaging = { workspace = true, features = ["nats"] }
+async-nats.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+tokio-util.workspace = true
 app-db.workspace = true
 app-networking.workspace = true
 app-telemetry.workspace = true

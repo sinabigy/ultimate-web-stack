@@ -261,6 +261,163 @@ async fn outage_open_loop(use_engine: bool) -> anyhow::Result<Value> {
     }))
 }
 
+struct NoopJob(Arc<std::sync::atomic::AtomicU64>);
+
+#[async_trait::async_trait]
+impl app_workers::JobHandler for NoopJob {
+    fn kind(&self) -> &'static str {
+        "noop"
+    }
+    async fn handle(&self, _ctx: &app_workers::JobContext<'_>) -> Result<(), app_workers::JobError> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl app_messaging::nats::MessageHandler for NoopJob {
+    async fn handle(&self, _d: &app_messaging::nats::Delivery<'_>) -> Result<(), app_messaging::nats::HandlerError> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
+    }
+}
+
+/// PostgreSQL job queue vs NATS JetStream: publish rate (16 concurrent producers, idempotency
+/// keys) and end-to-end drain rate (32 concurrent no-op handlers). Both durable.
+async fn queue_bench(smoke: bool) -> anyhow::Result<Value> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    let n: usize = if smoke { 2_000 } else { 20_000 };
+    let (producers, consumers) = (16usize, 32usize);
+    let db_url = std::env::var("BENCH_DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://app:app-dev-only@localhost:55432/app_bench".into());
+    let nats_url = std::env::var("BENCH_NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:54222".into());
+    let mut out = serde_json::Map::new();
+    out.insert("jobs".into(), json!(n));
+    out.insert("producers".into(), json!(producers));
+    out.insert("consumers".into(), json!(consumers));
+
+    // PostgreSQL
+    {
+        let pool = sqlx::postgres::PgPoolOptions::new().max_connections(40).connect(&db_url).await?;
+        app_db::MIGRATOR.run(&pool).await?;
+        sqlx::query("DELETE FROM jobs WHERE queue = 'bench'").execute(&pool).await?;
+        let t = Instant::now();
+        stream::iter(0..n)
+            .map(|i| {
+                let pool = pool.clone();
+                async move {
+                    let key = format!("bench:{i}:{}", std::process::id());
+                    app_db::jobs::enqueue(
+                        &pool,
+                        &app_db::jobs::NewJob {
+                            queue: "bench",
+                            kind: "noop",
+                            payload: json!({"i": i}),
+                            priority: 0,
+                            max_attempts: 3,
+                            run_at: None,
+                            idempotency_key: Some(&key),
+                            organization_id: None,
+                            trace_context: None,
+                        },
+                    )
+                    .await
+                }
+            })
+            .buffer_unordered(producers)
+            .for_each(|r| async move {
+                if let Err(e) = r {
+                    eprintln!("enqueue: {e}");
+                }
+            })
+            .await;
+        let publish = t.elapsed();
+        let done = Arc::new(AtomicU64::new(0));
+        let svc = app_workers::JobServices {
+            db: pool.clone(),
+            events: Arc::new(app_messaging::LocalEventBus::default()),
+            providers: app_networking::ProviderRegistry::default(),
+        };
+        let mut cfg = app_workers::WorkerConfig::new("bench", consumers);
+        cfg.poll_interval = Duration::from_millis(100);
+        let stop = tokio_util::sync::CancellationToken::new();
+        let t = Instant::now();
+        let w =
+            tokio::spawn(app_workers::PgWorker::new(cfg, svc, vec![Arc::new(NoopJob(done.clone()))]).run(stop.clone()));
+        while done.load(Ordering::Relaxed) < n as u64 && t.elapsed() < Duration::from_secs(300) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let drain = t.elapsed();
+        stop.cancel();
+        let _ = w.await;
+        out.insert("postgres".into(), json!({
+            "publish_per_sec": n as f64 / publish.as_secs_f64(), "drain_per_sec": done.load(Ordering::Relaxed) as f64 / drain.as_secs_f64(),
+            "processed": done.load(Ordering::Relaxed), "publish_s": publish.as_secs_f64(), "drain_s": drain.as_secs_f64(),
+        }));
+        sqlx::query("DELETE FROM jobs WHERE queue = 'bench'").execute(&pool).await?;
+    }
+
+    // NATS JetStream
+    match app_messaging::nats::connect(&nats_url, "bench").await {
+        Err(e) => {
+            out.insert("jetstream".into(), json!({"skipped": format!("NATS not reachable at {nats_url}: {e}")}));
+        }
+        Ok(client) => {
+            let stream_name = format!("BENCH{}", std::process::id());
+            let q = app_messaging::nats::JetStreamQueue::new(
+                client.clone(),
+                app_messaging::nats::QueueConfig::new(&stream_name),
+            )
+            .await?;
+            let t = Instant::now();
+            stream::iter(0..n)
+                .map(|i| {
+                    let q = q.clone();
+                    async move {
+                        q.publish("noop", bytes::Bytes::from(format!("{{\"i\":{i}}}")), Some(&format!("bench:{i}")))
+                            .await
+                    }
+                })
+                .buffer_unordered(producers)
+                .for_each(|r| async move {
+                    if let Err(e) = r {
+                        eprintln!("publish: {e}");
+                    }
+                })
+                .await;
+            let publish = t.elapsed();
+            let done = Arc::new(AtomicU64::new(0));
+            let stop = tokio_util::sync::CancellationToken::new();
+            let t = Instant::now();
+            let w = tokio::spawn(
+                app_messaging::nats::JetStreamWorker {
+                    queue: q.clone(),
+                    durable: "bench".into(),
+                    filter: format!("{}.>", q.config().subject_prefix),
+                    handler: Arc::new(NoopJob(done.clone())),
+                    concurrency: consumers,
+                    shutdown_grace: Duration::from_secs(5),
+                }
+                .run(stop.clone()),
+            );
+            while done.load(Ordering::Relaxed) < n as u64 && t.elapsed() < Duration::from_secs(300) {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            let drain = t.elapsed();
+            stop.cancel();
+            let _ = w.await;
+            out.insert("jetstream".into(), json!({
+                "publish_per_sec": n as f64 / publish.as_secs_f64(), "drain_per_sec": done.load(Ordering::Relaxed) as f64 / drain.as_secs_f64(),
+                "processed": done.load(Ordering::Relaxed), "publish_s": publish.as_secs_f64(), "drain_s": drain.as_secs_f64(),
+            }));
+            let js = async_nats::jetstream::new(client);
+            let _ = js.delete_stream(&stream_name).await;
+            let _ = js.delete_stream(format!("{stream_name}_DLQ")).await;
+        }
+    }
+    Ok(Value::Object(out))
+}
+
 /// Per-request tracing cost: time to create, enter and close spans shaped like the HTTP request
 /// span (with W3C parent extraction), with and without the OpenTelemetry layer.
 fn span_cost() -> Value {
@@ -506,6 +663,7 @@ async fn main() -> anyhow::Result<()> {
         Some("seed-http") => seed_http().await?,
         Some("ensure-db") => ensure_db().await?,
         Some("span-cost") => span_cost(),
+        Some("queue") => queue_bench(smoke).await?,
         _ => anyhow::bail!("usage: app-bench outbound|db [--smoke]"),
     };
     println!("{}", serde_json::to_string_pretty(&v)?);

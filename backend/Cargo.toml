@@ -55,6 +55,7 @@ tracing-opentelemetry = { version = "0.34", default-features = false }
 metrics = "0.24"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "uuid", "time", "json", "ipnet", "macros", "migrate", "derive"] }
 ipnet = "2"
+async-nats = "0.50"
 redis = { version = "1.7", default-features = false, features = ["tokio-comp", "connection-manager", "script"] }
 moka = { version = "0.12", features = ["future"] }
 base64 = "0.22"

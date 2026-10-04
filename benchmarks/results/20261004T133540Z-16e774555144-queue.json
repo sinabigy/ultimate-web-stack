@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "repeat": 3,
+  "server_env_overrides": {},
+  "started_at": "2026-10-04T13:35:40+00:00",
+  "smoke": false,
+  "environment": {
+    "host": "Mac",
+    "os": "macOS 26.5.1",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "logical_cores": 10,
+    "memory_gb": 16.0,
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "oha": "oha 1.16.0",
+    "git_sha": "16e774555144",
+    "git_dirty": true,
+    "build_profile": "release (lto=thin, codegen-units=1)",
+    "container_runtime": "2 cpus, 4094447616 bytes, Ubuntu 24.04.4 LTS, aarch64",
+    "notes": "Load generator and server share the host; services (PostgreSQL/Redis/Dragonfly) run in the container VM."
+  },
+  "suites": {
+    "messaging": {
+      "status": "ok",
+      "wall_s": 11.5,
+      "data": {
+        "consumers": 32,
+        "jetstream": {
+          "drain_per_sec": 46646.77707178244,
+          "drain_s": 0.428754166,
+          "processed": 20000,
+          "publish_per_sec": 43899.05555286539,
+          "publish_s": 0.455590667
+        },
+        "jobs": 20000,
+        "postgres": {
+          "drain_per_sec": 4653.987111480793,
+          "drain_s": 4.2973905,
+          "processed": 20000,
+          "publish_per_sec": 3180.2128641388726,
+          "publish_s": 6.288887208
+        },
+        "producers": 16
+      }
+    }
+  },
+  "finished_at": "2026-10-04T13:35:52+00:00"
+}

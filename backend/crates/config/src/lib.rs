@@ -502,7 +502,10 @@ impl Default for RateLimitConfig {
 pub struct MessagingConfig {
     /// NATS/JetStream. Off in the core profile: jobs use PostgreSQL and events stay in-process.
     pub enabled: bool,
+    /// Development default matches `infra/docker/compose.yaml` (profile `messaging`).
     pub nats_url: String,
+    /// Subject for realtime events (every instance subscribes and re-broadcasts locally).
+    pub events_subject: String,
     pub stream: String,
     /// Deliveries before a message is dead-lettered.
     pub max_deliver: i64,
@@ -513,7 +516,8 @@ impl Default for MessagingConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            nats_url: "nats://127.0.0.1:4222".into(),
+            nats_url: "nats://127.0.0.1:54222".into(),
+            events_subject: "app.events".into(),
             stream: "APP_JOBS".into(),
             max_deliver: 5,
             ack_wait_ms: 30_000,

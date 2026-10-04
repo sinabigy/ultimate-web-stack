@@ -1,32 +1,170 @@
 {
   "$comment": "Benchmark gates. `invariants` are machine-independent properties checked on every run (smoke included). `regressions` compare against a baseline recorded on the SAME machine fingerprint; on a different machine they are reported as not comparable instead of failing. Paths: dotted keys; `[key=value,...]` selects exactly one list element.",
   "invariants": [
-    { "name": "plaintext: no errors", "path": "suites.http.data.plaintext[concurrency=64].success_rate", "min": 0.9999 },
-    { "name": "db read: no errors", "path": "suites.http.data.db.success_rate", "min": 0.999 },
-    { "name": "cached read: no errors", "path": "suites.http.data.cached.success_rate", "min": 0.9999 },
-    { "name": "authenticated request: no errors", "path": "suites.auth.data.org_runs_page.success_rate", "min": 0.999 },
-    { "name": "missing credentials are always 401", "path": "suites.auth.data.unauthenticated_401.status_codes.401", "min": 1, "equals_path": "suites.auth.data.unauthenticated_401.requests" },
-    { "name": "cross-tenant probes are always 404", "path": "suites.auth.data.cross_tenant_404.status_codes.404", "min": 1, "equals_path": "suites.auth.data.cross_tenant_404.requests" },
-    { "name": "engine: keep-alive reuse", "path": "suites.outbound.data.connection_reuse.pooled_keepalive.upstream.connection_reuse", "min": 0.95 },
-    { "name": "engine: rate-limited work completes", "path": "suites.outbound.data.rate_limited_500rps.engine.success_rate", "min": 1.0 },
-    { "name": "engine: 429 waste bounded", "path": "suites.outbound.data.rate_limited_500rps.engine.upstream.waste_ratio", "max": 0.2 },
-    { "name": "engine: overload work completes", "path": "suites.outbound.data.overloaded_capacity16.engine.success_rate", "min": 0.99 },
-    { "name": "engine: overload waste bounded", "path": "suites.outbound.data.overloaded_capacity16.engine.upstream.waste_ratio", "max": 0.05 },
-    { "name": "engine: overload goodput ≥ 85% of provider capacity (1600/s)", "path": "suites.outbound.data.overloaded_capacity16.engine.useful_rps", "min": 1360 },
-    { "name": "engine: no retry amplification during outage", "path": "suites.outbound.data.outage_open_loop_engine.amplification_during_outage", "max": 1.0 },
-    { "name": "engine: recovers within 2s of provider recovery", "path": "suites.outbound.data.outage_open_loop_engine.recovery_s", "max": 2.0 }
+    {
+      "name": "plaintext: no errors",
+      "path": "suites.http.data.plaintext[concurrency=64].success_rate",
+      "min": 0.9999
+    },
+    {
+      "name": "db read: no errors",
+      "path": "suites.http.data.db.success_rate",
+      "min": 0.999
+    },
+    {
+      "name": "cached read: no errors",
+      "path": "suites.http.data.cached.success_rate",
+      "min": 0.9999
+    },
+    {
+      "name": "authenticated request: no errors",
+      "path": "suites.auth.data.org_runs_page.success_rate",
+      "min": 0.999
+    },
+    {
+      "name": "missing credentials are always 401",
+      "path": "suites.auth.data.unauthenticated_401.status_codes.401",
+      "min": 1,
+      "equals_path": "suites.auth.data.unauthenticated_401.requests"
+    },
+    {
+      "name": "cross-tenant probes are always 404",
+      "path": "suites.auth.data.cross_tenant_404.status_codes.404",
+      "min": 1,
+      "equals_path": "suites.auth.data.cross_tenant_404.requests"
+    },
+    {
+      "name": "engine: keep-alive reuse",
+      "path": "suites.outbound.data.connection_reuse.pooled_keepalive.upstream.connection_reuse",
+      "min": 0.95
+    },
+    {
+      "name": "engine: rate-limited work completes",
+      "path": "suites.outbound.data.rate_limited_500rps.engine.success_rate",
+      "min": 1.0
+    },
+    {
+      "name": "engine: 429 waste bounded",
+      "path": "suites.outbound.data.rate_limited_500rps.engine.upstream.waste_ratio",
+      "max": 0.2
+    },
+    {
+      "name": "engine: overload work completes",
+      "path": "suites.outbound.data.overloaded_capacity16.engine.success_rate",
+      "min": 0.99
+    },
+    {
+      "name": "engine: overload waste bounded",
+      "path": "suites.outbound.data.overloaded_capacity16.engine.upstream.waste_ratio",
+      "max": 0.05
+    },
+    {
+      "name": "engine: overload goodput ≥ 85% of provider capacity (1600/s)",
+      "path": "suites.outbound.data.overloaded_capacity16.engine.useful_rps",
+      "min": 1360
+    },
+    {
+      "name": "engine: no retry amplification during outage",
+      "path": "suites.outbound.data.outage_open_loop_engine.amplification_during_outage",
+      "max": 1.0
+    },
+    {
+      "name": "engine: recovers within 2s of provider recovery",
+      "path": "suites.outbound.data.outage_open_loop_engine.recovery_s",
+      "max": 2.0
+    },
+    {
+      "name": "PostgreSQL queue: every job processed",
+      "path": "suites.messaging.data.postgres.processed",
+      "min": 1,
+      "equals_path": "suites.messaging.data.jobs"
+    },
+    {
+      "name": "JetStream queue: every job processed",
+      "path": "suites.messaging.data.jetstream.processed",
+      "min": 1,
+      "equals_path": "suites.messaging.data.jobs"
+    }
   ],
   "regressions": [
-    { "name": "plaintext throughput", "path": "suites.http.data.plaintext[concurrency=64].success_rps", "better": "higher", "tolerance": 0.15 },
-    { "name": "plaintext p99", "path": "suites.http.data.plaintext[concurrency=64].p99_ms", "better": "lower", "tolerance": 0.35 },
-    { "name": "json throughput", "path": "suites.http.data.json[concurrency=64].success_rps", "better": "higher", "tolerance": 0.15 },
-    { "name": "db read throughput", "path": "suites.http.data.db.success_rps", "better": "higher", "tolerance": 0.2 },
-    { "name": "db read p99", "path": "suites.http.data.db.p99_ms", "better": "lower", "tolerance": 0.4 },
-    { "name": "cached read throughput", "path": "suites.http.data.cached.success_rps", "better": "higher", "tolerance": 0.15 },
-    { "name": "authenticated tenant page throughput", "path": "suites.auth.data.org_runs_page.success_rps", "better": "higher", "tolerance": 0.2 },
-    { "name": "authenticated tenant page p99", "path": "suites.auth.data.org_runs_page.p99_ms", "better": "lower", "tolerance": 0.4 },
-    { "name": "server memory under load", "path": "suites.http.data.plaintext[concurrency=64].server_rss_mb_max", "better": "lower", "tolerance": 0.6, "note": "peak RSS varied 35% between identical runs (allocator retention); this gate catches leaks and doublings, not drift" },
-    { "name": "engine rate-limited completion time", "path": "suites.outbound.data.rate_limited_500rps.engine.wall_s", "better": "lower", "tolerance": 0.25 },
-    { "name": "session lookup ops/s", "path": "suites.db.data.results[query=session_auth_lookup,pool_size=32,concurrency=64].ops_per_sec", "better": "higher", "tolerance": 0.2 }
+    {
+      "name": "plaintext throughput",
+      "path": "suites.http.data.plaintext[concurrency=64].success_rps",
+      "better": "higher",
+      "tolerance": 0.15
+    },
+    {
+      "name": "plaintext p99",
+      "path": "suites.http.data.plaintext[concurrency=64].p99_ms",
+      "better": "lower",
+      "tolerance": 0.35
+    },
+    {
+      "name": "json throughput",
+      "path": "suites.http.data.json[concurrency=64].success_rps",
+      "better": "higher",
+      "tolerance": 0.15
+    },
+    {
+      "name": "db read throughput",
+      "path": "suites.http.data.db.success_rps",
+      "better": "higher",
+      "tolerance": 0.2
+    },
+    {
+      "name": "db read p99",
+      "path": "suites.http.data.db.p99_ms",
+      "better": "lower",
+      "tolerance": 0.4
+    },
+    {
+      "name": "cached read throughput",
+      "path": "suites.http.data.cached.success_rps",
+      "better": "higher",
+      "tolerance": 0.15
+    },
+    {
+      "name": "authenticated tenant page throughput",
+      "path": "suites.auth.data.org_runs_page.success_rps",
+      "better": "higher",
+      "tolerance": 0.2
+    },
+    {
+      "name": "authenticated tenant page p99",
+      "path": "suites.auth.data.org_runs_page.p99_ms",
+      "better": "lower",
+      "tolerance": 0.4
+    },
+    {
+      "name": "server memory under load",
+      "path": "suites.http.data.plaintext[concurrency=64].server_rss_mb_max",
+      "better": "lower",
+      "tolerance": 0.6,
+      "note": "peak RSS varied 35% between identical runs (allocator retention); this gate catches leaks and doublings, not drift"
+    },
+    {
+      "name": "engine rate-limited completion time",
+      "path": "suites.outbound.data.rate_limited_500rps.engine.wall_s",
+      "better": "lower",
+      "tolerance": 0.25
+    },
+    {
+      "name": "session lookup ops/s",
+      "path": "suites.db.data.results[query=session_auth_lookup,pool_size=32,concurrency=64].ops_per_sec",
+      "better": "higher",
+      "tolerance": 0.2
+    },
+    {
+      "name": "PostgreSQL queue drain rate",
+      "path": "suites.messaging.data.postgres.drain_per_sec",
+      "better": "higher",
+      "tolerance": 0.3
+    },
+    {
+      "name": "JetStream drain rate",
+      "path": "suites.messaging.data.jetstream.drain_per_sec",
+      "better": "higher",
+      "tolerance": 0.3
+    }
   ]
 }

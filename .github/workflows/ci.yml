@@ -54,6 +54,8 @@ jobs:
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | sudo tar -xz -C /usr/local/bin gitleaks
           gitleaks version
+      - name: NATS with JetStream (services cannot pass server flags)
+        run: docker run -d --name nats -p 54222:4222 nats:2.14.7-alpine --jetstream
       - name: Migrate the schema used by `cargo sqlx prepare --check`
         working-directory: backend
         run: cargo sqlx migrate run --source migrations
@@ -61,7 +63,7 @@ jobs:
         run: >
           python3 tools/ai-validate --strict --keep-going --report ai-validate-backend.json
           --only rust-fmt --only rust-clippy --only sqlx-offline-fresh --only rust-audit --only rust-deny --only secret-scan --only config-check
-          --only rust-test --only rust-test-cedar --only rust-test-cache --only ts-bindings-fresh
+          --only rust-test --only rust-test-cedar --only rust-test-cache --only rust-test-nats --only ts-bindings-fresh
       - if: always()
         uses: actions/upload-artifact@v4
         with: { name: ai-validate-backend, path: ai-validate-backend.json }

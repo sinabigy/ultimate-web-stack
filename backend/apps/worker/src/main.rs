@@ -20,7 +20,10 @@ async fn main() -> anyhow::Result<()> {
     let metrics = app_telemetry::init_metrics(&config.telemetry)?;
     let pool = app_db::connect(&config.database, "app-worker").await?;
     let providers = app_networking::ProviderRegistry::from_config(&config.providers)?;
-    let events = app_workers::events::PgEventBus::start(pool.clone()).await.context("event bus")?;
+    let events = app_workers::events::start_event_bus(&config.messaging, pool.clone(), "app-worker")
+        .await
+        .map_err(anyhow::Error::msg)
+        .context("event bus")?;
     let shutdown = CancellationToken::new();
 
     let mut wc = app_workers::WorkerConfig::new("runs", config.jobs.concurrency);

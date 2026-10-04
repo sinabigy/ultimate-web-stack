@@ -66,3 +66,21 @@ impl EventBus for PgEventBus {
         self.local.subscribe()
     }
 }
+
+/// The deployment's realtime bus: NATS when `messaging.enabled` (scale-out, no database load),
+/// otherwise PostgreSQL LISTEN/NOTIFY (no extra infrastructure). Both reach every instance.
+pub async fn start_event_bus(
+    cfg: &app_config::MessagingConfig,
+    pool: sqlx::PgPool,
+    client_name: &str,
+) -> Result<std::sync::Arc<dyn app_messaging::EventBus>, String> {
+    if cfg.enabled {
+        let client = app_messaging::nats::connect(&cfg.nats_url, client_name).await.map_err(|e| e.to_string())?;
+        let bus =
+            app_messaging::nats::NatsEventBus::start(client, &cfg.events_subject).await.map_err(|e| e.to_string())?;
+        tracing::info!(url = %cfg.nats_url, subject = %cfg.events_subject, "realtime events over NATS");
+        Ok(bus)
+    } else {
+        Ok(PgEventBus::start(pool).await.map_err(|e| e.to_string())?)
+    }
+}

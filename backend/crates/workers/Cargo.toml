@@ -10,7 +10,8 @@ publish.workspace = true
 [dependencies]
 app-db.workspace = true
 app-domain.workspace = true
-app-messaging.workspace = true
+app-messaging = { workspace = true, features = ["nats"] }
+app-config.workspace = true
 app-networking.workspace = true
 app-telemetry.workspace = true
 async-trait.workspace = true

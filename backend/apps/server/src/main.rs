@@ -121,7 +121,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Outbound providers and realtime fan-out (PostgreSQL NOTIFY works across processes).
     let providers = app_networking::ProviderRegistry::from_config(&config.providers)?;
-    let events = app_workers::events::PgEventBus::start(pool.clone()).await.context("starting event bus")?;
+    let events = app_workers::events::start_event_bus(&config.messaging, pool.clone(), "app-server")
+        .await
+        .map_err(anyhow::Error::msg)
+        .context("starting event bus")?;
     let health_registry = providers.clone();
     builder = builder
         .health_check(Arc::new(app_api::services::DbCheck(pool.clone())))

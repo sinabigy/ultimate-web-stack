@@ -7,12 +7,32 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+nats = ["dep:async-nats", "dep:serde_json", "dep:serde", "dep:futures", "dep:app-telemetry", "dep:bytes", "dep:thiserror", "dep:tokio-util"]
+
 [dependencies]
 app-domain.workspace = true
+async-nats = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+app-telemetry = { workspace = true, optional = true }
+bytes = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
 async-trait.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 metrics.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+app-config.workspace = true
+tracing.workspace = true
+
+[[test]]
+name = "nats"
+required-features = ["nats"]
 
 [lints]
 workspace = true

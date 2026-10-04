@@ -201,6 +201,19 @@
         "note": "Redis 8 and Dragonfly integration (TTL, locks, shared GCRA, cross-process stampede, outage degradation). Needs ./dev up with the cache module."
       },
       {
+        "id": "rust-test-nats",
+        "stage": "integration",
+        "cmd": "TEST_NATS_URL=${TEST_NATS_URL:-nats://127.0.0.1:54222} cargo test -p app-messaging --features nats",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1200,
+        "note": "NATS event bus fan-out and JetStream queue: dedup, exactly-once processing, retry/backoff, dead letters + replay, crash-on-last-attempt sweep, graceful drain, trace propagation. Needs ./dev up with NATS."
+      },
+      {
         "id": "ts-bindings-fresh",
         "stage": "typecheck",
         "cmd": "cargo test --workspace export_bindings -q >/dev/null && git diff --quiet --exit-code -- ../frontend/src/api/generated && test -z \"$(git ls-files --others --exclude-standard ../frontend/src/api/generated)\"",
@@ -468,9 +481,17 @@
         ]
       },
       "messaging_nats": {
-        "enabled": false,
+        "enabled": true,
         "adapter": "nats-jetstream",
-        "reason": "Planned (T-0009): durable streams, DLQ, idempotent consumers."
+        "paths": [
+          "backend/crates/messaging/src/nats.rs",
+          "docs/architecture/messaging.md"
+        ],
+        "reason": "Realtime events across instances over NATS when messaging.enabled; JetStream durable queue (dedup, retries, DLQ, sweeper) for high-volume or cross-service work. Example-app runs stay on the PostgreSQL queue (transactional enqueue).",
+        "evidence": [
+          "backend/crates/messaging/tests/nats.rs",
+          ".ai/knowledge/DECISIONS/0007-postgres-queue-default-jetstream-for-scale.md"
+        ]
       },
       "analytics_clickhouse": {
         "enabled": false,
