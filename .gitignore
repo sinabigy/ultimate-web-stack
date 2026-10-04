@@ -23,3 +23,7 @@ test-results/
 *.log
 .env.zitadel
 /var/
+# Benchmark scratch results (complete runs are committed; smoke/partial runs stay local)
+benchmarks/results/*-smoke*.json
+benchmarks/results/latest-smoke.json
+benchmarks/results/latest-partial.json
