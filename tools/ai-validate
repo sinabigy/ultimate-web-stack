@@ -94,7 +94,7 @@ def main(argv=None) -> int:
         print(f"[{results[0]['status'].upper():4}] ai-check")
     stopped = results[0]["status"] == "fail" and not a.keep_going
     for c in ([] if stopped else selected):
-        if not a.json:
+        if not a.json and sys.stdout.isatty():
             print(f"[....] {c['id']}", end="\r", flush=True)
         r = run_command(root, c)
         results.append(r)
