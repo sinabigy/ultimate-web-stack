@@ -1,0 +1,286 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-size: 22px;
+}
+h2 {
+  font-size: 17px;
+}
+h3 {
+  font-size: 15px;
+}
+p {
+  margin: 0;
+}
+a {
+  color: var(--brand-text);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+code,
+kbd,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+::selection {
+  background: var(--brand-soft);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: -100px;
+  z-index: 100;
+  background: var(--surface);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+.skip-link:focus {
+  top: var(--space-3);
+}
+
+/* layout utilities */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.wrap {
+  flex-wrap: wrap;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.grid {
+  display: grid;
+  gap: var(--space-4);
+}
+.grid-cards {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.grid-2 {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+.muted {
+  color: var(--text-2);
+}
+.subtle {
+  color: var(--text-3);
+  font-size: 13px;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* utility classes (static layout tweaks live here, not in inline styles: strict CSP) */
+.w-auto {
+  width: auto;
+}
+.w-full {
+  width: 100%;
+}
+.m-0 {
+  margin: 0;
+}
+.mt-2 {
+  margin-top: var(--space-2);
+}
+.mt-3 {
+  margin-top: var(--space-3);
+}
+.p-3 {
+  padding: var(--space-3);
+}
+.px-5 {
+  padding: 0 20px;
+}
+.menu-pad {
+  padding: var(--space-2) var(--space-3);
+}
+.gap-0 {
+  gap: 0;
+}
+.gap-1 {
+  gap: 4px;
+}
+.gap-6 {
+  gap: 6px;
+}
+.gap-2 {
+  gap: var(--space-2);
+}
+.relative {
+  position: relative;
+}
+.inline-flex {
+  display: inline-flex;
+}
+.inline-block {
+  display: inline-block;
+}
+.justify-center {
+  justify-content: center;
+}
+.text-center {
+  text-align: center;
+}
+.text-left {
+  text-align: left;
+}
+.capitalize {
+  text-transform: capitalize;
+}
+.min-w-0 {
+  min-width: 0;
+}
+.minw-160 {
+  min-width: 160px;
+}
+.minw-220 {
+  min-width: 220px;
+}
+.maxw-140 {
+  max-width: 140px;
+}
+.maxw-260 {
+  max-width: 260px;
+}
+.maxw-320 {
+  max-width: 320px;
+}
+.maxw-480 {
+  max-width: 480px;
+}
+.scroll-260 {
+  max-height: 260px;
+  overflow: auto;
+}
+.scroll-360 {
+  max-height: 360px;
+  overflow: auto;
+}
+.fieldset-reset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.field-inline {
+  flex-direction: row;
+  align-items: center;
+}
+.icon-28 {
+  width: 28px;
+  height: 28px;
+}
+.size-36 {
+  width: 36px;
+  height: 36px;
+}
+.input-bare {
+  border: 0;
+  box-shadow: none;
+}
+.th-plain {
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.palette-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+.badge-count {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  height: 16px;
+  padding: 0 5px;
+  font-size: 10px;
+}

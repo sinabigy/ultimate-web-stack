@@ -11,27 +11,35 @@
   },
   "stack": {
     "languages": [
-      "rust"
+      "rust",
+      "typescript"
     ],
     "package_managers": [
-      "cargo"
+      "cargo",
+      "npm"
     ],
     "build_systems": [
-      "cargo"
+      "cargo",
+      "vite"
     ],
     "frameworks": [
       "axum",
-      "tokio"
+      "tokio",
+      "sqlx",
+      "solidjs"
     ],
     "detected_by": "user"
   },
   "paths": {
     "source": [
       "backend/crates",
-      "backend/apps"
+      "backend/apps",
+      "frontend/src"
     ],
     "tests": [
-      "backend/crates/api/tests"
+      "backend/crates/api/tests",
+      "backend/crates/db/tests",
+      "frontend/tests"
     ],
     "docs": [
       "docs"
@@ -115,6 +123,77 @@
         "confirmed": true,
         "timeout_s": 1800,
         "note": "Fails when Rust API types changed but frontend/src/api/generated was not regenerated (./dev types) and committed."
+      },
+      {
+        "id": "web-install",
+        "stage": "build",
+        "cmd": "npm ci --no-audit --no-fund",
+        "cwd": "frontend",
+        "requires": [
+          "npm"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 900
+      },
+      {
+        "id": "web-typecheck",
+        "stage": "typecheck",
+        "cmd": "npm run -s typecheck",
+        "cwd": "frontend",
+        "requires": [
+          "npm"
+        ],
+        "source": "user",
+        "confirmed": true
+      },
+      {
+        "id": "web-lint",
+        "stage": "lint",
+        "cmd": "npm run -s lint",
+        "cwd": "frontend",
+        "requires": [
+          "npm"
+        ],
+        "source": "user",
+        "confirmed": true
+      },
+      {
+        "id": "web-test",
+        "stage": "unit",
+        "cmd": "npm test",
+        "cwd": "frontend",
+        "requires": [
+          "npm"
+        ],
+        "source": "user",
+        "confirmed": true
+      },
+      {
+        "id": "web-build",
+        "stage": "build",
+        "cmd": "npm run -s build",
+        "cwd": "frontend",
+        "requires": [
+          "npm"
+        ],
+        "source": "user",
+        "confirmed": true
+      },
+      {
+        "id": "e2e",
+        "stage": "e2e",
+        "cmd": "node scripts/e2e-prepare.mjs && npx playwright test",
+        "cwd": "frontend",
+        "requires": [
+          "npm",
+          "cargo",
+          "docker"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 2400,
+        "note": "Full stack in a real browser: app-server serving the built SPA (strict CSP), PostgreSQL (fresh app_e2e database), mock OIDC. Needs ./dev up and `npx playwright install chromium` once."
       }
     ]
   },

@@ -1,0 +1,131 @@
+/* Design tokens. Change the brand here; components only use these variables.
+   Contrast: text tokens meet WCAG 2.2 AA (4.5:1) on their surface tokens in both themes. */
+:root {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --sidebar-width: 248px;
+  --topbar-height: 56px;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow: 0 4px 16px rgb(15 23 42 / 0.08), 0 1px 3px rgb(15 23 42 / 0.06);
+  --shadow-lg: 0 24px 48px rgb(15 23 42 / 0.18);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration: 160ms;
+
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f2f4f7;
+  --surface-3: #e9edf2;
+  --border: #e2e6ec;
+  --border-strong: #c9d0da;
+  --text: #0f172a;
+  --text-2: #475467;
+  --text-3: #5d6b7e;
+  --brand: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-soft: #eef2ff;
+  --brand-text: #3730a3;
+  --on-brand: #ffffff;
+  --success: #047857;
+  --success-soft: #ecfdf5;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+  --danger: #b91c1c;
+  --on-danger: #ffffff;
+  --danger-soft: #fef2f2;
+  --info: #0369a1;
+  --info-soft: #f0f9ff;
+  --focus: #6366f1;
+  --chart-1: #4f46e5;
+  --chart-2: #0ea5e9;
+  --chart-3: #f59e0b;
+  --chart-4: #ef4444;
+  --overlay: rgb(15 23 42 / 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0f17;
+    --surface: #111827;
+    --surface-2: #172033;
+    --surface-3: #1f2a40;
+    --border: #243049;
+    --border-strong: #33415e;
+    --text: #e6eaf2;
+    --text-2: #b4bfd0;
+    --text-3: #93a1b7;
+    --brand: #818cf8;
+    --brand-hover: #a5b4fc;
+    --brand-soft: #1e1b4b;
+    --brand-text: #c7d2fe;
+    --on-brand: #0b0f17;
+    --success: #34d399;
+    --success-soft: #052e22;
+    --warning: #fbbf24;
+    --warning-soft: #2d2006;
+    --danger: #f87171;
+    --on-danger: #1a0505;
+    --danger-soft: #2f0d0d;
+    --info: #38bdf8;
+    --info-soft: #082335;
+    --focus: #a5b4fc;
+    --shadow: 0 4px 16px rgb(0 0 0 / 0.4);
+    --overlay: rgb(0 0 0 / 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0f17;
+  --surface: #111827;
+  --surface-2: #172033;
+  --surface-3: #1f2a40;
+  --border: #243049;
+  --border-strong: #33415e;
+  --text: #e6eaf2;
+  --text-2: #b4bfd0;
+  --text-3: #93a1b7;
+  --brand: #818cf8;
+  --brand-hover: #a5b4fc;
+  --brand-soft: #1e1b4b;
+  --brand-text: #c7d2fe;
+  --on-brand: #0b0f17;
+  --success: #34d399;
+  --success-soft: #052e22;
+  --warning: #fbbf24;
+  --warning-soft: #2d2006;
+  --danger: #f87171;
+  --on-danger: #1a0505;
+  --danger-soft: #2f0d0d;
+  --info: #38bdf8;
+  --info-soft: #082335;
+  --focus: #a5b4fc;
+  --shadow: 0 4px 16px rgb(0 0 0 / 0.4);
+  --overlay: rgb(0 0 0 / 0.6);
+}
+
+/* biome-ignore-start lint/complexity/noImportantStyles: user motion preference must override every component */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* biome-ignore-end lint/complexity/noImportantStyles: end of reduced-motion override */

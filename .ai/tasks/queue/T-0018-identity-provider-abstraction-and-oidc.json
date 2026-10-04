@@ -7,7 +7,7 @@
     "Callback rejects bad state, nonce, issuer, audience, expired and forged ID tokens (tests)",
     "No token or credential ever reaches browser storage; only an HttpOnly session cookie",
     "Login page shows only configured methods; social login uses provider hints",
-    "Works against generic OIDC (mock) and ZITADEL with config change only"
+    "Works against generic OIDC (mock IdP in tests); the same code against real ZITADEL is verified by T-0025"
   ],
   "non_goals": [],
   "dependencies": [

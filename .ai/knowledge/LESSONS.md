@@ -21,3 +21,11 @@ APPLIES TO: whole repository; `git config core.hooksPath .githooks` (./dev setup
 LESSON: Personal workspaces must not take clean slugs derived from the user's name.
 EVIDENCE: tenancy test `last_owner_cannot_leave_or_be_demoted` collided with personal slug "solo"; personal slugs now always carry a suffix.
 APPLIES TO: backend/crates/db/src/orgs.rs ensure_personal_org
+
+LESSON: Scripted source edits must assert that each pattern matched; a silent no-op replacement shipped an unauthenticated route group.
+EVIDENCE: /api/v1/events had no auth layer because a Python str.replace targeted pre-rustfmt text; caught only by the browser E2E (SSE 401); regression test `authenticated_realtime_stream_accepts_session`.
+APPLIES TO: any automated refactoring; prefer exact-match edit tools that fail loudly.
+
+LESSON: Solid compiles *static* `style={{...}}` props into template HTML, which a strict `style-src 'self'` CSP blocks; use classes for static styles (dynamic styles via CSSOM are fine).
+EVIDENCE: Chromium CSP console errors in E2E against the real backend headers; unit tests (jsdom) cannot see CSP.
+APPLIES TO: frontend/src
