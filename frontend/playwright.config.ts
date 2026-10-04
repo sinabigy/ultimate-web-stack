@@ -36,6 +36,12 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
+      command: "../backend/target/debug/fake-upstream 59090",
+      url: "http://127.0.0.1:59090/healthz",
+      reuseExistingServer: false,
+      stdout: "ignore",
+    },
+    {
       command: "../backend/target/debug/mock-oidc",
       url: `${IDP}/.well-known/openid-configuration`,
       env: {

@@ -84,16 +84,48 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!(error = %e, "permission vocabulary sync failed (database unavailable?); will be retried on next start");
     }
     let services = Arc::new(app_api::bootstrap::build_services(&config, pool.clone())?);
+
+    // Outbound providers and realtime fan-out (PostgreSQL NOTIFY works across processes).
+    let providers = app_networking::ProviderRegistry::from_config(&config.providers)?;
+    let events = app_workers::events::PgEventBus::start(pool.clone()).await.context("starting event bus")?;
+    let health_registry = providers.clone();
     builder = builder
         .health_check(Arc::new(app_api::services::DbCheck(pool.clone())))
         .health_check(Arc::new(app_api::services::IdpCheck(services.oidc.clone())))
+        .events(events.clone())
+        .provider_health(Arc::new(move |name: &str| {
+            health_registry.health(name).map(|h| app_api::dto::ProviderHealth {
+                concurrency_limit: h.concurrency_limit,
+                inflight: h.inflight,
+                queued: h.queued,
+                circuit: h.circuit.to_string(),
+                success_rate: h.success_rate,
+                p50_ms: h.p50_ms,
+                p95_ms: h.p95_ms,
+                p99_ms: h.p99_ms,
+                rate_429: h.rate_429,
+            })
+        }))
         .services(services);
     let state = builder.build();
     let router = app_api::build_router(state.clone());
+
+    // Simple deployments run the job worker in this process; larger ones run `app-worker`.
+    let worker = config.jobs.run_in_process.then(|| {
+        let mut wc = app_workers::WorkerConfig::new("runs", config.jobs.concurrency);
+        wc.poll_interval = Duration::from_millis(config.jobs.poll_interval_ms);
+        let svc = app_workers::JobServices { db: pool.clone(), events: events.clone(), providers: providers.clone() };
+        let w =
+            app_workers::PgWorker::new(wc, svc, vec![Arc::new(app_workers::handlers::ExecuteRun { parallelism: 16 })]);
+        tokio::spawn(w.run(state.lifecycle.shutdown.clone()))
+    });
 
     let addr = SocketAddr::new(config.http.host, config.http.port);
     let listener = tokio::net::TcpListener::bind(addr).await.with_context(|| format!("binding {addr}"))?;
     tracing::info!(%addr, "listening");
     app_api::server::serve(listener, router, state).await?;
+    if let Some(w) = worker {
+        let _ = w.await; // the worker drains in-flight jobs (bounded) on the same shutdown signal
+    }
     Ok(())
 }

@@ -1,0 +1,24 @@
+[package]
+name = "app-worker"
+description = "Background worker process: runs job queues; exposes /healthz and /metrics."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+app-api.workspace = true
+app-config.workspace = true
+app-db.workspace = true
+app-networking.workspace = true
+app-telemetry.workspace = true
+app-workers.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

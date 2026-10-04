@@ -249,12 +249,16 @@ dependencies = [
  "app-api",
  "app-config",
  "app-db",
+ "app-domain",
  "app-messaging",
+ "app-networking",
  "app-rate-limit",
  "app-telemetry",
+ "app-workers",
  "reqwest",
  "serde_json",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -268,6 +272,47 @@ dependencies = [
  "thiserror 2.0.21",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "app-worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "app-api",
+ "app-config",
+ "app-db",
+ "app-networking",
+ "app-telemetry",
+ "app-workers",
+ "axum",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "app-workers"
+version = "0.1.0"
+dependencies = [
+ "app-authz",
+ "app-db",
+ "app-domain",
+ "app-messaging",
+ "app-networking",
+ "async-trait",
+ "fake-upstream",
+ "futures",
+ "metrics",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.21",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

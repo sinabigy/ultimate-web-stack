@@ -606,7 +606,7 @@ pub struct ProviderDefinition {
 impl Default for ProviderDefinition {
     fn default() -> Self {
         Self {
-            base_url: "http://127.0.0.1:9090".into(),
+            base_url: "http://127.0.0.1:59090".into(), // fake-upstream in development
             api_key: Secret::default(),
             initial_concurrency: 32,
             min_concurrency: 2,

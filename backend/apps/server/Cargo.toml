@@ -15,6 +15,10 @@ path = "src/main.rs"
 cedar = ["app-api/cedar"]
 
 [dependencies]
+app-networking.workspace = true
+app-workers.workspace = true
+app-domain.workspace = true
+tokio-util.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true
 app-db.workspace = true

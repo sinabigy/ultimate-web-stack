@@ -155,12 +155,13 @@ def cmd_up(a) -> None:
     app_env = dict(ENV)
     app_env.update({"APP__DATABASE__URL": ENV["DATABASE_URL"], "APP__HTTP__BENCH_ENDPOINTS": "true"})
     procs = {}
+    sh(["cargo", "build", "-q", "-p", "fake-upstream", "-p", "mock-oidc", "-p", "app-server"], cwd=ROOT / "backend")
+    # Simulated external provider used by the example app's runs (no internet needed).
+    procs["fake-upstream"] = subprocess.Popen([str(ROOT / "backend/target/debug/fake-upstream")], cwd=ROOT, env=app_env)
     if a.identity == "mock":
-        sh(["cargo", "build", "-q", "-p", "mock-oidc", "-p", "app-server"], cwd=ROOT / "backend")
         procs["mock-oidc"] = subprocess.Popen([str(ROOT / "backend/target/debug/mock-oidc")], cwd=ROOT, env=app_env)
         app_env.update({"APP__AUTH__PROVIDER": "oidc", "APP__AUTH__ISSUER_URL": "http://127.0.0.1:59081", "APP__AUTH__CLIENT_ID": "app-web"})
     else:
-        sh(["cargo", "build", "-q", "-p", "app-server"], cwd=ROOT / "backend")
         app_env.update(load_env_file(ROOT / ".env.zitadel"))
     app_env.update(load_env_file(ROOT / ".env"))
     procs["app-server"] = subprocess.Popen([str(ROOT / "backend/target/debug/app-server")], cwd=ROOT / "backend", env=app_env)
