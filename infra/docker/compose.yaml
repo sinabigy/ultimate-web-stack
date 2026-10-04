@@ -30,5 +30,51 @@ services:
       timeout: 3s
       retries: 30
 
+  # ---------------------------------------------------------------- identity profile
+  # Self-hosted ZITADEL (default identity provider). Uses the same PostgreSQL server with its own
+  # database and role (created by ZITADEL's init with the admin credentials below).
+  # The issuer is http://localhost:${DEV_ZITADEL_PORT:-58081}; scripts/zitadel-bootstrap configures
+  # the project, OIDC client, roles and test users and writes .env.zitadel (gitignored).
+  zitadel:
+    profiles: ["identity"]
+    image: ghcr.io/zitadel/zitadel:v4.19.4
+    command: ["start-from-init", "--masterkeyFromEnv", "--tlsMode", "disabled"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ZITADEL_MASTERKEY: ${ZITADEL_MASTERKEY:-MasterkeyNeedsToHave32Characters}
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: ${DEV_ZITADEL_PORT:-58081}
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_DATABASE_POSTGRES_HOST: postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: "5432"
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_PASSWORD:-zitadel-dev-only}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: app
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD:-app-dev-only}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: Blueprint
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin@localhost
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD:-Password1!Password1!}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: blueprint-bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Blueprint bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2030-01-01T00:00:00Z"
+      ZITADEL_FIRSTINSTANCE_PATPATH: /machinekey/pat.txt
+      # Keep the built-in login UI (Login V2 is a separate Next.js deployment; see docs).
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+    ports: ["127.0.0.1:${DEV_ZITADEL_PORT:-58081}:8080"]
+    volumes:
+      - ../../var/zitadel:/machinekey
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
 volumes:
   pgdata:

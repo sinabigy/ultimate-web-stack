@@ -152,6 +152,13 @@ async fn service_accounts_use_verified_jwts_and_are_not_users(pool: PgPool) {
         let bad = app.service_token("svc-reporting", "runs:read").await;
         assert_eq!(app.bearer(&bad, Method::GET, &runs, None).await.status, StatusCode::UNAUTHORIZED, "{fault}");
     }
+    // A token carrying only IdP scopes (as ZITADEL issues) gets exactly the registered grant.
+    let idp_only = app.service_token("svc-reporting", "openid").await;
+    assert_eq!(app.bearer(&idp_only, Method::GET, &runs, None).await.status, StatusCode::OK);
+    let r = app
+        .bearer(&idp_only, Method::POST, &runs, Some(json!({"label": "x", "provider": "simulated", "requested": 1})))
+        .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "registration bounds IdP-scoped tokens");
     // valid token, but client not registered with the application
     let unregistered = app.service_token("svc-unregistered", "runs:read").await;
     assert_eq!(app.bearer(&unregistered, Method::GET, &runs, None).await.status, StatusCode::UNAUTHORIZED);

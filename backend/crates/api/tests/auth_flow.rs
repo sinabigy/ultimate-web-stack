@@ -330,3 +330,14 @@ async fn authenticated_realtime_stream_accepts_session(pool: PgPool) {
     let anon = app.router.clone().oneshot(Request::get("/api/v1/events").body(Body::empty()).unwrap()).await.unwrap();
     assert_eq!(anon.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[sqlx::test(migrator = "app_db::MIGRATOR")]
+async fn extra_id_token_audiences_must_be_explicitly_trusted(pool: PgPool) {
+    let app = TestApp::new(pool.clone()).await;
+    app.fault("extra_audience").await;
+    assert_eq!(app.try_login("aud@example.com", "pwd", "").await.unwrap_err(), "/login?error=login_rejected");
+    let trusted =
+        TestApp::with_config(pool, |c| c.auth.id_token_trusted_audiences = vec!["extra-audience".into()]).await;
+    trusted.fault("extra_audience").await;
+    assert!(trusted.try_login("aud@example.com", "pwd", "").await.is_ok());
+}

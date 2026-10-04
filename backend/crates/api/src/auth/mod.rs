@@ -131,14 +131,19 @@ pub async fn authenticate(State(state): State<AppState>, mut req: Request, next:
             match svc.service_tokens.verify(token).await {
                 Ok(claims) => match app_db::api_keys::find_service_client(&svc.db, &claims.sub).await {
                     Ok(Some(client)) => {
-                        // Effective scopes: registered scopes ∩ scopes in this token.
+                        // The organisation's registration of this client is the grant (it was
+                        // escalation-checked at registration). Token scopes that are application
+                        // permission keys can only narrow it; IdP-specific scopes (`openid`,
+                        // `urn:zitadel:...`) are ignored.
                         let registered =
                             PermissionSet::parse_keys(client.scopes.iter().map(String::as_str)).unwrap_or_default();
-                        let granted = PermissionSet::parse_keys(claims.scopes()).unwrap_or_default();
+                        let requested: PermissionSet =
+                            claims.scopes().into_iter().filter_map(app_authz::Permission::parse).collect();
+                        let scopes = if requested.is_empty() { registered } else { registered.intersect(&requested) };
                         Some(Principal::Service {
                             client_id: client.id,
                             organization_id: client.organization_id,
-                            scopes: registered.intersect(&granted),
+                            scopes,
                             name: client.name,
                         })
                     }

@@ -245,12 +245,17 @@ impl OidcProvider {
         let nonce = Nonce::new(nonce.to_string());
 
         let verify = |client: &Client| -> Result<VerifiedLogin, OidcError> {
-            let verifier = client.id_token_verifier().set_allowed_algs(vec![
-                CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
-                CoreJwsSigningAlgorithm::RsaSsaPssSha256,
-                CoreJwsSigningAlgorithm::EcdsaP256Sha256,
-                CoreJwsSigningAlgorithm::EdDsa,
-            ]);
+            let trusted = self.cfg.id_token_trusted_audiences.clone();
+            let verifier = client
+                .id_token_verifier()
+                // Only explicitly configured extra audiences are accepted (deny by default).
+                .set_other_audience_verifier_fn(move |aud| trusted.iter().any(|t| t == aud.as_str()))
+                .set_allowed_algs(vec![
+                    CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
+                    CoreJwsSigningAlgorithm::RsaSsaPssSha256,
+                    CoreJwsSigningAlgorithm::EcdsaP256Sha256,
+                    CoreJwsSigningAlgorithm::EdDsa,
+                ]);
             let claims = id_token.claims(&verifier, &nonce).map_err(|e| OidcError::InvalidToken(error_chain(&e)))?;
             let auth_time = claims
                 .auth_time()

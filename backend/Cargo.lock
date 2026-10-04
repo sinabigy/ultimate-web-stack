@@ -232,6 +232,8 @@ dependencies = [
  "app-messaging",
  "app-rate-limit",
  "app-telemetry",
+ "reqwest",
+ "serde_json",
  "tokio",
  "tracing",
 ]

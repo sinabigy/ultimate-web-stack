@@ -24,10 +24,47 @@ pub enum ConfigError {
     Invalid(String),
 }
 
+/// Environment values are parsed by type, so `APP__AUTH__CLIENT_ID=393614044919037955` arrives
+/// as an integer. Identifiers and secrets must accept any scalar and keep its exact text.
+mod lenient {
+    use serde::{Deserialize, Deserializer};
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Scalar {
+        // Order matters: integers before floats so large ids never lose precision through f64.
+        S(String),
+        U(u64),
+        I(i64),
+        F(f64),
+        B(bool),
+    }
+
+    impl Scalar {
+        fn into_string(self) -> String {
+            match self {
+                Scalar::S(s) => s,
+                Scalar::I(i) => i.to_string(),
+                Scalar::U(u) => u.to_string(),
+                Scalar::F(f) => f.to_string(),
+                Scalar::B(b) => b.to_string(),
+            }
+        }
+    }
+
+    pub fn string<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+        Ok(Scalar::deserialize(d)?.into_string())
+    }
+
+    pub fn strings<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+        Ok(Vec::<Scalar>::deserialize(d)?.into_iter().map(Scalar::into_string).collect())
+    }
+}
+
 /// A string that never appears in logs or debug output.
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
-pub struct Secret(String);
+pub struct Secret(#[serde(deserialize_with = "lenient::string")] String);
 
 impl Secret {
     pub fn new(s: impl Into<String>) -> Self {
@@ -254,6 +291,7 @@ pub struct AuthConfig {
     pub profile: AuthProfile,
     /// OIDC issuer. Discovery is fetched from `<issuer>/.well-known/openid-configuration`.
     pub issuer_url: String,
+    #[serde(deserialize_with = "lenient::string")]
     pub client_id: String,
     /// Confidential client secret. Empty = public client (PKCE only). PKCE is always used.
     pub client_secret: Secret,
@@ -289,11 +327,17 @@ pub struct AuthConfig {
     pub api_key_pepper: Secret,
     /// API keys look like `<prefix>_<env>_<id>_<secret>`.
     pub api_key_prefix: String,
+    /// Extra `aud` values allowed in ID tokens besides `client_id` (OIDC Core 3.1.3.7 requires
+    /// rejecting untrusted extra audiences). ZITADEL adds the project id here.
+    #[serde(deserialize_with = "lenient::strings")]
+    pub id_token_trusted_audiences: Vec<String>,
     /// Accepted `aud` values for machine-to-machine JWT bearer tokens. Empty disables M2M JWTs.
+    #[serde(deserialize_with = "lenient::strings")]
     pub service_audiences: Vec<String>,
     /// System-admin endpoints require a session whose authentication used MFA.
     pub require_mfa_for_system_admin: bool,
     /// Email addresses granted the `system_admin` level on first login (bootstrap only).
+    #[serde(deserialize_with = "lenient::strings")]
     pub bootstrap_system_admins: Vec<String>,
     /// Take the system trust level from an ID-token claim at every login (IdP is the source
     /// of truth for platform operators). Organisation roles always stay application-owned.
@@ -332,6 +376,7 @@ impl Default for AuthConfig {
             token_encryption_key: Secret::default(),
             api_key_pepper: Secret::default(),
             api_key_prefix: "app".into(),
+            id_token_trusted_audiences: Vec::new(),
             service_audiences: Vec::new(),
             require_mfa_for_system_admin: true,
             bootstrap_system_admins: Vec::new(),
@@ -766,6 +811,20 @@ mod tests {
             assert_eq!(c.http.port, 9999);
             assert_eq!(c.database.url.expose(), "postgres://u:p@h/db");
             assert!(c.messaging.enabled);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn numeric_identifiers_and_secrets_from_env_stay_strings() {
+        Jail::expect_with(|jail| {
+            jail.set_env("APP__AUTH__CLIENT_ID", "393614044919037955");
+            jail.set_env("APP__AUTH__SERVICE_AUDIENCES", "[393614044835086339, app-api]");
+            jail.set_env("APP__AUTH__CLIENT_SECRET", "12345678901234567890");
+            let c = load(Figment::new().merge(Env::prefixed("APP__").split("__"))).expect("load");
+            assert_eq!(c.auth.client_id, "393614044919037955");
+            assert_eq!(c.auth.service_audiences, vec!["393614044835086339", "app-api"]);
+            assert_eq!(c.auth.client_secret.expose(), "12345678901234567890");
             Ok(())
         });
     }

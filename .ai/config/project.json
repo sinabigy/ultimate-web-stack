@@ -85,6 +85,19 @@
         "note": "Fails if .sqlx query metadata is stale relative to the schema/queries. Needs PostgreSQL (./dev up)."
       },
       {
+        "id": "config-check",
+        "stage": "other",
+        "cmd": "SQLX_OFFLINE=true cargo run -q -p app-server -- check-config",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1200,
+        "note": "Validates the effective configuration (redirect URIs, cookie policy, production secrets). `./dev check --auth` adds --online (OIDC discovery, issuer, PKCE)."
+      },
+      {
         "id": "rust-test",
         "stage": "integration",
         "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo test --workspace",

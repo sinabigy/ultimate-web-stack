@@ -58,6 +58,8 @@ pub enum Fault {
     BadSignature,
     WrongNonce,
     NoEmail,
+    /// ID token `aud` = [client_id, "extra-audience"] (as ZITADEL does with its project id).
+    ExtraAudience,
 }
 
 struct Key {
@@ -430,8 +432,13 @@ async fn token(State(s): State<St>, headers: HeaderMap, Form(f): Form<TokenForm>
                 return oauth_err("invalid_client", "bad secret");
             }
             let requested: Vec<&str> = f.scope.as_deref().unwrap_or("").split_whitespace().collect();
-            let granted: Vec<&String> =
+            // Like real IdPs: grant the requested scopes the account may have, plus `openid` if asked.
+            let openid = "openid".to_string();
+            let mut granted: Vec<&String> =
                 scopes.iter().filter(|sc| requested.is_empty() || requested.contains(&sc.as_str())).collect();
+            if requested.contains(&"openid") {
+                granted.push(&openid);
+            }
             let fault = s.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
             let claims = json!({
                 "iss": if fault == Some(Fault::WrongIssuer) { "https://evil.example".to_string() } else { s.issuer.clone() },
@@ -458,7 +465,12 @@ fn id_token(s: &Inner, client_id: &str, g: &CodeGrant, fault: Option<Fault>) -> 
     let mut claims = json!({
         "iss": if fault == Some(Fault::WrongIssuer) { "https://evil.example".to_string() } else { s.issuer.clone() },
         "sub": u.sub(),
-        "aud": if fault == Some(Fault::WrongAudience) { "someone-else".to_string() } else { client_id.to_string() },
+        "aud": match fault {
+            Some(Fault::WrongAudience) => json!("someone-else"),
+            Some(Fault::ExtraAudience) => json!([client_id, "extra-audience"]),
+            _ => json!(client_id),
+        },
+        "azp": client_id,
         "iat": now(),
         "exp": if fault == Some(Fault::Expired) { now() - 3600 } else { now() + 300 },
         "auth_time": now(),
