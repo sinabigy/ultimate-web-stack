@@ -1,0 +1,22 @@
+# Runtime experiment (extreme profile): Tokio vs Monoio, epoll vs io_uring, on Linux.
+# A separate workspace; never part of the core build. Run: benchmarks/runtime/run.sh
+[package]
+name = "runtime-experiment"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "io-util", "macros"] }
+axum = "0.8"
+socket2 = "0.6"
+monoio = { version = "0.2", features = ["sync"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[lints.rust]
+unsafe_code = "forbid"

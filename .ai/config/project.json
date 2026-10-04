@@ -550,7 +550,16 @@
       "runtime_monoio": {
         "enabled": false,
         "adapter": "monoio-io_uring",
-        "reason": "Extreme profile experiment; only with benchmark evidence (T-0013)."
+        "paths": [
+          "backend/experiments/runtime",
+          "benchmarks/runtime",
+          "docs/benchmarks/runtime.md"
+        ],
+        "reason": "Rejected with evidence: on Linux 6.8 io_uring (Monoio) was 0-24% slower than epoll on identical code; Tokio thread-per-core fastest by 3-7%; axum overhead (15-20%) dominates. Experiment kept for re-measurement on target hardware.",
+        "evidence": [
+          "benchmarks/results/20261004T142225Z-5d7a9e6f204e-runtime.json",
+          ".ai/knowledge/DECISIONS/0010-stay-on-tokio-no-io-uring-runtime.md"
+        ]
       },
       "observability": {
         "enabled": true,
@@ -597,7 +606,8 @@
       "docs/security/threat-model.md",
       "docs/architecture/analytics.md",
       "docs/architecture/messaging.md",
-      "docs/benchmarks/pingora.md"
+      "docs/benchmarks/pingora.md",
+      "docs/benchmarks/runtime.md"
     ]
   }
 }

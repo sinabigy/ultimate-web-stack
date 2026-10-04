@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "kind": "runtime-experiment",
+  "smoke": false,
+  "started_at": "2026-10-04T14:19:11+00:00",
+  "environment": {
+    "kernel": "6.8.0-117-generic",
+    "arch": "aarch64",
+    "nproc": "2",
+    "cpu": "0x000",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "oha": "oha 1.16.0",
+    "io_uring_disabled": "0",
+    "image": "rust:1.99.0-bookworm",
+    "host": "colima VM on Apple M5",
+    "seccomp": "unconfined",
+    "note": "load generator in the same container; 2 vCPUs shared by server and oha"
+  },
+  "results": [
+    {
+      "variant": "axum_ref",
+      "threads": 1,
+      "concurrency": 256,
+      "success_rps": 265899.7,
+      "success_rate": 1.0,
+      "p50_ms": 0.479,
+      "p99_ms": 3.413,
+      "p999_ms": 4.638
+    },
+    {
+      "variant": "axum_ref",
+      "threads": 1,
+      "concurrency": 64,
+      "success_rps": 225762.8,
+      "success_rate": 1.0,
+      "p50_ms": 0.186,
+      "p99_ms": 1.743,
+      "p999_ms": 2.665
+    },
+    {
+      "variant": "axum_ref",
+      "threads": 2,
+      "concurrency": 256,
+      "success_rps": 276961.3,
+      "success_rate": 1.0,
+      "p50_ms": 0.52,
+      "p99_ms": 3.369,
+      "p999_ms": 5.155
+    },
+    {
+      "variant": "axum_ref",
+      "threads": 2,
+      "concurrency": 64,
+      "success_rps": 267682.6,
+      "success_rate": 1.0,
+      "p50_ms": 0.118,
+      "p99_ms": 1.921,
+      "p999_ms": 2.724
+    },
+    {
+      "variant": "monoio_epoll",
+      "threads": 1,
+      "concurrency": 256,
+      "success_rps": 277713.8,
+      "success_rate": 1.0,
+      "p50_ms": 0.703,
+      "p99_ms": 2.65,
+      "p999_ms": 3.63
+    },
+    {
+      "variant": "monoio_epoll",
+      "threads": 1,
+      "concurrency": 64,
+      "success_rps": 276369.5,
+      "success_rate": 1.0,
+      "p50_ms": 0.117,
+      "p99_ms": 1.907,
+      "p999_ms": 3.072
+    },
+    {
+      "variant": "monoio_epoll",
+      "threads": 2,
+      "concurrency": 256,
+      "success_rps": 335973.0,
+      "success_rate": 1.0,
+      "p50_ms": 0.696,
+      "p99_ms": 2.296,
+      "p999_ms": 4.048
+    },
+    {
+      "variant": "monoio_epoll",
+      "threads": 2,
+      "concurrency": 64,
+      "success_rps": 309088.5,
+      "success_rate": 1.0,
+      "p50_ms": 0.165,
+      "p99_ms": 1.09,
+      "p999_ms": 2.537
+    },
+    {
+      "variant": "monoio_uring",
+      "threads": 1,
+      "concurrency": 256,
+      "success_rps": 276411.8,
+      "success_rate": 1.0,
+      "p50_ms": 0.804,
+      "p99_ms": 2.583,
+      "p999_ms": 4.012
+    },
+    {
+      "variant": "monoio_uring",
+      "threads": 1,
+      "concurrency": 64,
+      "success_rps": 252646.9,
+      "success_rate": 1.0,
+      "p50_ms": 0.16,
+      "p99_ms": 1.666,
+      "p999_ms": 2.731
+    },
+    {
+      "variant": "monoio_uring",
+      "threads": 2,
+      "concurrency": 256,
+      "success_rps": 300753.1,
+      "success_rate": 1.0,
+      "p50_ms": 0.656,
+      "p99_ms": 3.013,
+      "p999_ms": 4.535
+    },
+    {
+      "variant": "monoio_uring",
+      "threads": 2,
+      "concurrency": 64,
+      "success_rps": 235245.7,
+      "success_rate": 1.0,
+      "p50_ms": 0.077,
+      "p99_ms": 2.822,
+      "p999_ms": 4.765
+    },
+    {
+      "variant": "tokio_mt",
+      "threads": 1,
+      "concurrency": 256,
+      "success_rps": 285457.4,
+      "success_rate": 1.0,
+      "p50_ms": 0.779,
+      "p99_ms": 2.66,
+      "p999_ms": 5.364
+    },
+    {
+      "variant": "tokio_mt",
+      "threads": 1,
+      "concurrency": 64,
+      "success_rps": 283413.1,
+      "success_rate": 1.0,
+      "p50_ms": 0.162,
+      "p99_ms": 1.389,
+      "p999_ms": 2.525
+    },
+    {
+      "variant": "tokio_mt",
+      "threads": 2,
+      "concurrency": 256,
+      "success_rps": 328476.7,
+      "success_rate": 1.0,
+      "p50_ms": 0.631,
+      "p99_ms": 2.317,
+      "p999_ms": 3.932
+    },
+    {
+      "variant": "tokio_mt",
+      "threads": 2,
+      "concurrency": 64,
+      "success_rps": 308420.3,
+      "success_rate": 1.0,
+      "p50_ms": 0.159,
+      "p99_ms": 0.896,
+      "p999_ms": 2.457
+    },
+    {
+      "variant": "tokio_tpc",
+      "threads": 1,
+      "concurrency": 256,
+      "success_rps": 302161.3,
+      "success_rate": 1.0,
+      "p50_ms": 0.75,
+      "p99_ms": 2.28,
+      "p999_ms": 4.443
+    },
+    {
+      "variant": "tokio_tpc",
+      "threads": 1,
+      "concurrency": 64,
+      "success_rps": 294336.9,
+      "success_rate": 1.0,
+      "p50_ms": 0.167,
+      "p99_ms": 1.053,
+      "p999_ms": 2.4
+    },
+    {
+      "variant": "tokio_tpc",
+      "threads": 2,
+      "concurrency": 256,
+      "success_rps": 341883.4,
+      "success_rate": 1.0,
+      "p50_ms": 0.63,
+      "p99_ms": 2.552,
+      "p999_ms": 4.474
+    },
+    {
+      "variant": "tokio_tpc",
+      "threads": 2,
+      "concurrency": 64,
+      "success_rps": 317999.4,
+      "success_rate": 1.0,
+      "p50_ms": 0.143,
+      "p99_ms": 1.207,
+      "p999_ms": 2.595
+    }
+  ]
+}
