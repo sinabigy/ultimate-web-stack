@@ -3,7 +3,8 @@
 //! Outermost → innermost for every request:
 //! request-id (generate/accept) → trace span → panic catcher → sensitive-header redaction →
 //! security headers → CORS → CSRF (Fetch Metadata / Origin) → client ip → metrics →
-//! rate limit → [per group] load shedding, timeout, body limit → handler.
+//! [API group] load shedding → authentication → rate limit (principal or IP) → timeout →
+//! body limit → handler. Ops endpoints bypass shedding and rate limiting.
 //!
 //! Streaming routes (SSE/WebSocket) skip timeouts and load shedding; they end on shutdown.
 
@@ -75,6 +76,8 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
         ServiceBuilder::new()
             .layer(middleware::from_fn_with_state(state.clone(), mw::shed_load))
             .layer(middleware::from_fn_with_state(state.clone(), crate::auth::authenticate))
+            // After authentication: signed-in principals get their own bucket (not their IP's).
+            .layer(middleware::from_fn_with_state(state.clone(), mw::rate_limit))
             .layer(TimeoutLayer::with_status_code(StatusCode::GATEWAY_TIMEOUT, cfg.request_timeout()))
             .layer(DefaultBodyLimit::max(cfg.body_limit_bytes))
             .layer(RequestBodyLimitLayer::new(cfg.body_limit_bytes)),
@@ -112,8 +115,7 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
             .layer(cors(&state))
             .layer(csrf(&state))
             .layer(middleware::from_fn_with_state(state.clone(), mw::client_ip))
-            .layer(middleware::from_fn(mw::http_metrics))
-            .layer(middleware::from_fn_with_state(state.clone(), mw::rate_limit)),
+            .layer(middleware::from_fn(mw::http_metrics)),
     )
     .with_state(state)
 }

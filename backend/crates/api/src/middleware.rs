@@ -68,7 +68,18 @@ pub async fn http_metrics(req: Request, next: Next) -> Response {
 
 /// Load shedding: beyond `http.max_inflight` concurrent requests, reject immediately with 503
 /// rather than queueing. Queueing past capacity only converts overload into timeouts for everyone.
+/// Operational endpoints for load balancers, orchestrators and scrapers. They bypass load
+/// shedding and rate limiting: a health check rejected during a traffic burst makes the
+/// balancer pull a healthy instance (observed: a Prometheus scrape got 429 while the same
+/// client IP was under load).
+pub fn is_ops_path(path: &str) -> bool {
+    matches!(path, "/healthz" | "/readyz" | "/metrics" | "/version")
+}
+
 pub async fn shed_load(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    if is_ops_path(req.uri().path()) {
+        return next.run(req).await;
+    }
     match state.inflight.clone().try_acquire_owned() {
         Ok(_permit) => next.run(req).await,
         Err(_) => {
@@ -80,13 +91,17 @@ pub async fn shed_load(State(state): State<AppState>, req: Request, next: Next) 
     }
 }
 
-/// Per-client rate limiting. Key: authenticated principal when present (set by auth
-/// middleware as `RateLimitKey`), otherwise client IP.
+/// Per-client rate limiting. Key: authenticated principal when present (set by the auth
+/// middleware as `RateLimitKey`, so this layer must run *after* authentication), otherwise
+/// client IP. Requests with neither (no trusted IP) are not limited here; limit them at the edge.
 #[derive(Debug, Clone)]
 pub struct RateLimitKey(pub String);
 
 pub async fn rate_limit(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let Some(limiter) = state.rate_limiter.clone() else { return next.run(req).await };
+    if is_ops_path(req.uri().path()) {
+        return next.run(req).await;
+    }
     let key = req
         .extensions()
         .get::<RateLimitKey>()

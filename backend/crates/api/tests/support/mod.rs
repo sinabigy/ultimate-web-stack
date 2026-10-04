@@ -93,9 +93,18 @@ impl TestApp {
         cfg.validate().expect("test config valid");
         app_db::orgs::sync_permissions(&pool).await.unwrap();
         let services = app_api::bootstrap::build_services(&cfg, pool.clone()).unwrap();
-        let state = AppState::builder(cfg, BuildInfo { name: "t", version: "0", git_sha: "t", profile: "debug" })
-            .services(Arc::new(services))
-            .build();
+        let limiter = cfg.rate_limit.enabled.then(|| {
+            Arc::new(app_rate_limit::MemoryRateLimiter::new(app_rate_limit::Quota {
+                per_second: cfg.rate_limit.per_client_rps,
+                burst: cfg.rate_limit.burst,
+            }))
+        });
+        let mut builder = AppState::builder(cfg, BuildInfo { name: "t", version: "0", git_sha: "t", profile: "debug" })
+            .services(Arc::new(services));
+        if let Some(l) = limiter {
+            builder = builder.rate_limiter(l);
+        }
+        let state = builder.build();
         let router = app_api::build_router(state.clone());
         let http = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().unwrap();
         Self { router, state, pool, mock, http }

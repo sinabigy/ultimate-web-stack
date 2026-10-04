@@ -150,14 +150,21 @@ async fn rate_limit_returns_429_with_retry_after() {
         .rate_limiter(Arc::new(MemoryRateLimiter::new(Quota { per_second: 1.0, burst: 2 })))
         .build();
     let app = app_api::build_router(state);
-    let req = || Request::get("/healthz").header("cf-connecting-ip", "9.9.9.9").body(Body::empty()).unwrap();
-    assert_eq!(send(&app, req()).await.status(), StatusCode::OK);
-    assert_eq!(send(&app, req()).await.status(), StatusCode::OK);
-    let res = send(&app, req()).await;
+    let req = |path: &str, ip: &str| Request::get(path).header("cf-connecting-ip", ip).body(Body::empty()).unwrap();
+    assert_eq!(send(&app, req("/api/v1/nope", "9.9.9.9")).await.status(), StatusCode::NOT_FOUND);
+    assert_eq!(send(&app, req("/api/v1/nope", "9.9.9.9")).await.status(), StatusCode::NOT_FOUND);
+    let res = send(&app, req("/api/v1/nope", "9.9.9.9")).await;
     assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
     assert!(res.headers().contains_key(header::RETRY_AFTER));
-    let other = Request::get("/healthz").header("cf-connecting-ip", "8.8.8.8").body(Body::empty()).unwrap();
-    assert_eq!(send(&app, other).await.status(), StatusCode::OK, "limits are per client");
+    assert_eq!(
+        send(&app, req("/api/v1/nope", "8.8.8.8")).await.status(),
+        StatusCode::NOT_FOUND,
+        "limits are per client"
+    );
+    // The limited client's health checks and scrapes still pass.
+    for path in ["/healthz", "/readyz", "/version"] {
+        assert_eq!(send(&app, req(path, "9.9.9.9")).await.status(), StatusCode::OK, "{path} is never rate limited");
+    }
 }
 
 #[tokio::test]
@@ -167,11 +174,13 @@ async fn load_is_shed_beyond_max_inflight() {
     let state = state_with(cfg, vec![]);
     let app = echo_router(state.clone());
     let held = state.inflight.clone().try_acquire_owned().unwrap(); // simulate one in-flight request
-    let res = send(&app, get_req("/healthz")).await;
+    let res = send(&app, get_req("/api/v1/missing")).await;
     assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(res.headers()[header::RETRY_AFTER], "1");
+    assert_eq!(send(&app, get_req("/healthz")).await.status(), StatusCode::OK, "liveness is never shed");
+    assert_eq!(send(&app, get_req("/readyz")).await.status(), StatusCode::OK, "readiness is never shed");
     drop(held);
-    assert_eq!(send(&app, get_req("/healthz")).await.status(), StatusCode::OK);
+    assert_eq!(send(&app, get_req("/api/v1/missing")).await.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]

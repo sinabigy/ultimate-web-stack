@@ -329,7 +329,7 @@
       "tenancy": "organizations-shared-schema",
       "jobs": "postgres-skip-locked-queue",
       "outbound": "adaptive-engine",
-      "observability": "tracing-prometheus"
+      "observability": "otel-tracing-prometheus-loki-tempo"
     },
     "modules": {
       "identity": {
@@ -486,6 +486,33 @@
         "enabled": false,
         "adapter": "monoio-io_uring",
         "reason": "Extreme profile experiment; only with benchmark evidence (T-0013)."
+      },
+      "observability": {
+        "enabled": true,
+        "adapter": "otel-prometheus-loki-tempo-grafana",
+        "paths": [
+          "backend/crates/telemetry",
+          "infra/docker/observability",
+          "docs/operations/observability.md"
+        ],
+        "reason": "Metrics (/metrics), W3C tracing (request → job → provider, OTLP export opt-in), JSON logs with trace_id. Dev stack starts with ./dev up --with observability.",
+        "evidence": [
+          "backend/crates/api/tests/tracing.rs",
+          ".ai/knowledge/DECISIONS/0006-trace-propagation-default-on.md"
+        ]
+      },
+      "security_gates": {
+        "enabled": true,
+        "adapter": "cargo-audit+cargo-deny+npm-audit+gitleaks",
+        "paths": [
+          "backend/deny.toml",
+          ".gitleaksignore",
+          "docs/security/threat-model.md"
+        ],
+        "reason": "Supply-chain and secret scanning in canonical validation and CI; STRIDE threat model.",
+        "evidence": [
+          "docs/security/threat-model.md"
+        ]
       }
     },
     "deployment": {
@@ -500,7 +527,9 @@
       "docs/multitenancy/README.md",
       "docs/admin/README.md",
       "docs/architecture/outbound-engine.md",
-      "benchmarks/README.md"
+      "benchmarks/README.md",
+      "docs/operations/observability.md",
+      "docs/security/threat-model.md"
     ]
   }
 }

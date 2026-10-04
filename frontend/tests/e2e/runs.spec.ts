@@ -8,7 +8,8 @@ test("a run executes in the background and streams live progress", async ({ page
   const session = await page.evaluate(async () => (await fetch("/api/v1/session")).json());
   const slug = session.organizations[0].slug as string;
   await page.goto(`/org/${slug}/runs`);
-  await expect(page.getByText("Live")).toBeVisible(); // SSE connected
+  // SSE connected (the page's own indicator; the header shows another one).
+  await expect(page.locator("#main").getByRole("status", { name: "Realtime connection" })).toHaveText(/Live/);
   await page.getByRole("button", { name: "New run" }).click();
   const dialog = page.getByRole("dialog", { name: "New run" });
   await dialog.getByLabel("Label").fill("E2E batch");

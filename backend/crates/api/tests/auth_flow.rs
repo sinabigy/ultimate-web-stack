@@ -346,3 +346,26 @@ async fn extra_id_token_audiences_must_be_explicitly_trusted(pool: PgPool) {
     trusted.fault("extra_audience").await;
     assert!(trusted.try_login("aud@example.com", "pwd", "").await.is_ok());
 }
+
+#[sqlx::test(migrator = "app_db::MIGRATOR")]
+async fn rate_limits_are_per_principal_once_signed_in(pool: PgPool) {
+    let app = TestApp::with_config(pool, |c| {
+        c.rate_limit.enabled = true;
+        c.rate_limit.per_client_rps = 0.01;
+        c.rate_limit.burst = 3;
+    })
+    .await;
+    // Same network origin for both users (no client IP): only the principal can tell them apart.
+    let a = app.login("rl-a@example.com").await;
+    let b = app.login("rl-b@example.com").await;
+    // Exhaust a's bucket (login itself already spent some of it).
+    let mut limited = false;
+    for _ in 0..4 {
+        if app.get(&a, "/api/v1/account/profile").await.status == StatusCode::TOO_MANY_REQUESTS {
+            limited = true;
+            break;
+        }
+    }
+    assert!(limited, "a is limited after its burst");
+    assert_eq!(app.get(&b, "/api/v1/account/profile").await.status, StatusCode::OK, "b has its own bucket");
+}

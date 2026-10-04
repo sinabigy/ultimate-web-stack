@@ -28,6 +28,7 @@ import os
 import shutil
 import signal
 import subprocess
+import threading
 import sys
 import time
 import urllib.request
@@ -42,12 +43,32 @@ ENV.setdefault("DATABASE_URL", "postgres://app:app-dev-only@localhost:55432/app"
 PIDS = ROOT / "var/dev-pids.json"
 
 # module name → compose profile/services it needs
+# architecture module → (compose profile, services, start automatically). Heavy optional stacks
+# start only with `./dev up --with <module>`.
 MODULE_SERVICES = {
-    "cache": ("cache", ["redis"]),
-    "messaging": ("messaging", ["nats"]),
-    "analytics": ("analytics", ["clickhouse"]),
-    "observability": ("observability", ["prometheus", "grafana", "otel-collector"]),
+    "cache": ("cache", ["redis"], True),
+    "messaging_nats": ("messaging", ["nats"], True),
+    "analytics_clickhouse": ("analytics", ["clickhouse"], True),
+    "observability": ("observability", ["prometheus", "tempo", "loki", "alloy", "grafana"], False),
 }
+LOG_DIR = ROOT / "var" / "log"
+
+
+def spawn_logged(name: str, cmd: list[str], cwd: Path, env: dict) -> subprocess.Popen:
+    """Start a process whose output goes to the console and to var/log/<name>.log (shipped to
+    Loki by the observability profile)."""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+    def pump() -> None:
+        with open(LOG_DIR / f"{name}.log", "a", encoding="utf-8") as f:
+            for line in proc.stdout:  # type: ignore[union-attr]
+                sys.stdout.write(line)
+                f.write(line)
+                f.flush()
+
+    threading.Thread(target=pump, daemon=True).start()
+    return proc
 
 
 def sh(cmd: list[str] | str, cwd: Path = ROOT, check: bool = True, env: dict | None = None, quiet: bool = False) -> int:
@@ -136,11 +157,17 @@ def cmd_doctor(_a) -> None:
 
 def cmd_up(a) -> None:
     profiles, services = [], ["postgres"]
-    for m in enabled_modules():
-        if m in MODULE_SERVICES:
-            p, svcs = MODULE_SERVICES[m]
-            profiles.append(p)
-            services += svcs
+    mods = (project().get("architecture") or {}).get("modules") or {}
+    wanted = [m for m in enabled_modules() if MODULE_SERVICES.get(m, ("", [], False))[2]] + list(a.with_modules)
+    for m in dict.fromkeys(wanted):
+        if m not in MODULE_SERVICES:
+            sys.exit(f"unknown module for --with: {m} (known: {', '.join(MODULE_SERVICES)})")
+        if m == "cache" and mods.get("cache", {}).get("adapter", "memory") == "memory" and m not in a.with_modules:
+            continue  # in-process cache: no Redis needed
+        p, svcs, _auto = MODULE_SERVICES[m]
+        profiles.append(p)
+        services += svcs
+    observability = "prometheus" in services
     if a.identity == "zitadel":
         profiles.append("identity")
         services.append("zitadel")
@@ -154,6 +181,10 @@ def cmd_up(a) -> None:
         return
     app_env = dict(ENV)
     app_env.update({"APP__DATABASE__URL": ENV["DATABASE_URL"], "APP__HTTP__BENCH_ENDPOINTS": "true"})
+    if observability:
+        # Traces to Tempo; JSON logs (with trace_id) tailed into Loki by Alloy.
+        app_env.update({"APP__TELEMETRY__OTLP_ENDPOINT": "http://127.0.0.1:" + os.environ.get("DEV_TEMPO_OTLP_PORT", "54318"),
+                        "APP__LOG__FORMAT": "json"})
     procs = {}
     sh(["cargo", "build", "-q", "-p", "fake-upstream", "-p", "mock-oidc", "-p", "app-server"], cwd=ROOT / "backend")
     # Simulated external provider used by the example app's runs (no internet needed).
@@ -164,14 +195,25 @@ def cmd_up(a) -> None:
     else:
         app_env.update(load_env_file(ROOT / ".env.zitadel"))
     app_env.update(load_env_file(ROOT / ".env"))
-    procs["app-server"] = subprocess.Popen([str(ROOT / "backend/target/debug/app-server")], cwd=ROOT / "backend", env=app_env)
+    procs["app-server"] = spawn_logged("app-server", [str(ROOT / "backend/target/debug/app-server")], ROOT / "backend", app_env)
     procs["vite"] = subprocess.Popen(["npm", "run", "-s", "dev"], cwd=ROOT / "frontend", env=app_env)
     PIDS.parent.mkdir(exist_ok=True)
     PIDS.write_text(json.dumps({k: p.pid for k, p in procs.items()}))
     ok = wait_http("http://localhost:8080/readyz", 60) and wait_http("http://localhost:5190/", 60)
     print(f"\n{'ready' if ok else 'started (not all endpoints answered yet)'}:  app http://localhost:5190   api http://localhost:8080"
           f"   identity: {a.identity}{' (any email on the mock login page)' if a.identity == 'mock' else ' (alice@example.com / see .env.zitadel)'}")
+    if observability:
+        print("observability: grafana http://localhost:" + os.environ.get("DEV_GRAFANA_PORT", "53000")
+              + "  prometheus http://localhost:" + os.environ.get("DEV_PROMETHEUS_PORT", "59190"))
     print("Ctrl-C stops the app processes (services keep running; ./dev down stops them).")
+
+    def _interrupt(*_args) -> None:
+        raise KeyboardInterrupt
+
+    # Explicit handlers: a parent may have started us with SIGINT ignored (background jobs of
+    # non-interactive shells), and SIGTERM (e.g. from a supervisor) should stop children too.
+    signal.signal(signal.SIGINT, _interrupt)
+    signal.signal(signal.SIGTERM, _interrupt)
     try:
         while all(p.poll() is None for p in procs.values()):
             time.sleep(1)
@@ -281,6 +323,8 @@ def main() -> None:
     up = sub.add_parser("up")
     up.add_argument("--identity", choices=["mock", "zitadel"], default="mock")
     up.add_argument("--no-app", action="store_true", help="only start services and migrate")
+    up.add_argument("--with", dest="with_modules", action="append", default=[], metavar="MODULE",
+                    help="also start an optional module's services, e.g. --with observability")
     up.set_defaults(fn=cmd_up)
     dn = sub.add_parser("down")
     dn.add_argument("--volumes", action="store_true")

@@ -1,0 +1,13 @@
+# Scrapes the app processes running on the host (./dev up) and the observability stack itself.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: app-server
+    static_configs: [{ targets: ["host.docker.internal:8080"], labels: { service: app } }]
+  - job_name: app-worker
+    static_configs: [{ targets: ["host.docker.internal:9091"], labels: { service: app-worker } }]
+  - job_name: tempo
+    static_configs: [{ targets: ["tempo:3200"] }]
+  - job_name: loki
+    static_configs: [{ targets: ["loki:3100"] }]
