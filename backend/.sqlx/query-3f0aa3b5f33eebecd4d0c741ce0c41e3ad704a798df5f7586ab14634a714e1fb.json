@@ -1,0 +1,186 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO users (id, identity_provider, external_subject, email, email_verified, display_name, avatar_url,\n                           system_role, last_login_at)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $8 THEN 'system_admin' ELSE 'none' END, now())\n        ON CONFLICT (identity_provider, external_subject) DO UPDATE SET\n            email = EXCLUDED.email,\n            email_verified = EXCLUDED.email_verified,\n            avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url),\n            last_login_at = now(),\n            system_role = CASE WHEN $8 AND users.system_role = 'none' THEN 'system_admin' ELSE users.system_role END\n        RETURNING id, identity_provider, external_subject, email, email_verified, display_name, avatar_url,\n                  preferences, status, system_role, last_login_at, created_at, updated_at, (xmax = 0) AS \"inserted!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "identity_provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "identity_provider"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "external_subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "external_subject"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "email_verified",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "email_verified"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "display_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "preferences",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "preferences"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "system_role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "system_role"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "last_login_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "last_login_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "inserted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "3f0aa3b5f33eebecd4d0c741ce0c41e3ad704a798df5f7586ab14634a714e1fb"
+}

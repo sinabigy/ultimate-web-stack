@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users SET preferences = $2 WHERE id = $1 AND status <> 'deleted'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "332fe024239adce9397277e11ae206236f23e5904e8d94bf5de0437e9e76e9b9"
+}

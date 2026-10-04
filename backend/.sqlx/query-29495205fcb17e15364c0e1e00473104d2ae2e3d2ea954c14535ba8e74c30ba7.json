@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT queue,\n                  count(*) FILTER (WHERE status = 'queued') AS \"queued!\",\n                  count(*) FILTER (WHERE status = 'running') AS \"running!\",\n                  count(*) FILTER (WHERE status = 'dead') AS \"dead!\",\n                  count(*) FILTER (WHERE status = 'succeeded' AND finished_at > now() - interval '24 hours') AS \"succeeded_24h!\",\n                  EXTRACT(EPOCH FROM now() - min(run_at) FILTER (WHERE status = 'queued'))::float8 AS oldest_queued_secs\n           FROM jobs GROUP BY queue ORDER BY queue",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "queue",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "queue"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "queued!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "running!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "dead!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "succeeded_24h!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "oldest_queued_secs",
+        "type_info": "Float8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "29495205fcb17e15364c0e1e00473104d2ae2e3d2ea954c14535ba8e74c30ba7"
+}

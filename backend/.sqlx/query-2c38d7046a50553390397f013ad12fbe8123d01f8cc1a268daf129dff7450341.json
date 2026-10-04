@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users SET status = $2 WHERE id = $1 AND status <> 'deleted'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2c38d7046a50553390397f013ad12fbe8123d01f8cc1a268daf129dff7450341"
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE runs SET status = $3, finished_at = now() WHERE organization_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "828cb057de179e21c490031eb39b75f3419f363a2e09ff447f2fb5d0e776b234"
+}

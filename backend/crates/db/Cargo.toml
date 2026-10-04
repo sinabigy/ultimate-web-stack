@@ -1,0 +1,29 @@
+[package]
+name = "app-db"
+description = "PostgreSQL access via SQLx: pool, migrations, tenant-scoped repositories."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+app-authz.workspace = true
+app-config.workspace = true
+app-domain.workspace = true
+base64.workspace = true
+ipnet.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+app-config.workspace = true
+
+[lints]
+workspace = true

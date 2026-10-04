@@ -1,0 +1,152 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, organization_id, owner_id, label, provider, requested, succeeded, failed, status, created_at, updated_at\n           FROM runs\n           WHERE organization_id = $1 AND ($2::text IS NULL OR status = $2)\n             AND ($3::timestamptz IS NULL OR (created_at, id) < ($3, $4))\n           ORDER BY created_at DESC, id DESC LIMIT $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "organization_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "organization_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "owner_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "owner_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "requested",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "requested"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "succeeded",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "succeeded"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "failed",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "failed"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "runs",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "87752a11c93181ecb95ed6bb0f6e5d040ae1830a6667f0f4aec2038dab10a70c"
+}

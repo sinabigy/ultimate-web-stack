@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO roles (id, organization_id, key, name, description, builtin) VALUES ($1, $2, $3, $4, $5, false)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4b1468dbe40d8bd67289d553df202c97a23f1567b8cc4d3273c327cb0379df2c"
+}

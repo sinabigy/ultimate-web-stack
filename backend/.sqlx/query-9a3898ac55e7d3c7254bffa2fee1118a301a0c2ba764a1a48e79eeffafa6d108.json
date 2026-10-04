@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE invitations SET accepted_at = now(), accepted_by = $2\n         WHERE id = $1 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > now()\n         RETURNING organization_id, role_id, invited_by",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "organization_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "invitations",
+            "name": "organization_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "role_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "invitations",
+            "name": "role_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "invited_by",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "invitations",
+            "name": "invited_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "9a3898ac55e7d3c7254bffa2fee1118a301a0c2ba764a1a48e79eeffafa6d108"
+}

@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT o.deleted_at, m.role_id AS \"role_id?\", r.key AS \"role_key?\", r.builtin AS \"role_builtin?\",\n               COALESCE((SELECT array_agg(rp.permission) FROM role_permissions rp WHERE rp.role_id = m.role_id), '{}') AS \"custom!: Vec<String>\"\n        FROM organizations o\n        LEFT JOIN organization_memberships m ON m.organization_id = o.id AND m.user_id = $2\n        LEFT JOIN roles r ON r.id = m.role_id\n        WHERE o.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "organizations",
+            "name": "deleted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "role_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "organization_memberships",
+            "name": "role_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "role_key?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "roles",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "role_builtin?",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "roles",
+            "name": "builtin"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "custom!: Vec<String>",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "f160badbbc19af3bb3c21bd7672e3c1665ca2594438ea94e568716b55a75d96f"
+}

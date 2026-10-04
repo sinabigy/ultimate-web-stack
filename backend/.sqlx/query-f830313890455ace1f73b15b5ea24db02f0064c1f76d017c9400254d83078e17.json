@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO team_members (team_id, organization_id, user_id)\n         SELECT id, organization_id, $3 FROM teams WHERE id = $1 AND organization_id = $2\n         ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f830313890455ace1f73b15b5ea24db02f0064c1f76d017c9400254d83078e17"
+}

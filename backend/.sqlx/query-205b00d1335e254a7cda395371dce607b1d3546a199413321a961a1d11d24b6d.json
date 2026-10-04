@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM sessions WHERE LEAST(expires_at, COALESCE(revoked_at, expires_at)) < now() - make_interval(days => $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "205b00d1335e254a7cda395371dce607b1d3546a199413321a961a1d11d24b6d"
+}

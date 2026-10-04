@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO permissions (key, description) SELECT * FROM unnest($1::text[], $2::text[])\n         ON CONFLICT (key) DO UPDATE SET description = EXCLUDED.description",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e7652320839458d793e46fbdc87a974f540370111012e46f968d836ed48897b7"
+}

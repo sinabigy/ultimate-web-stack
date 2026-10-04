@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SAVEPOINT personal_org",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e35275ad01537f07ff71f2ac98cba89218ae37cebd59aa8444be395de9daf5a3"
+}

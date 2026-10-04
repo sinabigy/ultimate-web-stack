@@ -1,0 +1,168 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, occurred_at, actor_type, actor_id, actor_label, action, outcome, target_type, target_id,\n               organization_id, request_id, metadata\n        FROM audit_events\n        WHERE ($1::uuid IS NULL OR organization_id = $1)\n          AND ($2::text IS NULL OR action LIKE $2)\n          AND ($3::uuid IS NULL OR actor_id = $3)\n          AND ($4::text IS NULL OR outcome = $4)\n          AND ($5::timestamptz IS NULL OR occurred_at >= $5)\n          AND ($6::timestamptz IS NULL OR occurred_at < $6)\n          AND ($7::timestamptz IS NULL OR (occurred_at, id) < ($7, $8))\n        ORDER BY occurred_at DESC, id DESC\n        LIMIT $9\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "occurred_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "occurred_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "actor_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "actor_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "actor_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "actor_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "actor_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "actor_label"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "action",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "action"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "outcome",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "target_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "target_type"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "target_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "target_id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "organization_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "organization_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "request_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "request_id"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "metadata",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "audit_events",
+            "name": "metadata"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "008eb29620123a160a1d104e09cec91eeaf0404fd1e9df4e80816f3dff4d2b41"
+}

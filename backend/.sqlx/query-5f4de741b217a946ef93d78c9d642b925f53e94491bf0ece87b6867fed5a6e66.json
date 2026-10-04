@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE runs SET succeeded = GREATEST(succeeded, $3), failed = GREATEST(failed, $4)\n         WHERE organization_id = $1 AND id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5f4de741b217a946ef93d78c9d642b925f53e94491bf0ece87b6867fed5a6e66"
+}

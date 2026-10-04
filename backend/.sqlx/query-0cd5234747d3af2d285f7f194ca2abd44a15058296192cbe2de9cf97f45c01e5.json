@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE jobs SET\n             status = CASE WHEN $4 OR attempts >= max_attempts THEN 'dead' ELSE 'queued' END,\n             run_at = now() + make_interval(secs => LEAST(3600, power(2, attempts)) * (1 + random() * 0.25)),\n             finished_at = CASE WHEN $4 OR attempts >= max_attempts THEN now() ELSE NULL END,\n             last_error = $3, locked_by = NULL, locked_until = NULL\n           WHERE id = $1 AND locked_by = $2 AND status = 'running'\n           RETURNING status",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "jobs",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0cd5234747d3af2d285f7f194ca2abd44a15058296192cbe2de9cf97f45c01e5"
+}

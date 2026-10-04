@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM oidc_flows WHERE expires_at < now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "abd1224f05d65e13fbfc8bf0e59c0740445a687107f4beb70475727bbe885eef"
+}

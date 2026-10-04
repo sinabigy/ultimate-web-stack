@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM roles WHERE id = $1 AND organization_id = $2 AND NOT builtin",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "81594aaccd8843efbb82d19e49b546b4127ae0cf25ddc78973b68e14d67c2fd4"
+}

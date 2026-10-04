@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "RELEASE SAVEPOINT personal_org",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "8df496d1c2130909f32d007f87bf0e963161b99fa82859cae87f71e8acba12de"
+}
