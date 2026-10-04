@@ -1,0 +1,96 @@
+# Functional CI. Every check is a confirmed command in .ai/config/project.json, run through
+# tools/ai-validate, so local `./dev check`, AI agents and CI execute exactly the same commands.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: postgres://app:app-dev-only@localhost:55432/app
+
+jobs:
+  protocol:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 tools/ai-check
+
+  backend:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env: { POSTGRES_USER: app, POSTGRES_PASSWORD: app-dev-only, POSTGRES_DB: app }
+        ports: ["55432:5432"]
+        options: --health-cmd "pg_isready -U app" --health-interval 2s --health-retries 30
+      redis:
+        image: redis:8-alpine
+        ports: ["56379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 2s --health-retries 30
+      dragonfly:
+        image: docker.dragonflydb.io/dragonflydb/dragonfly:v2.0.0
+        ports: ["56380:6379"]
+        options: --ulimit memlock=-1 --health-cmd "redis-cli ping" --health-interval 2s --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Rust toolchain (pinned by backend/rust-toolchain.toml)
+        working-directory: backend
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: backend }
+      - name: sqlx-cli
+        run: cargo install sqlx-cli --locked --no-default-features --features rustls,postgres
+      - name: Migrate the schema used by `cargo sqlx prepare --check`
+        working-directory: backend
+        run: cargo sqlx migrate run --source migrations
+      - name: Validate (backend)
+        run: >
+          python3 tools/ai-validate --strict --keep-going --report ai-validate-backend.json
+          --only rust-fmt --only rust-clippy --only sqlx-offline-fresh --only config-check
+          --only rust-test --only rust-test-cedar --only rust-test-cache --only ts-bindings-fresh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: ai-validate-backend, path: ai-validate-backend.json }
+
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 26, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Validate (frontend)
+        run: >
+          python3 tools/ai-validate --strict --keep-going
+          --only web-install --only web-typecheck --only web-lint --only web-test --only web-build --only web-bundle-budget
+
+  e2e:
+    runs-on: ubuntu-24.04
+    needs: [backend, frontend]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env: { POSTGRES_USER: app, POSTGRES_PASSWORD: app-dev-only, POSTGRES_DB: app }
+        ports: ["55432:5432"]
+        options: --health-cmd "pg_isready -U app" --health-interval 2s --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - working-directory: backend
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: backend }
+      - uses: actions/setup-node@v5
+        with: { node-version: 26, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Playwright browser
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+      - name: Validate (end-to-end)
+        run: python3 tools/ai-validate --strict --only web-build --only e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report, path: frontend/playwright-report }

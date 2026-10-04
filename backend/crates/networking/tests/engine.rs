@@ -86,6 +86,32 @@ async fn rate_limited_provider_is_respected_and_work_completes() {
 }
 
 #[tokio::test]
+async fn learned_rate_converges_near_the_provider_limit() {
+    // Regression test for the rate controller (benchmarks: 163 → ~500 useful req/s at a 500/s
+    // limit). After learning, sustained throughput must stay close to the limit, without
+    // collapsing the concurrency limit (a 429 is a rate signal, not a concurrency signal).
+    let limit = 400.0;
+    let up = upstream(Behaviour { rps: limit, burst: 40.0, retry_after_secs: 1, ..Default::default() }).await;
+    let p = Arc::new(Provider::new("t", settings(&up.url())).unwrap());
+    // Learning: each 429 costs a 1s pause; the estimate includes the provider's burst, so the
+    // hold level converges over a few events (measured: 3-4 at this limit).
+    let (ok, failed, _) = fire(&p, 3200, 64, true).await;
+    assert_eq!((ok, failed), (3200, 0));
+    let before = up.upstream.stats();
+    let start = Instant::now();
+    let (ok, failed, _) = fire(&p, 1600, 64, true).await; // steady state
+    let elapsed = start.elapsed().as_secs_f64();
+    let after = up.upstream.stats();
+    assert_eq!((ok, failed), (1600, 0));
+    let rate = 1600.0 / elapsed;
+    let new_429 = after.rate_limited - before.rate_limited;
+    let cap = p.health().rate_cap_rps;
+    assert!(rate >= 0.85 * limit, "steady useful rate {rate:.0}/s < 85% of {limit}/s (429s: {new_429}, cap {cap:?})");
+    assert!(new_429 <= 80, "steady state should rarely hit the limit: {new_429} 429s");
+    assert!(p.limiter().limit() >= 16, "concurrency limit collapsed to {}", p.limiter().limit());
+}
+
+#[tokio::test]
 async fn overloaded_provider_converges_to_capacity_then_recovers() {
     // Provider: 8 concurrent at 10ms, latency rising with overload, hard limit 24 → 503.
     // Engine deliberately misconfigured to start at 128 concurrent (5x too many).

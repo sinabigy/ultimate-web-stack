@@ -9,9 +9,12 @@
 //!      ─► classify ─► feedback to limiter/breaker/stats ─► retry (full jitter, budget, Retry-After)
 //! ```
 //!
-//! The objective is **successful useful throughput**, not raw request rate: on 429/503/timeouts
-//! or sustained latency growth the concurrency limit shrinks multiplicatively; while healthy and
-//! fully used it grows additively. A 429 with `Retry-After` pauses the whole provider.
+//! The objective is **successful useful throughput**, not raw request rate. Two controllers:
+//! - *concurrency* (AIMD): 503/504/timeouts or sustained latency growth shrink the limit
+//!   multiplicatively; healthy, fully used capacity grows it additively;
+//! - *request rate*: learned from 429s (ceiling memory, hold just below it, probe slowly);
+//!   a 429 with `Retry-After` pauses the whole provider.
+//!
 //! See docs/architecture/outbound-engine.md for the algorithm and tuning.
 
 pub mod adaptive;

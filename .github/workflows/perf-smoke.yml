@@ -1,0 +1,32 @@
+# Performance smoke on pull requests: short runs, machine-independent invariants only
+# (shared runners are too noisy for throughput gates; see benchmarks/README.md).
+name: perf-smoke
+on:
+  pull_request:
+    paths: ["backend/**", "benchmarks/**", ".github/workflows/perf-smoke.yml"]
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env: { POSTGRES_USER: app, POSTGRES_PASSWORD: app-dev-only, POSTGRES_DB: app }
+        ports: ["55432:5432"]
+        options: --health-cmd "pg_isready -U app" --health-interval 2s --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - working-directory: backend
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: backend }
+      - run: cargo install oha --locked
+      - run: python3 benchmarks/run.py --smoke --suite http,auth,outbound,db
+      - run: python3 benchmarks/compare.py --smoke
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: bench-smoke, path: benchmarks/results/latest-smoke.json }

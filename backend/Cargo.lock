@@ -148,6 +148,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "app-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "app-db",
+ "app-networking",
+ "fake-upstream",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "app-cache"
 version = "0.1.0"
 dependencies = [

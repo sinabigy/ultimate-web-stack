@@ -12,7 +12,7 @@
                               canonical validation (tools/ai-validate) + optional identity checks
   ./dev test [--e2e] [--zitadel]
                               backend + frontend tests; optional browser suites
-  ./dev benchmark [--smoke]   benchmark suite (benchmarks/run.py)
+  ./dev benchmark [--smoke]   benchmark suites + regression gates + report (benchmarks/)
   ./dev types                 regenerate TypeScript bindings from Rust API types
   ./dev db migrate|reset|prepare|psql
   ./dev logs [service]
@@ -242,7 +242,13 @@ def cmd_test(a) -> None:
 
 
 def cmd_benchmark(a) -> None:
-    sys.exit(sh([sys.executable, "benchmarks/run.py"] + (["--smoke"] if a.smoke else []) + a.extra, check=False))
+    """Run suites, then apply the gates and render docs/benchmarks/latest.md (full runs only)."""
+    smoke = ["--smoke"] if a.smoke else []
+    rc = sh([sys.executable, "benchmarks/run.py"] + smoke + a.extra, check=False)
+    gate = sh([sys.executable, "benchmarks/compare.py"] + smoke, check=False)
+    if not a.smoke:
+        sh([sys.executable, "benchmarks/report.py"], check=False)
+    sys.exit(rc or gate)
 
 
 def cmd_types(_a) -> None:

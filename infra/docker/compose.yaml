@@ -46,7 +46,7 @@ services:
 
   dragonfly:
     profiles: ["cache", "dragonfly"]
-    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v2.0.0
     command: ["--maxmemory=512mb", "--proactor_threads=2", "--dbfilename="]  # Dragonfly needs >= 256MiB per thread
     ulimits:
       memlock: -1
