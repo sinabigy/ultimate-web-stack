@@ -1,0 +1,38 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0011",
+  "title": "External API engine with adaptive concurrency",
+  "objective": "Generic provider model: pooled HTTP/2 clients, per-provider rate (rps, tokens/min) and concurrency budgets, retries with backoff+jitter, circuit breaker, timeouts, priority, idempotency, adaptive concurrency reacting to 429/5xx/latency; local fake upstream.",
+  "acceptance_criteria": [
+    "Unit + property tests for limiter, breaker, AIMD controller",
+    "Against the fake upstream: engine backs off on 429 storms and recovers; useful-throughput benchmark recorded",
+    "Algorithm documented"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0002"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p blueprint-networking"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

@@ -42,10 +42,10 @@
     "core.filesystem"
   ],
   "context_class": "medium",
-  "status": "queue",
+  "status": "completed",
   "blocked_reason": null,
   "template": "project-discovery",
-  "result": null,
+  "result": ".ai/context/summaries/T-0001.result.json",
   "history": [
     {
       "at": "2026-10-04T07:53:18Z",
@@ -53,6 +53,20 @@
       "from": null,
       "to": "queue",
       "note": "from template project-discovery"
+    },
+    {
+      "at": "2026-10-04T07:53:27Z",
+      "event": "transition",
+      "from": "queue",
+      "to": "active",
+      "note": null
+    },
+    {
+      "at": "2026-10-04T07:56:03Z",
+      "event": "transition",
+      "from": "active",
+      "to": "completed",
+      "note": "completed"
     }
   ]
 }

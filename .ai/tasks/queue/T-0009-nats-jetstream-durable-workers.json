@@ -1,0 +1,38 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0009",
+  "title": "NATS/JetStream durable workers",
+  "objective": "Optional messaging layer: NATS core pub/sub, JetStream durable consumers, retries with backoff, idempotency, poison/dead-letter handling, graceful worker shutdown.",
+  "acceptance_criteria": [
+    "Integration test: job survives worker restart and is processed exactly once (idempotent)",
+    "Poison message lands in DLQ after max deliveries",
+    "NATS throughput benchmark recorded"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0004"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p blueprint-messaging -- --include-ignored"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

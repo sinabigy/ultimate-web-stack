@@ -1,0 +1,39 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0007",
+  "title": "Benchmark harness and regression gates",
+  "objective": "benchmarks/ suite producing machine-readable results and human reports for backend, DB, network, messaging and frontend; smoke perf gate separate from full benchmark runs.",
+  "acceptance_criteria": [
+    "benchmarks produce results/*.json with rps, success rps, p50/p95/p99/p99.9, CPU, RAM",
+    "A regression comparator flags a synthetic slowdown",
+    "docs/benchmarks report generated from real runs"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0002",
+    "T-0004"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "./dev benchmark --smoke"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

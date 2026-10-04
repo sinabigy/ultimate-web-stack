@@ -1,0 +1,38 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0005",
+  "title": "End-to-end frontend to backend application path",
+  "objective": "Frontend talks to backend through the API client: login, authenticated endpoint, CRUD on the example domain, realtime updates.",
+  "acceptance_criteria": [
+    "A browser E2E test logs in, creates an item and sees it listed via the real backend + Postgres",
+    "Auth uses secure cookies with CSRF protection"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0003",
+    "T-0004"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "Playwright E2E against ./dev up"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

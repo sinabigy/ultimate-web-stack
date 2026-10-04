@@ -1,0 +1,38 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0014",
+  "title": "Deployment profiles",
+  "objective": "Dev compose, simple VPS (systemd + binary + static frontend), container/advanced, hyperscale (k8s/bare-metal) profiles with documentation; release-profile optimisation measured (LTO, codegen-units, allocator).",
+  "acceptance_criteria": [
+    "docker compose config validates for every profile",
+    "Release container builds and passes healthcheck",
+    "systemd unit passes systemd-analyze verify (in Linux container)"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0005"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "./dev check (infra stage)"
+  ],
+  "risk": "medium",
+  "task_class": "docs",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

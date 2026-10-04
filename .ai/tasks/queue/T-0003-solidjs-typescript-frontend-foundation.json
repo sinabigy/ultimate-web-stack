@@ -1,0 +1,36 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0003",
+  "title": "SolidJS + TypeScript frontend foundation",
+  "objective": "Strict-TS SolidJS/Vite frontend with routing, lazy routes, API client, realtime client (SSE/WebSocket), auth integration, error boundaries, telemetry hooks, accessible responsive layout, CSP-compatible build.",
+  "acceptance_criteria": [
+    "npm run typecheck, lint, test and build pass",
+    "Routes are code-split (separate chunks in build output)",
+    "No inline scripts/styles that would violate a strict CSP"
+  ],
+  "non_goals": [],
+  "dependencies": [],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "npm run typecheck && npm test && npm run build"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0010",
+  "title": "ClickHouse analytics module",
+  "objective": "Optional analytics: event schema, batching ingestion, partitioning/TTL retention, query examples; Postgres stays transactional truth.",
+  "acceptance_criteria": [
+    "Events flow app -> NATS -> ingester -> ClickHouse in an integration test",
+    "Schema has partitioning and TTL"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0009"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p blueprint-analytics -- --include-ignored"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

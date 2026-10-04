@@ -1,0 +1,38 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0015",
+  "title": "Project generator",
+  "objective": "create-project command: copies the app skeleton, initialises ai-project-template protocol via ai-init --target, selects profile/modules, writes architecture block and confirmed validation commands, inherits ADRs, git init, validation, optional dev start. Interactive and non-interactive.",
+  "acceptance_criteria": [
+    "create-project demo --profile core --no-start produces a project whose ./dev check passes",
+    "Generated project.json architecture matches flags",
+    "Generator has automated tests"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0005"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "python3 -m unittest scripts tests for generator"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

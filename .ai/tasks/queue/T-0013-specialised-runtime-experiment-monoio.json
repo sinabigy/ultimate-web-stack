@@ -1,0 +1,37 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0013",
+  "title": "Specialised runtime experiment (Monoio / io_uring)",
+  "objective": "Isolated outbound-networking benchmark comparing Tokio vs Monoio (io_uring, thread-per-core) on Linux; decide whether an optional hot-path service is justified.",
+  "acceptance_criteria": [
+    "Equivalent workloads run on Linux with recorded results",
+    "ADR records decision with reversal conditions"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0007"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "benchmarks/network/runtime run in Linux container"
+  ],
+  "risk": "medium",
+  "task_class": "architecture",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

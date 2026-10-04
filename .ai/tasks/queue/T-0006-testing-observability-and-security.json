@@ -1,0 +1,38 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0006",
+  "title": "Testing, observability and security baseline",
+  "objective": "OpenTelemetry-compatible tracing/metrics/logs, Prometheus metrics endpoint, optional local Prometheus/Grafana/Loki/Tempo stack, security headers/CSP/CORS/CSRF, dependency audit, secret scanning, threat model.",
+  "acceptance_criteria": [
+    "/metrics exposes request and provider metrics",
+    "Trace context propagates request -> queue -> worker -> provider in a test",
+    "cargo audit / npm audit run in validation; threat model documented"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0005"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "./dev check"
+  ],
+  "risk": "medium",
+  "task_class": "security",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

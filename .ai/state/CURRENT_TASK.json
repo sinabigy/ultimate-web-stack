@@ -2,6 +2,6 @@
   "current_task_schema_version": 1,
   "task_id": null,
   "path": null,
-  "next_step": "Start the discovery task: python3 tools/ai-task start T-0001",
-  "updated_at": "2026-10-04T07:53:18Z"
+  "next_step": null,
+  "updated_at": "2026-10-04T07:56:03Z"
 }

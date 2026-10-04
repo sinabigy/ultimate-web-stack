@@ -1,0 +1,36 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0002",
+  "title": "Rust/Axum/Tokio backend core",
+  "objective": "Modular-monolith Rust workspace (api, config, errors, telemetry, domain, db, auth, cache, messaging, rate_limit, networking, workers) with health/ready/version, JSON API, graceful shutdown, timeouts, request IDs, structured errors, tracing, body limits, secure headers.",
+  "acceptance_criteria": [
+    "cargo build/test/clippy -D warnings/fmt pass for the workspace",
+    "GET /healthz, /readyz, /version and a JSON example respond correctly in integration tests",
+    "Graceful shutdown, request-id propagation, timeout and body-limit behaviour covered by tests"
+  ],
+  "non_goals": [],
+  "dependencies": [],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

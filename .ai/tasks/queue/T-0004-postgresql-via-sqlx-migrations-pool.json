@@ -1,0 +1,38 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0004",
+  "title": "PostgreSQL via SQLx: migrations, pool, example domain",
+  "objective": "PostgreSQL as transactional truth via SQLx: migrations, pooling, transactions, UUIDv7 ids, timestamps, indexes, health checks, slow-query visibility, example domain.",
+  "acceptance_criteria": [
+    "Migrations apply cleanly to an empty database and are re-runnable",
+    "DB integration tests pass against a real PostgreSQL",
+    "/readyz reports database status; DB outage yields 503 not a crash"
+  ],
+  "non_goals": [],
+  "dependencies": [
+    "T-0002"
+  ],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test -p blueprint-db -- --include-ignored against docker postgres"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-04T07:54:01Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}
