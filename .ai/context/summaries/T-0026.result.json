@@ -1,0 +1,29 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0026",
+  "outcome": "completed",
+  "summary": "Auth knowledge is canonical: project.json architecture (identity zitadel, auth_profile b2b, organizations, rbac + optional cedar, postgres BFF sessions, separate system admin model) plus docs/authentication|authorization|multitenancy|admin with diagrams, verified against code; the 10 invariants are in CONSTRAINTS.md. Writing the docs surfaced and fixed two gaps (plaintext PKCE verifier at rest; no step-up re-auth for system-admin mutations). ./dev check runs config-check (identity configuration) and the auth/tenancy/admin/credential security suites.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "./dev check: ai-validate 17 pass, 0 fail, 0 skip (2026-10-04)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "python3 tools/ai-check: OK",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "backend/crates/api/tests/admin.rs mutating_admin_actions_require_recent_authentication; auth_flow.rs pkce_and_prompt_parameters_sent (encrypted at rest)",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-04T12:32:00Z"
+}
