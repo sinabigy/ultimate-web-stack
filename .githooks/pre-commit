@@ -1,0 +1,13 @@
+#!/bin/sh
+# Fast gates before every commit. Full validation: ./dev check
+# Enable once per clone: git config core.hooksPath .githooks   (./dev setup does this)
+set -e
+export PATH="$HOME/.cargo/bin:$PATH"
+python3 tools/ai-check >/dev/null || { python3 tools/ai-check; exit 1; }
+if git diff --cached --name-only | grep -q '^backend/'; then
+  (cd backend && cargo fmt --all --check) || { echo "pre-commit: run 'cargo fmt --all' in backend/"; exit 1; }
+  (cd backend && SQLX_OFFLINE=true cargo clippy --workspace --all-targets --quiet -- -D warnings) || exit 1
+fi
+if git diff --cached --name-only | grep -q '^frontend/' && [ -d frontend/node_modules ]; then
+  (cd frontend && npm run --silent typecheck && npm run --silent lint) || exit 1
+fi

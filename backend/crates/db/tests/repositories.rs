@@ -48,9 +48,11 @@ fn access(org: Uuid, user: Uuid) -> OrgAccess {
 
 #[sqlx::test(migrator = "app_db::MIGRATOR")]
 async fn statement_timeout_applied_to_pool_connections(_pool: PgPool) {
-    let mut cfg = app_config::DatabaseConfig::default();
-    cfg.url = app_config::Secret::new(std::env::var("DATABASE_URL").unwrap());
-    cfg.statement_timeout_ms = 1234;
+    let cfg = app_config::DatabaseConfig {
+        url: app_config::Secret::new(std::env::var("DATABASE_URL").unwrap()),
+        statement_timeout_ms: 1234,
+        ..Default::default()
+    };
     let pool = app_db::connect(&cfg, "test").await.unwrap();
     let v: String = sqlx::query_scalar("SHOW statement_timeout").fetch_one(&pool).await.unwrap();
     assert_eq!(v, "1234ms");
