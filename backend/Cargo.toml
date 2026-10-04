@@ -22,6 +22,9 @@ app-authz = { path = "crates/authz" }
 app-db = { path = "crates/db" }
 app-auth = { path = "crates/auth" }
 mock-oidc = { path = "apps/mock-oidc" }
+fake-upstream = { path = "apps/fake-upstream" }
+app-networking = { path = "crates/networking" }
+app-workers = { path = "crates/workers" }
 
 # core runtime
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "signal", "net", "time", "sync"] }
