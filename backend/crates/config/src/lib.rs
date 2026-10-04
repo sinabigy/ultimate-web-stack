@@ -307,9 +307,9 @@ impl Default for AuthConfig {
             issuer_url: "http://localhost:8081".into(),
             client_id: String::new(),
             client_secret: Secret::default(),
-            redirect_url: "http://localhost:5173/auth/callback".into(),
-            post_logout_redirect_url: "http://localhost:5173/login".into(),
-            public_origin: "http://localhost:5173".into(),
+            redirect_url: "http://localhost:5190/auth/callback".into(),
+            post_logout_redirect_url: "http://localhost:5190/login".into(),
+            public_origin: "http://localhost:5190".into(),
             scopes: vec!["openid".into(), "profile".into(), "email".into()],
             methods: LoginMethods { passkey: true, password: true, ..Default::default() },
             allow_registration: true,
@@ -808,10 +808,10 @@ mod tests {
         c.auth.redirect_url = "http://evil.example/auth/callback".into();
         assert!(c.validate().is_err(), "cross-origin redirect");
         let mut c = AppConfig::default();
-        c.auth.redirect_url = "http://localhost:5173/callback".into();
+        c.auth.redirect_url = "http://localhost:5190/callback".into();
         assert!(c.validate().is_err(), "wrong path");
         let mut c = AppConfig::default();
-        c.auth.public_origin = "http://localhost:5173/app".into();
+        c.auth.public_origin = "http://localhost:5190/app".into();
         assert!(c.validate().is_err(), "origin with path");
         let mut c = AppConfig::default();
         c.auth.scopes = vec!["email".into()];

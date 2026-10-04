@@ -18,6 +18,9 @@ app-domain = { path = "crates/domain" }
 app-api = { path = "crates/api" }
 app-rate-limit = { path = "crates/rate_limit" }
 app-messaging = { path = "crates/messaging" }
+app-authz = { path = "crates/authz" }
+app-db = { path = "crates/db" }
+app-auth = { path = "crates/auth" }
 
 # core runtime
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "signal", "net", "time", "sync"] }
