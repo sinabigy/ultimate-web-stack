@@ -275,3 +275,53 @@ fn builtin_roles_are_strictly_nested() {
         assert!(bp(w[0]).is_subset_of(&bp(w[1])) && bp(w[0]) != bp(w[1]), "{:?} ⊂ {:?}", w[0], w[1]);
     }
 }
+
+#[cfg(feature = "cedar")]
+mod differential {
+    use super::*;
+    use app_authz::cedar::CedarAuthorizer;
+    use proptest::prelude::*;
+
+    fn role_strategy() -> impl Strategy<Value = OrgRole> {
+        prop::sample::select(OrgRole::ALL.to_vec())
+    }
+    fn perm_strategy() -> impl Strategy<Value = P> {
+        prop::sample::select(P::ALL.to_vec())
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(400))]
+        /// RBAC and Cedar must agree on every decision (allow/deny and reason).
+        #[test]
+        fn engines_agree(actor_role in role_strategy(), target_role in role_strategy(), new_role in proptest::option::of(role_strategy()),
+                         action in perm_strategy(), own in any::<bool>(), is_self in any::<bool>(), owners in 1usize..3,
+                         sys in prop::sample::select(vec![SystemRole::None, SystemRole::SystemAuditor, SystemRole::SystemAdmin]),
+                         sys_perm in prop::sample::select(S::ALL.to_vec()), mfa in any::<bool>(), need_mfa in any::<bool>()) {
+            let cedar = CedarAuthorizer::new_default().unwrap();
+            let org = Uuid::now_v7();
+            let me = Uuid::now_v7();
+            let actor = Actor::User(UserActor { id: me, system_role: sys, active: true, mfa, auth_age: Duration::from_secs(30) });
+            let f = facts(org, Some(actor_role));
+            let a = Rbac.org_access(&actor, &f).unwrap();
+            let c = cedar.org_access(&actor, &f).unwrap();
+            prop_assert_eq!(a.permissions(), c.permissions());
+
+            let owned = Resource::Owned { owner_id: Some(if own { me } else { Uuid::now_v7() }) };
+            prop_assert_eq!(Rbac.authorize(&a, action, &owned), cedar.authorize(&c, action, &owned));
+            prop_assert_eq!(Rbac.authorize(&a, action, &Resource::Organization), cedar.authorize(&c, action, &Resource::Organization));
+            let member = Resource::Member { user_id: Uuid::now_v7(), role: RoleGrant::builtin(target_role) };
+            prop_assert_eq!(Rbac.authorize(&a, action, &member), cedar.authorize(&c, action, &member));
+
+            let target = if is_self { me } else { Uuid::now_v7() };
+            let cur = RoleGrant::builtin(target_role);
+            let new = new_role.map(RoleGrant::builtin);
+            prop_assert_eq!(
+                Rbac.authorize_role_change(&a, target, &cur, new.as_ref(), owners),
+                cedar.authorize_role_change(&c, target, &cur, new.as_ref(), owners)
+            );
+
+            let ctx = Context { require_mfa_for_system: need_mfa, max_auth_age: None };
+            prop_assert_eq!(Rbac.authorize_system(&actor, sys_perm, &ctx), cedar.authorize_system(&actor, sys_perm, &ctx));
+        }
+    }
+}

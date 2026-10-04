@@ -13,10 +13,10 @@
 //! Engines: [`rbac::Rbac`] (default) and, with feature `cedar`, `cedar::CedarAuthorizer`.
 //! Both must pass the shared conformance suite in `tests/conformance.rs`.
 
-pub mod permission;
-pub mod rbac;
 #[cfg(feature = "cedar")]
 pub mod cedar;
+pub mod permission;
+pub mod rbac;
 
 use std::time::Duration;
 
@@ -30,10 +30,19 @@ use uuid::Uuid;
 pub enum Actor {
     User(UserActor),
     /// OAuth client / service account registered to one organisation. Never a user.
-    Service { id: Uuid, organization_id: Uuid, scopes: PermissionSet },
+    Service {
+        id: Uuid,
+        organization_id: Uuid,
+        scopes: PermissionSet,
+    },
     /// API key owned by one organisation; effective permissions are its scopes intersected
     /// with its creator's *current* permissions.
-    ApiKey { id: Uuid, organization_id: Uuid, scopes: PermissionSet, created_by: Option<Uuid> },
+    ApiKey {
+        id: Uuid,
+        organization_id: Uuid,
+        scopes: PermissionSet,
+        created_by: Option<Uuid>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -173,9 +182,14 @@ pub enum Denied {
 pub enum Resource {
     Organization,
     /// A resource with an owner inside the organisation (e.g. a run).
-    Owned { owner_id: Option<Uuid> },
+    Owned {
+        owner_id: Option<Uuid>,
+    },
     /// A membership: the target user and their current role.
-    Member { user_id: Uuid, role: RoleGrant },
+    Member {
+        user_id: Uuid,
+        role: RoleGrant,
+    },
 }
 
 /// Request-level context for conditional policies.
