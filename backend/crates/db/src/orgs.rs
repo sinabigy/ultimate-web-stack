@@ -86,7 +86,9 @@ pub async fn ensure_personal_org(conn: &mut PgConnection, user_id: Uuid, display
     }
     let base = Slug::suggest(display_name);
     for attempt in 0..20u32 {
-        let candidate = if attempt == 0 { base.clone() } else { format!("{base}-{}", short_suffix(user_id, attempt)) };
+        // Personal workspaces always carry a suffix so they never claim clean names that a
+        // real organisation (company, team) will want later.
+        let candidate = format!("{base}-{}", short_suffix(user_id, attempt));
         let Ok(slug) = Slug::parse(&candidate) else { continue };
         // Savepoint so a slug collision does not abort the caller's transaction.
         sqlx::query!("SAVEPOINT personal_org").execute(&mut *conn).await?;
