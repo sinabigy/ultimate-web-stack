@@ -75,8 +75,12 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
             .layer(RequestBodyLimitLayer::new(cfg.body_limit_bytes)),
     );
 
-    let streams =
-        streams.route("/events/public", get(realtime::public_sse)).route("/ws/public", get(realtime::public_ws));
+    // Authenticated streams get the auth layer; the public demo streams are added afterwards
+    // (a layer applies only to routes that exist when it is added).
+    let streams = streams
+        .layer(middleware::from_fn_with_state(state.clone(), crate::auth::authenticate))
+        .route("/events/public", get(realtime::public_sse))
+        .route("/ws/public", get(realtime::public_ws));
 
     let mut app = Router::new().merge(ordinary).merge(streams);
     if let Some(dir) = cfg.static_dir.as_deref() {
@@ -140,15 +144,22 @@ fn csrf(state: &AppState) -> CsrfLayer {
     layer
 }
 
+/// Paths served by the API (everything else is the SPA or its assets).
+fn is_api_path(path: &str) -> bool {
+    path.starts_with("/api/")
+        || path.starts_with("/auth/")
+        || path.starts_with("/bench/")
+        || matches!(path, "/healthz" | "/readyz" | "/version" | "/metrics")
+}
+
 async fn security_headers(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    // Choose the CSP by *request path*, not response content type: a 304 Not Modified for the
+    // SPA has no Content-Type, and browsers merge 304 headers into the cached page, so a
+    // content-type rule would attach the API policy to the app and block its own scripts.
+    let api = is_api_path(req.uri().path());
     let mut res = next.run(req).await;
-    let is_html = res
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|ct| ct.starts_with("text/html"));
     let h = res.headers_mut();
-    let csp = if is_html { APP_CSP } else { API_CSP };
+    let csp = if api { API_CSP } else { APP_CSP };
     h.entry(header::CONTENT_SECURITY_POLICY).or_insert(HeaderValue::from_static(csp));
     h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));

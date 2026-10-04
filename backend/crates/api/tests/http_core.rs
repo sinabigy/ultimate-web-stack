@@ -218,3 +218,41 @@ impl TestClient {
         line.split_whitespace().nth(1).unwrap().parse().unwrap()
     }
 }
+
+#[tokio::test]
+async fn spa_revalidation_304_keeps_app_csp() {
+    let dir = std::env::temp_dir().join(format!("spa-{}", uuid_like()));
+    std::fs::create_dir_all(dir.join("assets")).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html><script type=module src=/assets/a.js></script>").unwrap();
+    let mut cfg = test_config();
+    cfg.http.static_dir = Some(dir.clone());
+    let app = app_api::build_router(state_with(cfg, vec![]));
+    let first = send(&app, get_req("/account/sessions")).await;
+    assert_eq!(first.status(), StatusCode::OK);
+    let csp = first.headers()[header::CONTENT_SECURITY_POLICY].to_str().unwrap().to_string();
+    assert!(csp.contains("script-src 'self'"), "{csp}");
+    let validator = first.headers().get(header::LAST_MODIFIED).cloned().expect("static files carry Last-Modified");
+    let again = send(
+        &app,
+        Request::get("/account/sessions").header(header::IF_MODIFIED_SINCE, validator).body(Body::empty()).unwrap(),
+    )
+    .await;
+    assert_eq!(again.status(), StatusCode::NOT_MODIFIED, "revalidation path exercised");
+    let csp = again
+        .headers()
+        .get(header::CONTENT_SECURITY_POLICY)
+        .map(|v| v.to_str().unwrap().to_string())
+        .unwrap_or_default();
+    assert!(
+        csp.contains("script-src 'self'") && !csp.contains("default-src 'none'"),
+        "304 must keep the app CSP: {csp}"
+    );
+    // API paths keep the locked-down policy.
+    let api = send(&app, get_req("/api/v1/nope")).await;
+    assert!(api.headers()[header::CONTENT_SECURITY_POLICY].to_str().unwrap().contains("default-src 'none'"));
+    std::fs::remove_dir_all(dir).ok();
+}
+
+fn uuid_like() -> String {
+    format!("{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos())
+}

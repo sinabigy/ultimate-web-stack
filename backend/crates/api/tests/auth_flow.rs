@@ -11,6 +11,7 @@ use axum::{
 use serde_json::json;
 use sqlx::PgPool;
 use support::*;
+use tower::ServiceExt;
 
 #[sqlx::test(migrator = "app_db::MIGRATOR")]
 async fn unauthenticated_access_is_rejected(pool: PgPool) {
@@ -307,4 +308,25 @@ async fn mfa_detected_from_amr(pool: PgPool) {
     let app = TestApp::new(pool).await;
     let b = app.try_login("mfa@example.com", "passkey", "").await.unwrap();
     assert_eq!(app.get(&b, "/api/v1/session").await.body["session"]["mfa"], true);
+}
+
+#[sqlx::test(migrator = "app_db::MIGRATOR")]
+async fn authenticated_realtime_stream_accepts_session(pool: PgPool) {
+    let app = TestApp::new(pool).await;
+    let b = app.login("rt@example.com").await;
+    let res = app
+        .router
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/events")
+                .header(header::COOKIE, format!("app_session={}", b.session))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()[header::CONTENT_TYPE], "text/event-stream");
+    let anon = app.router.clone().oneshot(Request::get("/api/v1/events").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(anon.status(), StatusCode::UNAUTHORIZED);
 }
