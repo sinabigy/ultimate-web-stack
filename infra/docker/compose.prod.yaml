@@ -9,6 +9,7 @@ x-app: &app
   env_file: [ "${APP_ENV_FILE:?set APP_ENV_FILE to the production environment file}" ]
   environment:
     APP__ENVIRONMENT: production
+    APP__CACHE__REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379}   # used only with cache.backend = "redis"
     APP__DATABASE__URL: postgres://app:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/app
   depends_on:
     postgres: { condition: service_healthy }

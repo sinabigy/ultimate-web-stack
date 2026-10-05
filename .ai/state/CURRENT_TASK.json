@@ -1,7 +1,7 @@
 {
   "current_task_schema_version": 1,
-  "task_id": null,
-  "path": null,
-  "next_step": null,
-  "updated_at": "2026-10-05T00:42:12Z"
+  "task_id": "T-0015",
+  "path": ".ai/tasks/active/T-0015-project-generator.json",
+  "next_step": "Work on T-0015: Project generator",
+  "updated_at": "2026-10-05T02:07:19Z"
 }
