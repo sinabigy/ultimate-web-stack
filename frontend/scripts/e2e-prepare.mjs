@@ -13,5 +13,18 @@ const pg = process.env.E2E_PG_CONTAINER ?? `${process.env.COMPOSE_PROJECT_NAME ?
 
 run("cargo build -q -p app-server -p mock-oidc -p fake-upstream", "../backend");
 run("npm run -s build");
-run(`docker exec ${pg} psql -U app -d app -qc "DROP DATABASE IF EXISTS app_e2e WITH (FORCE)"`);
-run(`docker exec ${pg} psql -U app -d app -qc "CREATE DATABASE app_e2e"`);
+// Locally PostgreSQL runs in the compose container (psql may not be installed on the host); in CI
+// it is a service container with another name, reachable over TCP, and the runner has psql.
+const hasContainer = (() => {
+  try {
+    execSync(`docker inspect ${pg}`, { stdio: "ignore", env });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+const adminUrl = process.env.E2E_ADMIN_DATABASE_URL ?? "postgres://app:app-dev-only@localhost:55432/app";
+const psql = (sql) =>
+  hasContainer ? run(`docker exec ${pg} psql -U app -d app -qc "${sql}"`) : run(`psql "${adminUrl}" -qc "${sql}"`);
+psql("DROP DATABASE IF EXISTS app_e2e WITH (FORCE)");
+psql("CREATE DATABASE app_e2e");

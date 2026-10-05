@@ -9,7 +9,7 @@ generated with one command.
 
 Rust · SolidJS · PostgreSQL · OIDC · RBAC/Cedar · Jobs · Realtime · Observability · Docker · systemd · Kubernetes · AI project protocol
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/sinabigy/ultimate-web-stack/actions/workflows/ci.yml/badge.svg)](https://github.com/sinabigy/ultimate-web-stack/actions/workflows/ci.yml)
 ![release](https://img.shields.io/badge/release-v1.0.0-blue)
 ![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)
 
@@ -26,7 +26,7 @@ Rust · SolidJS · PostgreSQL · OIDC · RBAC/Cedar · Jobs · Realtime · Obser
 ## Quickstart
 
 ```sh
-git clone https://github.com/OWNER/REPO && cd REPO
+git clone https://github.com/sinabigy/ultimate-web-stack && cd ultimate-web-stack
 scripts/create-project ../my-product --name "My Product"     # one command → an independent repository
 cd ../my-product
 ./dev setup && ./dev up                                       # → http://localhost:5190 (mock sign-in: any email)
@@ -187,8 +187,6 @@ change on evidence: see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Support the project
 
 ⭐ **If this project saved you time, star it: it helps other developers discover it.**
-
-Want to support continued development and regression testing? Use the **Sponsor** button.
 
 ## License
 

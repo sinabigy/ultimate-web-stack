@@ -436,7 +436,11 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=dest, check=True)
         subprocess.run(["git", "config", "core.hooksPath", ".githooks"], cwd=dest, check=True)
         subprocess.run(["git", "add", "-A"], cwd=dest, check=True)
-        subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m",
+        # Use the user's git identity; on a machine without one (fresh CI runner), fall back to a
+        # neutral generator identity instead of failing.
+        has_identity = subprocess.run(["git", "config", "user.email"], cwd=dest, capture_output=True).returncode == 0
+        identity = [] if has_identity else ["-c", "user.name=create-project", "-c", "user.email=create-project@localhost"]
+        subprocess.run(["git", *identity, "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m",
                         f"Generate {a.name} from {BLUEPRINT_NAME} ({blueprint_version()})"], cwd=dest, check=True)
     subprocess.run([sys.executable, "tools/ai-map", "--quiet"], cwd=dest, check=True)  # after the commit (map is gitignored)
     check = subprocess.run([sys.executable, "tools/ai-check"], cwd=dest, capture_output=True, text=True)

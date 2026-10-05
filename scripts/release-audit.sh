@@ -34,8 +34,9 @@ for p in "${patterns[@]}"; do
   [ "$n" = 0 ] && pass "history diffs: no '$p'" || fail "git history contains '$p' in $n diff lines (rewrite history before publishing)"
 done
 
-# 3. Commit identities (name/email/hostname) become public with the history.
-idents=$(git log --all --format='%an <%ae>%n%cn <%ce>' | sort -u)
+# 3. Identities (commit author/committer and annotated-tag tagger) become public with the history.
+idents=$( { git log --all --format='%an <%ae>%n%cn <%ce>'
+            git for-each-ref --format='%(taggername) %(taggeremail)' refs/tags | grep -v '^ *$'; } | sort -u)
 echo "$idents" | while read -r line; do echo "        identity in history: $line"; done
 if echo "$idents" | grep -qiE '\.(local|lan|home|mymodem)>|@[a-z0-9-]+\.(local|lan|home)'; then
   fail "history identities include a machine hostname email; rewrite authorship (launch: rewrite-author.sh) or confirm"

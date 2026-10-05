@@ -12,6 +12,4 @@ This is a community project with no guaranteed response times. Issues that inclu
 `./dev doctor` output and the exact failing command get answered fastest.
 
 ## Supporting the project
-If this project saved you time, ⭐ star the repository: it helps other developers find it. If you
-want to support continued development and regression testing, use the **Sponsor** button on the
-repository.
+If this project saved you time, ⭐ star the repository: it helps other developers find it.

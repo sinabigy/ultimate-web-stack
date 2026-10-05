@@ -14,8 +14,8 @@ says which files to update.
 ## Reporting a vulnerability
 
 **Please do not open a public issue.** Report privately through **GitHub private vulnerability
-reporting**: the repository's *Security* tab → *Report a vulnerability*. If that is unavailable,
-email **SECURITY_CONTACT**.
+reporting**: the repository's *Security* tab → *Report a vulnerability*, or
+<https://github.com/sinabigy/ultimate-web-stack/security/advisories/new>.
 
 Include:
 - the affected component and version or commit;

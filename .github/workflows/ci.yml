@@ -16,10 +16,11 @@ env:
 
 jobs:
   protocol:
+    # Protocol state, generator and benchmark-gate self-tests (Python + git only).
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - run: python3 tools/ai-check
+      - run: python3 tools/ai-validate --strict --only ai-check --only generator-selftest --only bench-gates-selftest
 
   backend:
     runs-on: ubuntu-24.04
@@ -45,6 +46,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }  # full history for the secret scan
+      - name: Free runner disk (unused preinstalled toolchains)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - name: Rust toolchain (pinned by backend/rust-toolchain.toml)
         working-directory: backend
         run: rustup show active-toolchain || rustup toolchain install
@@ -67,7 +70,7 @@ jobs:
       - name: Validate (backend)
         run: >
           python3 tools/ai-validate --strict --keep-going --report ai-validate-backend.json
-          --only rust-fmt --only rust-clippy --only sqlx-offline-fresh --only rust-audit --only rust-deny --only secret-scan --only config-check
+          --only rust-fmt --only rust-clippy --only rust-clippy-minimal --only sqlx-offline-fresh --only rust-audit --only rust-deny --only secret-scan --only config-check
           --only rust-test --only rust-test-cedar --only rust-test-cache --only rust-test-nats --only rust-test-clickhouse --only ts-bindings-fresh
       - if: always()
         uses: actions/upload-artifact@v4
@@ -101,6 +104,8 @@ jobs:
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v5
+      - name: Free runner disk (unused preinstalled toolchains)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - run: python3 tools/ai-validate --strict --only infra-verify --only release-smoke --only systemd-live
 
   e2e:
@@ -114,6 +119,8 @@ jobs:
         options: --health-cmd "pg_isready -U app" --health-interval 2s --health-retries 30
     steps:
       - uses: actions/checkout@v5
+      - name: Free runner disk (unused preinstalled toolchains)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - working-directory: backend
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2

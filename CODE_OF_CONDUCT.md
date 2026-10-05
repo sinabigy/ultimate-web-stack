@@ -11,8 +11,9 @@ In short:
 - maintainers may remove content and restrict participants who violate this code.
 
 ## Reporting
-Report unacceptable behaviour privately to the maintainers at **CONDUCT_CONTACT**. Reports are
-handled confidentially. Maintainers follow the Contributor Covenant's enforcement guidelines:
+Report unacceptable behaviour privately to the maintainers through the repository's private
+reporting form (*Security* tab → *Report a vulnerability*), with "Code of conduct" in the title.
+That channel is visible only to maintainers, and reports are handled confidentially. Maintainers follow the Contributor Covenant's enforcement guidelines:
 correction, then warning, then temporary ban, then permanent ban, depending on severity.
 
 Security vulnerabilities are not conduct issues: see [SECURITY.md](SECURITY.md).

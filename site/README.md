@@ -23,20 +23,12 @@ python3 -m http.server -d site 8000
 The copy button uses the Clipboard API, which needs a secure context (`https://` or
 `localhost`). From `file://` it falls back to selecting the text.
 
-## Before publishing: replace the placeholders
+## Repository links and naming
 
-| placeholder | where | replace with |
-|---|---|---|
-| `Ultimate Web Stack` | page title, header, hero, footer | the final project name |
-| `OWNER/REPO` | every GitHub link | the real `owner/repository` |
-| `sponsors/OWNER` | "Support development" link | the real GitHub Sponsors account, or remove the link |
-| `blob/main/` | documentation links | the default branch, if it is not `main` |
-
-A single find-and-replace per row is enough:
-
-```sh
-sed -i '' 's#OWNER/REPO#acme/web-stack#g; s#sponsors/OWNER#sponsors/acme#g' site/index.html   # macOS sed
-```
+Links point at `sinabigy/ultimate-web-stack`, documentation at `blob/main/`. To rename the
+project, find-and-replace `Ultimate Web Stack` (title, header, hero, footer) and the repository
+slug. There is no sponsorship link until a funding account exists: add one next to the footer's
+"Star on GitHub" button when it does.
 
 ## Keeping the numbers honest
 
@@ -60,10 +52,10 @@ you are ready, either option serves the `site/` directory as-is.
      `actions/deploy-pages`; or
    - publish from a branch: Pages can only serve the repository root or `/docs` from a branch,
      so for this layout the Actions route is simpler.
-3. The page is then served at `https://OWNER.github.io/REPO/`. All links on the page are
+3. The page is then served at `https://sinabigy.github.io/ultimate-web-stack/`. All links on the page are
    absolute or in-page anchors, so it works under that sub-path.
 4. Optional custom domain: **Settings → Pages → Custom domain**, plus a `CNAME` DNS record
-   pointing at `OWNER.github.io`.
+   pointing at `sinabigy.github.io`.
 
 ### Cloudflare Pages
 

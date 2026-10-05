@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question or idea
-    url: https://github.com/OWNER/REPO/discussions
+    url: https://github.com/sinabigy/ultimate-web-stack/discussions
     about: Ask questions and share ideas in Discussions (Q&A, Ideas, Show and tell).
   - name: Security vulnerability
-    url: https://github.com/OWNER/REPO/security/advisories/new
+    url: https://github.com/sinabigy/ultimate-web-stack/security/advisories/new
     about: Report privately. Please do not open a public issue (see SECURITY.md).
