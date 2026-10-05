@@ -232,6 +232,16 @@ def main() -> int:
         raise
 
 
+# Files that describe or run the blueprint as an open-source project, not the generated product.
+BLUEPRINT_PROJECT_FILES = [
+    "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", "SUPPORT.md", "GOVERNANCE.md", "ROADMAP.md",
+    "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE", "site/",
+    ".github/ISSUE_TEMPLATE/", ".github/FUNDING.yml", ".github/labels.yml", ".github/pull_request_template.md",
+    ".github/workflows/release.yml", "scripts/release-audit.sh", "scripts/demo.sh",
+    "docs/WHY.md", "docs/FAQ.md", "docs/QUICKSTART.md", "docs/VERSIONING.md",
+]
+
+
 def replay_command(a: argparse.Namespace, dest: Path) -> str:
     """The generation command, reconstructed from the effective options (also after interactive
     answers) with no source-machine paths: the destination is recorded by name only."""
@@ -257,7 +267,9 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
     # 1. copy
     # Blueprint-only parts: the generator itself, and the runtime experiment (evidence; its result
     # files and ADR stay). A generated product never depends on the blueprint repository.
-    skip_prefixes = ["backend/experiments/", "benchmarks/runtime/", "scripts/create-project", "scripts/validate-generated", "scripts/tests/"]
+    skip_prefixes = ["backend/experiments/", "benchmarks/runtime/", "scripts/create-project", "scripts/validate-generated", "scripts/tests/",
+                     # the blueprint's open-source project machinery (a product has its own)
+                     *BLUEPRINT_PROJECT_FILES]
     if not a.with_gateway:
         skip_prefixes.append("backend/gateway/")
     files = [f for f in tracked_files() if not any(f.startswith(p) for p in skip_prefixes)]
@@ -387,14 +399,24 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
         "Configuration: `backend/config/app.toml` (non-secret), `APP__*` environment variables (see `.env.example`).",
         "Architecture, decisions and constraints inherited from the blueprint: `.ai/knowledge/`, `docs/`.",
         "Switching optional modules (Redis, NATS, ClickHouse, Cedar) on or off later: `docs/MODULES.md`.",
+        "Building features: `docs/examples/adding-a-feature.md`; going live: `docs/PRODUCTION_CHECKLIST.md`.",
+        "License: your choice for this product. The blueprint code it started from is MIT OR Apache-2.0;",
+        "keep its notices in `third_party_licenses/ultimate-web-stack/`.",
         "AI agents: read `AI_PROTOCOL.md` first.",
         "",
     ]
     (dest / "README.md").write_text("\n".join(readme))
     index = dest / "docs/README.md"
-    if index.exists():  # the generator and its validator are blueprint-only
+    if index.exists():  # the generator, its validator and the project pages are blueprint-only
         index.write_text("".join(ln for ln in index.read_text().splitlines(keepends=True)
-                                 if not ln.startswith("| **Generating a project**")))
+                                 if not ln.startswith(("| **Generating a project**", "| **The project**"))))
+    # The product's own license is its owner's choice; the blueprint code it started from keeps
+    # its notices (MIT OR Apache-2.0 both require that).
+    notices = dest / "third_party_licenses/ultimate-web-stack"
+    notices.mkdir(parents=True, exist_ok=True)
+    for lic in ("LICENSE-MIT", "LICENSE-APACHE"):
+        if (BLUEPRINT / lic).exists():
+            shutil.copy2(BLUEPRINT / lic, notices / lic)
 
     # 5. fresh protocol instance (template's own mechanism)
     init = [sys.executable, "tools/ai-init", "--derive", "--name", a.name, "--origin-name", BLUEPRINT_NAME,

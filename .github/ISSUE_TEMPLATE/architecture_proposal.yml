@@ -1,0 +1,35 @@
+name: Architecture proposal
+description: Propose changing a default, adding a module, or revisiting a rejected technology.
+labels: ["architecture", "needs-evidence"]
+body:
+  - type: markdown
+    attributes:
+      value: "Defaults change on evidence: a failing acceptance test, or measurements that meet an ADR's reversal conditions (.ai/knowledge/DECISIONS/). Accepted proposals become ADRs."
+  - type: textarea
+    id: problem
+    attributes: { label: Problem and who it affects }
+    validations: { required: true }
+  - type: input
+    id: adr
+    attributes: { label: Related ADR(s), placeholder: "e.g. 0007-postgres-queue-default-jetstream-for-scale" }
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence (existing or planned)
+      description: Measurements (machine, method, repeats), failing tests, incidents. Planned experiments are fine — describe the method.
+    validations: { required: true }
+  - type: textarea
+    id: alternatives
+    attributes: { label: Alternatives considered }
+    validations: { required: true }
+  - type: textarea
+    id: reversal
+    attributes:
+      label: Reversal conditions
+      description: What result would show this proposal is wrong?
+    validations: { required: true }
+  - type: textarea
+    id: modules
+    attributes:
+      label: Impact on generated projects
+      description: New modules must be switchable (cargo feature, config, compose profile, CI service, validation command) and absent when unselected.

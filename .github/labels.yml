@@ -1,0 +1,14 @@
+# Label set for the public repository (apply once with: gh label create … or a label-sync action).
+- { name: bug, color: d73a4a, description: "Doesn't work as documented" }
+- { name: enhancement, color: a2eeef, description: Improvement without changing defaults }
+- { name: architecture, color: 5319e7, description: Changes a default or adds a module (needs evidence) }
+- { name: needs-evidence, color: fbca04, description: Waiting for measurements or a failing test }
+- { name: benchmark, color: 0e8a16, description: Benchmark results or harness }
+- { name: evidence, color: 0e8a16, description: New evidence for an existing decision }
+- { name: security, color: b60205, description: Security hardening (vulnerabilities go to private reporting) }
+- { name: docs, color: 0075ca, description: Documentation }
+- { name: generator, color: c5def5, description: scripts/create-project and generated output }
+- { name: ai-protocol, color: bfdadc, description: AI working protocol, agent experience }
+- { name: good first issue, color: 7057ff, description: Small, well-scoped, mentored }
+- { name: help wanted, color: 008672, description: Maintainers would welcome a contribution }
+- { name: needs-triage, color: ededed, description: Not yet reviewed }

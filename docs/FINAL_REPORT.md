@@ -166,7 +166,7 @@ tables: [benchmarks/SUMMARY.md](benchmarks/SUMMARY.md).
 | area | DEFAULT | PROFILE-SPECIFIC | OPTIONAL / INCONCLUSIVE | REJECTED |
 |---|---|---|---|---|
 | outbound engine | split rate/concurrency controllers, pooling, breaker | – | – | naive retrying client (9.3% completed, 99.5% waste) |
-| job queue | PostgreSQL | NATS JetStream (35k–49k vs 4.4k–5.1k jobs/s) | – | – |
+| job queue | PostgreSQL | NATS JetStream (38k–49k vs 4.4k–5.1k jobs/s) | – | – |
 | analytics | PostgreSQL per tenant (5.5–6.4 ms) | ClickHouse cross-tenant (24 ms vs 573 ms) | – | – |
 | cache | in-process (125k req/s) | Redis across instances (57k) | Dragonfly (54k) | Redis session cache |
 | edge | Axum behind Caddy or nginx TLS | Pingora for edge logic | – | extra proxy hop for speed (143k → 66k req/s) |

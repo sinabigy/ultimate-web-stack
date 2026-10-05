@@ -4,6 +4,38 @@ All notable changes to the blueprint. Versions are git tags (`vX.Y.Z`). Generate
 the version they came from in `.ai/config/project.json → architecture.origin.version` and in
 their README.
 
+## Unreleased
+
+Open-source packaging of 1.0.0. The architecture and generated application code are unchanged.
+
+### Added
+- **Licensing:** `LICENSE-MIT` and `LICENSE-APACHE` (the dual license `Cargo.toml` already
+  declared). Generated projects carry the notices in `third_party_licenses/ultimate-web-stack/`;
+  their own license is the owner's choice.
+- **Project files:** `CONTRIBUTING.md` (evidence rule, benchmark and architecture-proposal
+  workflows), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `SECURITY.md` (private
+  reporting), `SUPPORT.md`, `GOVERNANCE.md` and the public `ROADMAP.md`.
+- **GitHub:** issue forms (bug, feature, benchmark result, architecture proposal), a PR
+  template, `FUNDING.yml` (to be filled in), Dependabot, a label set, and a release workflow that
+  publishes this changelog.
+- **Docs:** quickstart, why, FAQ, troubleshooting, "what we don't use", AI-agent guide,
+  production checklist, versioning policy, and an adding-a-feature walkthrough.
+- **Scripts and site:** `scripts/release-audit.sh` (public-release audit: secrets in history and
+  tree, personal paths, identities, placeholders), `scripts/demo.sh` (golden-path demo for
+  recording), and `site/` (static landing page, not deployed).
+
+### Changed
+- **README** rewritten as the project landing page.
+- **Generator:** blueprint-only project files stay out of generated projects. A test checks that
+  every relative documentation link in a generated project resolves.
+
+### Fixed (documentation accuracy)
+- **Benchmark summary**, checked against the raw tables:
+  - keep-alive pooling is 40.9k vs 26.0k req/s (the summary said 35k);
+  - the JetStream drain range is 38k–49k jobs/s (the summary mixed in a publish rate);
+  - the DB-backed proxy cost is 12–15% with Pingora and 7–8% with nginx (the summary said
+    "12–14%, nginx the same").
+
 ## 1.0.0 — 2026-10-05
 
 First stable blueprint. Architecture frozen; changes from here on need a failing acceptance test

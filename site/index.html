@@ -1,0 +1,583 @@
+<!doctype html>
+<!--
+  Landing page for "Ultimate Web Stack" (working name).
+  To rename: find-and-replace the string "Ultimate Web Stack".
+  To point at the real repository: find-and-replace "OWNER/REPO" and "sponsors/OWNER".
+  Every number on this page is taken from docs/FINAL_REPORT.md, docs/FINAL_ACCEPTANCE.md,
+  docs/benchmarks/SUMMARY.md, CHANGELOG.md, README.md or docs/BLUEPRINT_CAPABILITY_MATRIX.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultimate Web Stack</title>
+<meta name="description" content="The web stack we tried to disprove. An evidence-driven, production-tested, AI-ready foundation for serious web applications, generated with one command.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fbf'/%3E%3Cpath d='M8 21l5-10 5 7 3-4 3 7' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#fbfbfa;--surface:#ffffff;--surface-2:#f2f3f5;--line:#d9dce2;--text:#16181d;--muted:#4a5160;
+  --accent:#1f5fbf;--accent-ink:#ffffff;--accent-soft:#e7eefb;--focus:#c2410c;
+  --def:#146c2e;--def-bg:#e5f3e9;--pro:#1d4f9e;--pro-bg:#e5edfa;--opt:#7a4a00;--opt-bg:#fbefd9;--rej:#a3261b;--rej-bg:#fbe6e3;
+  --code-bg:#14171d;--code-ink:#e6e9ef;--code-muted:#9aa4b4;
+  --radius:12px;--max:1120px;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0e1014;--surface:#161920;--surface-2:#1c2028;--line:#2c313c;--text:#e8eaef;--muted:#a7afbd;
+    --accent:#8ab4ff;--accent-ink:#0b1220;--accent-soft:#18243a;--focus:#ffb066;
+    --def:#7fd49a;--def-bg:#13281a;--pro:#9cc0ff;--pro-bg:#16233a;--opt:#f2c46b;--opt-bg:#2c2312;--rej:#ff9b8f;--rej-bg:#331a18;
+    --code-bg:#0a0c10;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--text);line-height:1.55;font-size:16px}
+a{color:var(--accent)}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+code,pre,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:.9em}
+:not(pre)>code{background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:.05em .35em;overflow-wrap:anywhere}
+h1,h2,h3{line-height:1.2;margin:0 0 .5em}
+h2{font-size:clamp(1.5rem,3.2vw,2rem);letter-spacing:-.01em}
+h3{font-size:1.05rem}
+p{margin:0 0 1em}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 16px}
+.skip{position:absolute;left:-9999px;top:8px;background:var(--surface);padding:8px 12px;border-radius:8px;z-index:10}
+.skip:focus{left:8px}
+/* header */
+.site-head{border-bottom:1px solid var(--line);background:var(--bg)}
+.site-head .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:60px}
+.brand{font-weight:700;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px}
+.brand svg{flex:none}
+.site-nav ul{list-style:none;margin:0;padding:0;display:flex;gap:18px;flex-wrap:wrap}
+.site-nav a{color:var(--muted);text-decoration:none;font-size:.95rem}
+.site-nav a:hover{color:var(--text)}
+@media (max-width:820px){.site-nav .opt{display:none}}
+/* hero */
+.hero{padding:64px 0 40px}
+.eyebrow{display:inline-block;font-size:.85rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 12px;margin-bottom:18px}
+.hero h1{font-size:clamp(2.1rem,6vw,3.6rem);letter-spacing:-.025em;max-width:16ch}
+.hero .sub{font-size:clamp(1.05rem,2.2vw,1.3rem);color:var(--muted);max-width:60ch;margin-bottom:28px}
+.name{color:var(--accent);font-weight:700;display:block;font-size:1rem;letter-spacing:.02em;margin-bottom:10px}
+.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:40px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:10px;font-weight:600;text-decoration:none;border:1px solid var(--line);color:var(--text);background:var(--surface)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:hover{filter:brightness(1.06)}
+.proof{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.proof li{background:var(--surface);padding:16px 18px}
+.proof b{display:block;font-size:clamp(1.5rem,3.5vw,2rem);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.proof span{color:var(--muted);font-size:.9rem}
+.proof-note{color:var(--muted);font-size:.85rem;margin-top:10px}
+@media (max-width:720px){.proof{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* sections */
+section{padding:56px 0;border-top:1px solid var(--line)}
+.lede{color:var(--muted);max-width:70ch}
+.env{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;padding:0;list-style:none}
+.env li{font-size:.85rem;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:900px){.g3,.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.g2,.g3,.g4{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;min-width:0}
+.card p:last-child,.card ul:last-child{margin-bottom:0}
+.card ul{padding-left:1.15em;margin:0 0 1em}
+.card li{margin:.2em 0}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+/* code */
+.code{position:relative;background:var(--code-bg);color:var(--code-ink);border-radius:var(--radius);border:1px solid var(--line);min-width:0}
+.code pre{margin:0;padding:18px 20px;overflow-x:auto;font-size:.86rem;line-height:1.6;tab-size:2}
+.code .c{color:var(--code-muted)}
+.copy{position:absolute;top:10px;right:10px;font:inherit;font-size:.8rem;font-weight:600;padding:5px 11px;border-radius:7px;border:1px solid #3a4150;background:#232833;color:#e6e9ef;cursor:pointer}
+.copy:hover{background:#2d3340}
+.copy[hidden]{display:none}
+/* tables */
+.tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;font-size:.92rem}
+.tbl th,.tbl td{text-align:left;vertical-align:top;padding:11px 13px;border-bottom:1px solid var(--line)}
+.tbl thead th{background:var(--surface-2);font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+.tbl tbody tr:last-child>*{border-bottom:0}
+.tbl tbody th{font-weight:650;white-space:nowrap}
+.none{color:var(--muted)}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:6px;padding:2px 7px}
+.t-def{color:var(--def);background:var(--def-bg)}
+.t-pro{color:var(--pro);background:var(--pro-bg)}
+.t-opt{color:var(--opt);background:var(--opt-bg)}
+.t-rej{color:var(--rej);background:var(--rej-bg)}
+.tbl td.def b{color:var(--def)} .tbl td.pro b{color:var(--pro)} .tbl td.opt b{color:var(--opt)} .tbl td.rej b{color:var(--rej)}
+@media (max-width:760px){
+  .tbl,.tbl tbody,.tbl tr,.tbl td,.tbl tbody th{display:block;width:100%}
+  .tbl{border:0;background:none}
+  .tbl thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .tbl tr{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+  .tbl tbody th{background:var(--surface-2);white-space:normal}
+  .tbl tbody th,.tbl tbody tr:last-child>*{border-bottom:0}
+  .tbl td{border-bottom:0;border-top:1px solid var(--line)}
+  .tbl td::before{content:attr(data-label);display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:2px}
+  .tbl td.none-cell{display:none}
+}
+/* don'ts */
+.card .x-list{list-style:none;margin:0;padding:0}
+.x-list li{padding:12px 0;border-bottom:1px solid var(--line)}
+.x-list li:last-child{border-bottom:0}
+.x-list strong{display:block}
+/* diagram */
+figure{margin:0}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.diagram svg{display:block;width:100%;max-width:600px;height:auto;margin:0 auto}
+@media (max-width:640px){.diagram{padding:6px}}
+.dg-box{fill:var(--surface-2);stroke:var(--text);stroke-width:1.4}
+.dg-core{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.dg-opt{fill:var(--surface);stroke:var(--muted);stroke-width:1.3;stroke-dasharray:5 4}
+.dg-t{fill:var(--text);font-size:14px;font-weight:700}
+.dg-s{fill:var(--muted);font-size:12px}
+.dg-l{fill:var(--muted);font-size:11px;font-style:italic}
+.dg-line{stroke:var(--text);stroke-width:1.4;fill:none}
+.dg-dash{stroke:var(--muted);stroke-width:1.3;fill:none;stroke-dasharray:5 4}
+.dg-head{fill:var(--text)}
+.dg-headm{fill:var(--muted)}
+.arch{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:900px){.arch{grid-template-columns:minmax(0,1fr)}}
+/* honesty */
+.honest{background:var(--opt-bg);border:1px solid var(--opt);border-radius:var(--radius);padding:22px 24px}
+.honest h2{color:var(--text)}
+.honest ul{margin:0;padding-left:1.2em}
+.honest li{margin:.45em 0}
+/* footer */
+.foot-cta{text-align:center;padding:64px 0}
+.foot-cta p{max-width:52ch;margin:0 auto 22px;font-size:1.15rem}
+footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);font-size:.92rem}
+footer ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 22px}
+footer .row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;align-items:center}
+.ok{color:var(--def);font-weight:700}
+.warn{color:var(--opt);font-weight:700}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Ultimate Web Stack, back to top">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1f5fbf"/><path d="M8 21l5-10 5 7 3-4 3 7" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Ultimate Web Stack</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <ul>
+        <li class="opt"><a href="#quickstart">Quickstart</a></li>
+        <li class="opt"><a href="#measured">Benchmarks</a></li>
+        <li class="opt"><a href="#security">Security</a></li>
+        <li class="opt"><a href="#limits">Limits</a></li>
+        <li><a href="https://github.com/OWNER/REPO">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<!-- 1. Hero -->
+<div class="hero" id="top">
+  <div class="wrap">
+    <span class="name">Ultimate Web Stack</span>
+    <h1>The web stack we tried to disprove.</h1>
+    <p class="sub">An evidence-driven, production-tested, AI-ready foundation for serious web applications — generated with one command.</p>
+    <div class="ctas">
+      <a class="btn primary" href="#quickstart">Get started</a>
+      <a class="btn" href="https://github.com/OWNER/REPO">
+        <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 .2a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"/></svg>
+        Star on GitHub
+      </a>
+    </div>
+    <ul class="proof" aria-label="Verified release results for version 1.0.0">
+      <li><b>29/29</b><span>release checks pass (<code>./dev check</code> on tag <code>v1.0.0</code>)</span></li>
+      <li><b>294</b><span>Rust tests in the suite</span></li>
+      <li><b>14/14</b><span>failure drill</span></li>
+      <li><b>17/17</b><span>benchmark invariant gates</span></li>
+      <li><b>2/2</b><span>clean-room AI agents built complete features</span></li>
+      <li><b>6/6</b><span>browser acceptance roles</span></li>
+    </ul>
+    <p class="proof-note">Release acceptance on 2026-10-05. Evidence: <a href="https://github.com/OWNER/REPO/blob/main/docs/FINAL_ACCEPTANCE.md">FINAL_ACCEPTANCE.md</a>.</p>
+  </div>
+</div>
+
+<!-- 2. Quickstart -->
+<section id="quickstart" aria-labelledby="qs-h">
+  <div class="wrap">
+    <h2 id="qs-h">Quickstart</h2>
+    <p class="lede">The golden commands. Every one of them was run during release acceptance. Run the generator from the blueprint repository; the destination must be outside it. The app runs at <code>http://localhost:5190</code> and the mock identity provider accepts any email.</p>
+    <div class="code">
+      <button class="copy" type="button" data-copy="golden" aria-live="polite" hidden>Copy</button>
+<pre id="golden" tabindex="0" aria-label="Golden commands"><code><span class="c"># Create (from the blueprint repository; DEST must be outside it)</span>
+scripts/create-project ../my-product --name "My Product"                        <span class="c"># core profile, b2b auth</span>
+scripts/create-project ../my-saas --name "My SaaS" --profile performance --cedar   <span class="c"># + Redis cache, Cedar</span>
+scripts/create-project ../my-scale --name "My Scale" --profile distributed        <span class="c"># + NATS, ClickHouse</span>
+
+<span class="c"># Enter</span>
+cd ../my-product
+
+<span class="c"># Validate the AI/project state</span>
+python3 tools/ai-check
+
+<span class="c"># Run locally (http://localhost:5190, mock identity provider: any email)</span>
+./dev setup
+./dev up
+
+<span class="c"># Validate everything (lint, audit, tests, E2E, deployment tiers, release image)</span>
+./dev check
+
+<span class="c"># Live proofs against the running stack</span>
+./dev test --system      <span class="c"># one journey through every component</span>
+./dev test --journey     <span class="c"># browser acceptance with screenshots</span>
+./dev test --drill       <span class="c"># failure drill (stops services briefly)</span>
+
+<span class="c"># Stop</span>
+./dev down</code></pre>
+    </div>
+    <p class="small muted" style="margin-top:12px">Prerequisites: Rust (pinned), Node ≥ 22, Docker (colima works: give it at least 6 GiB), Python 3.11+. A full <code>./dev check</code> on a generated project took 6 min (core) to 22 min (distributed) in acceptance.</p>
+  </div>
+</section>
+
+<!-- 3. Chosen by measurement -->
+<section id="measured" aria-labelledby="m-h">
+  <div class="wrap">
+    <h2 id="m-h">Chosen by measurement</h2>
+    <p class="lede">Every technology choice is backed by a measurement or a test. Rejected and inconclusive options are recorded too, and differences within the measured noise are never reported as wins.</p>
+    <ul class="env" aria-label="Measurement environment">
+      <li>Apple M5 (10 cores, 16 GB)</li>
+      <li>services in a 2-CPU / 4 GiB VM</li>
+      <li>median of 3 runs</li>
+      <li>noise ≤ 7.6% between full runs</li>
+      <li>one machine; not comparable across hardware</li>
+    </ul>
+    <table class="tbl" aria-label="Technology decisions by area">
+      <thead><tr><th scope="col">Area</th><th scope="col"><span class="tag t-def">Default</span></th><th scope="col"><span class="tag t-pro">Profile-specific</span></th><th scope="col"><span class="tag t-opt">Optional / inconclusive</span></th><th scope="col"><span class="tag t-rej">Rejected</span></th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Job queue</th><td class="def" data-label="Default"><b>PostgreSQL</b><br>4.4k–5.1k jobs/s</td><td class="pro" data-label="Profile-specific"><b>NATS JetStream</b><br>38k–49k jobs/s (about 10×)</td><td class="none-cell" data-label="Optional"><span class="none">–</span></td><td class="none-cell" data-label="Rejected"><span class="none">–</span></td></tr>
+        <tr><th scope="row">Cache</th><td class="def" data-label="Default"><b>In-process</b><br>125k req/s</td><td class="pro" data-label="Profile-specific"><b>Redis</b> across instances<br>57k req/s</td><td class="opt" data-label="Optional / inconclusive"><b>Dragonfly</b><br>54k req/s</td><td class="rej" data-label="Rejected"><b>Redis session cache</b></td></tr>
+        <tr><th scope="row">Analytics</th><td class="def" data-label="Default"><b>PostgreSQL</b> per tenant<br>5.5–6.4 ms</td><td class="pro" data-label="Profile-specific"><b>ClickHouse</b> cross-tenant<br>24 ms vs 573 ms</td><td class="none-cell" data-label="Optional"><span class="none">–</span></td><td class="none-cell" data-label="Rejected"><span class="none">–</span></td></tr>
+        <tr><th scope="row">Outbound engine</th><td class="def" data-label="Default"><b>Split rate + concurrency controllers</b>, pooling, breaker<br>496–500 useful req/s against a 500 req/s limit</td><td class="none-cell" data-label="Profile-specific"><span class="none">–</span></td><td class="none-cell" data-label="Optional"><span class="none">–</span></td><td class="rej" data-label="Rejected"><b>Naive retrying client</b><br>9.3% completed, 99.5% waste</td></tr>
+        <tr><th scope="row">Edge</th><td class="def" data-label="Default"><b>Axum behind Caddy or nginx TLS</b></td><td class="pro" data-label="Profile-specific"><b>Pingora</b> for edge logic</td><td class="none-cell" data-label="Optional"><span class="none">–</span></td><td class="rej" data-label="Rejected"><b>Extra proxy hop</b> for speed<br>143k → 66k req/s</td></tr>
+        <tr><th scope="row">Runtime</th><td class="def" data-label="Default"><b>Tokio + axum</b></td><td class="none-cell" data-label="Profile-specific"><span class="none">–</span></td><td class="opt" data-label="Optional / inconclusive"><b>Thread-per-core Tokio</b><br>+3–7% raw loops</td><td class="rej" data-label="Rejected"><b>Monoio / io_uring</b><br>0–24% slower than epoll</td></tr>
+        <tr><th scope="row">Allocator</th><td class="def" data-label="Default"><b>System</b></td><td class="none-cell" data-label="Profile-specific"><span class="none">–</span></td><td class="opt" data-label="Optional / inconclusive"><b>mimalloc, jemalloc</b><br>within ±10% noise</td><td class="none-cell" data-label="Rejected"><span class="none">–</span></td></tr>
+        <tr><th scope="row">LTO</th><td class="def" data-label="Default"><b>Thin</b>, codegen-units 1</td><td class="none-cell" data-label="Profile-specific"><span class="none">–</span></td><td class="none-cell" data-label="Optional"><span class="none">–</span></td><td class="rej" data-label="Rejected"><b>Fat by default</b><br>−14% size, +38% build, no speed gain</td></tr>
+        <tr><th scope="row">PGO</th><td class="def" data-label="Default"><b>Off</b></td><td class="none-cell" data-label="Profile-specific"><span class="none">–</span></td><td class="opt" data-label="Optional / inconclusive"><b>PGO</b><br>+7 to +16%, inside the 19% spread (within noise)</td><td class="none-cell" data-label="Rejected"><span class="none">–</span></td></tr>
+      </tbody>
+    </table>
+    <p class="small muted" style="margin-top:10px">Source: <a href="https://github.com/OWNER/REPO/blob/main/docs/benchmarks/SUMMARY.md">docs/benchmarks/SUMMARY.md</a>. HTTP numbers are lower bounds.</p>
+  </div>
+</section>
+
+<!-- 4. What we don't use -->
+<section id="not-used" aria-labelledby="nu-h">
+  <div class="wrap">
+    <h2 id="nu-h">What we intentionally don't use</h2>
+    <p class="lede">Negative results are listed on purpose: they are why some popular options are not in the default stack.</p>
+    <div class="grid g2">
+      <div class="card">
+        <h3><span class="tag t-rej">Rejected</span></h3>
+        <ul class="x-list">
+          <li><strong>Monoio / io_uring runtime</strong><span class="muted small">Identical request handling in a Linux 6.8 container: io_uring was 0–24% slower than epoll, and slower than Tokio at every point. (ADR 0010)</span></li>
+          <li><strong>An extra proxy hop by default (Pingora or nginx)</strong><span class="muted small">Halves trivial-endpoint throughput on a shared host (143k → 66k req/s, +0.5 ms p50) and cuts DB-backed throughput 12–15% (nginx: 7–8%). (ADR 0009)</span></li>
+          <li><strong>Redis session cache</strong><span class="muted small">The gain is bounded at about ⅓ of DB round trips, at the cost of revocation latency or fail-open risk. Sessions stay in PostgreSQL and revocation stays immediate. (ADR 0004)</span></li>
+          <li><strong>Fat LTO by default</strong><span class="muted small">14% smaller than thin LTO for 38% more build time; no throughput gain. (ADR 0011)</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="tag t-opt">No reliable win</span></h3>
+        <ul class="x-list">
+          <li><strong>PGO</strong><span class="muted small">+7% plaintext, +9% json, +16% db, −3% cached: all within the baseline's 19% round-to-round spread. Adds a 241 s optimised build plus training.</span></li>
+          <li><strong>mimalloc / jemalloc</strong><span class="muted small">Interleaved runs fall inside the baseline's own ±10% band. An earlier run that looked 26–36% slower was environmental drift.</span></li>
+          <li><strong>Thread-per-core Tokio</strong><span class="muted small">+3–7% on raw loops, but it would require non-<code>Send</code> executors across axum and sqlx.</span></li>
+          <li><strong>Dragonfly instead of Redis</strong><span class="muted small">54k vs 57k req/s at this scale (within noise). Kept as a tested adapter.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Architecture -->
+<section id="architecture" aria-labelledby="a-h">
+  <div class="wrap">
+    <h2 id="a-h">Architecture</h2>
+    <div class="arch">
+      <figure class="diagram">
+        <svg viewBox="0 0 420 560" role="img" aria-labelledby="dg-title dg-desc">
+          <title id="dg-title">System architecture</title>
+          <desc id="dg-desc">The SolidJS single-page app talks over HTTPS through a Caddy or nginx TLS proxy to the Rust axum API, which uses an OIDC identity provider for login. The API and a background worker use PostgreSQL 18 for sessions, jobs, events and audit. Metrics are served on an internal ops port. Optional modules: a Pingora edge gateway, Redis cache, NATS JetStream and ClickHouse.</desc>
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="dg-head"/></marker>
+            <marker id="ahm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="dg-headm"/></marker>
+          </defs>
+          <!-- SPA -->
+          <rect x="10" y="10" width="250" height="56" rx="9" class="dg-box"/>
+          <text x="24" y="34" class="dg-t">SolidJS SPA</text>
+          <text x="24" y="53" class="dg-s">browser · HttpOnly cookie, no tokens</text>
+          <!-- arrow SPA -> proxy -->
+          <line x1="135" y1="66" x2="135" y2="100" class="dg-line" marker-end="url(#ah)"/>
+          <text x="143" y="88" class="dg-l">HTTPS</text>
+          <!-- TLS proxy -->
+          <rect x="10" y="102" width="250" height="50" rx="9" class="dg-box"/>
+          <text x="24" y="124" class="dg-t">Caddy / nginx</text>
+          <text x="24" y="142" class="dg-s">TLS proxy</text>
+          <!-- Pingora optional -->
+          <rect x="280" y="102" width="130" height="50" rx="9" class="dg-opt"/>
+          <text x="292" y="124" class="dg-t">Pingora edge</text>
+          <text x="292" y="142" class="dg-s">--with-gateway</text>
+          <path d="M300 152 L234 186" class="dg-dash" marker-end="url(#ahm)"/>
+          <!-- arrow proxy -> API -->
+          <line x1="135" y1="152" x2="135" y2="186" class="dg-line" marker-end="url(#ah)"/>
+          <!-- API -->
+          <rect x="10" y="188" width="250" height="100" rx="9" class="dg-core"/>
+          <text x="24" y="212" class="dg-t">Rust · axum API</text>
+          <text x="24" y="231" class="dg-s">Tokio · SQLx · BFF sessions</text>
+          <text x="24" y="248" class="dg-s">RBAC or Cedar · default deny</text>
+          <rect x="18" y="258" width="234" height="22" rx="5" class="dg-box"/>
+          <text x="28" y="273" class="dg-s">internal ops port: /metrics · /readyz</text>
+          <!-- IdP -->
+          <rect x="290" y="198" width="120" height="56" rx="9" class="dg-box"/>
+          <text x="302" y="222" class="dg-t">OIDC IdP</text>
+          <text x="302" y="241" class="dg-s">mock · ZITADEL</text>
+          <line x1="263" y1="226" x2="287" y2="226" class="dg-line" marker-end="url(#ah)" marker-start="url(#ah)"/>
+          <!-- API -> PG -->
+          <line x1="135" y1="288" x2="135" y2="330" class="dg-line" marker-end="url(#ah)"/>
+          <text x="143" y="314" class="dg-l">SQLx</text>
+          <!-- PG -->
+          <rect x="10" y="332" width="250" height="62" rx="9" class="dg-core"/>
+          <text x="24" y="357" class="dg-t">PostgreSQL 18</text>
+          <text x="24" y="377" class="dg-s">sessions · jobs · events · audit</text>
+          <!-- Worker -->
+          <rect x="280" y="332" width="130" height="62" rx="9" class="dg-core"/>
+          <text x="292" y="357" class="dg-t">Worker</text>
+          <text x="292" y="377" class="dg-s">jobs, leases, DLQ</text>
+          <line x1="279" y1="363" x2="263" y2="363" class="dg-line" marker-end="url(#ah)"/>
+          <!-- Optional modules -->
+          <text x="10" y="432" class="dg-l">optional modules (profiles), compiled in only when selected</text>
+          <line x1="10" y1="414" x2="410" y2="414" class="dg-dash"/>
+          <rect x="10" y="444" width="115" height="62" rx="9" class="dg-opt"/>
+          <text x="20" y="468" class="dg-t">Redis</text>
+          <text x="20" y="487" class="dg-s">shared cache</text>
+          <rect x="135" y="444" width="150" height="62" rx="9" class="dg-opt"/>
+          <text x="145" y="468" class="dg-t">NATS/JetStream</text>
+          <text x="145" y="487" class="dg-s">queue, realtime bus</text>
+          <rect x="295" y="444" width="115" height="62" rx="9" class="dg-opt"/>
+          <text x="305" y="468" class="dg-t">ClickHouse</text>
+          <text x="305" y="487" class="dg-s">analytics</text>
+          <!-- legend -->
+          <rect x="10" y="528" width="22" height="14" rx="3" class="dg-core"/>
+          <text x="40" y="540" class="dg-s">every project</text>
+          <rect x="140" y="528" width="22" height="14" rx="3" class="dg-opt"/>
+          <text x="170" y="540" class="dg-s">optional</text>
+        </svg>
+      </figure>
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>Universal core</h3>
+          <ul>
+            <li>SolidJS + TypeScript + Vite, API types generated from Rust (ts-rs)</li>
+            <li>Rust, Tokio + axum, SQLx with compile-time checked SQL</li>
+            <li>PostgreSQL 18 as the single source of truth for sessions, jobs, events and audit</li>
+            <li>PostgreSQL job queue: <code>SKIP LOCKED</code>, leases, DLQ, idempotent enqueue</li>
+            <li>Realtime over SSE and WebSocket; outbound API engine with rate and concurrency controllers</li>
+            <li>W3C tracing end to end, Prometheus metrics on the internal ops port, JSON logs</li>
+          </ul>
+        </div>
+        <p class="small muted">Each optional module is a cargo feature plus configuration plus a compose profile, a CI service and a validation command. An unselected module is absent from all five, and the server's startup <code>configuration</code> log line proves what is active.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Security & evidence -->
+<section id="security" aria-labelledby="s-h">
+  <div class="wrap">
+    <h2 id="s-h">Security, with evidence</h2>
+    <p class="lede">Each claim below is backed by a test or a live run. UI hiding is never counted as evidence.</p>
+    <div class="grid g3">
+      <div class="card">
+        <h3>BFF sessions over OIDC</h3>
+        <p class="small">The browser holds only an HttpOnly <code>__Host-</code> cookie. Tokens stay server-side, encrypted with AES-256-GCM. PKCE, nonce, state, CSRF tokens, MFA step-up. Nothing sensitive in localStorage.</p>
+      </div>
+      <div class="card">
+        <h3>RBAC or Cedar, default deny</h3>
+        <p class="small">Every org-scoped handler decides through the configured engine. Repositories accept only an <code>OrgAccess</code> proof, never an organization id from the client. System admin is a separate, MFA-gated trust level.</p>
+      </div>
+      <div class="card">
+        <h3>Tenant isolation: 404</h3>
+        <p class="small">A non-member gets 404, so existence is not revealed. Under load, the benchmark invariant saw 404 for every cross-tenant probe (10,429) and 401 for every missing credential (382,179 requests).</p>
+      </div>
+      <div class="card">
+        <h3>Append-only audit trail</h3>
+        <p class="small">Denied writes, escalation attempts and credential-scope denials are audited; the authorization matrix checks audit counts.</p>
+      </div>
+      <div class="card">
+        <h3>Authorization matrix, both engines</h3>
+        <p class="small">Runs over HTTP under RBAC and under Cedar: anonymous → 401; member → admin action 403; tenant A → tenant B 404; escalation 403; auditor 8 reads / 3 mutations → 200 / 403; a Cedar read policy enforced over HTTP (mutation-checked).</p>
+      </div>
+      <div class="card">
+        <h3>Browser acceptance</h3>
+        <p class="small">6/6 per role against the full stack, 27 screenshots. E2E: all 28 routes render, axe (WCAG 2.2 AA) in light and dark themes, no CSP violations, keyboard operability.</p>
+      </div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <h3>Failure drill: <span class="ok">14/14</span></h3>
+        <ul class="small">
+          <li>PostgreSQL down: 503, and the session survives the outage</li>
+          <li>NATS or ClickHouse down: core works, readiness <code>degraded</code>, automatic recovery</li>
+          <li>Tampered session cookie: 401</li>
+          <li>Missing CSRF token: 403 <code>csrf_failed</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Live systemd test and release image smoke: <span class="ok">pass / pass</span></h3>
+        <ul class="small">
+          <li><strong>systemd</strong> (Debian 12 container): start, check-config, migrations, non-root, worker, restart, graceful stop, crash restart</li>
+          <li><strong>Release image</strong> (distroless): health, readiness, public surface, non-root, read-only, no baked secrets, restart, graceful shutdown</li>
+          <li>Public <code>/metrics</code> is an explicit 404; metrics live on the internal ops port</li>
+        </ul>
+      </div>
+    </div>
+    <p class="small muted" style="margin-top:16px">Found by tests, benchmarks, live runs and clean-room agents, then fixed with a regression test: rate limits keyed by IP instead of principal; public <code>/metrics</code>; an empty <code>PATCH /orgs/{slug}</code> that wrote without an authorization decision; a logout CSRF race; a worker crash-loop under systemd and Kubernetes; database outages answered 500 instead of 503.</p>
+  </div>
+</section>
+
+<!-- 7. AI agents -->
+<section id="ai" aria-labelledby="ai-h">
+  <div class="wrap">
+    <h2 id="ai-h">Built to be continued by AI agents</h2>
+    <p class="lede">Two independent coding agents were each given <strong>only</strong> a freshly generated repository and a product request. Both built complete, secure features and never looked outside the repository.</p>
+    <div class="grid g2">
+      <div class="card">
+        <p class="small muted">Run 1 · <code>performance</code>, <code>b2b</code>, Cedar</p>
+        <h3>Organization Projects</h3>
+        <p class="small">CRUD, permissions, audit and UI. <code>./dev check</code> <span class="ok">23/23</span>. Live: member 403, cross-tenant 404.</p>
+      </div>
+      <div class="card">
+        <p class="small muted">Run 2 · default <code>core</code>, <code>b2b</code>, release candidate</p>
+        <h3>Announcements with notifications</h3>
+        <p class="small"><code>./dev check</code> <span class="ok">22/22</span>, including release smoke and live systemd. Member writes 403 (audited), cross-tenant 404 by slug and id, notifications only to the other members. Scorecard "yes" on all 11 capabilities.</p>
+      </div>
+    </div>
+    <p style="margin-top:16px">Every generated repository carries the AI working protocol (ai-project-template 1.2.0): <code>AI_PROTOCOL.md</code>, <code>.ai/</code> state and tasks, <code>CONVENTIONS.md</code> and the ADRs. Run 2 named the authorization recipe and <code>CONVENTIONS.md</code> as the decisive documents. Every reusable gap the agents reported was fixed in the blueprint; two protocol-tool issues were passed upstream to ai-project-template.</p>
+  </div>
+</section>
+
+<!-- 8. Deployment -->
+<section id="deploy" aria-labelledby="d-h">
+  <div class="wrap">
+    <h2 id="d-h">Deployment options</h2>
+    <table class="tbl">
+      <thead><tr><th scope="col">Tier</th><th scope="col">Artefact</th><th scope="col">Verified</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">VPS</th><td data-label="Artefact">Release binaries, hardened systemd units, Caddy</td><td data-label="Verified"><span class="ok">Live</span>: systemd in a Debian 12 container. Not run on a real VM; TLS issuance not exercised.</td></tr>
+        <tr><th scope="row">Containers</th><td data-label="Artefact">Distroless release image, production compose</td><td data-label="Verified"><span class="ok">Live</span>: release smoke. Single host; TLS proxy not exercised.</td></tr>
+        <tr><th scope="row">Kubernetes</th><td data-label="Artefact">Base manifests + kustomize (HPA, PDB, NetworkPolicy, probes on the ops port)</td><td data-label="Verified"><span class="warn">Static validation only</span> (kubeconform <code>-strict</code>). Not run on a live cluster; do not assume runtime behaviour.</td></tr>
+        <tr><th scope="row">Pingora edge</th><td data-label="Artefact">Optional gateway (<code>--with-gateway</code>)</td><td data-label="Verified"><span class="warn">Compile, lint and benchmark only.</span> For programmable edge logic, not raw speed.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 9. Profiles -->
+<section id="profiles" aria-labelledby="p-h">
+  <div class="wrap">
+    <h2 id="p-h">Profiles</h2>
+    <p class="lede">Choose infrastructure by the measured "when". Auth is a separate choice: <code>basic</code>, <code>consumer</code>, <code>b2b</code> (default) or <code>enterprise</code>, plus <code>--cedar</code>.</p>
+    <div class="grid g4">
+      <div class="card"><h3><code>core</code> <span class="muted small">default</span></h3><p class="small">PostgreSQL alone. Auth, dashboards, jobs, realtime, audit, in-process cache. For one host.</p></div>
+      <div class="card"><h3><code>performance</code></h3><p class="small">+ Redis cache and shared rate limits. For several API instances; on one instance, in-process is 2.2× faster.</p></div>
+      <div class="card"><h3><code>distributed</code></h3><p class="small">+ NATS/JetStream and ClickHouse. About 10× the PostgreSQL queue drain; about 24× faster cross-tenant aggregates.</p></div>
+      <div class="card"><h3><code>full</code></h3><p class="small">+ Prometheus, Tempo, Loki, Alloy and Grafana dev stack, for observability development.</p></div>
+    </div>
+    <p class="small muted" style="margin-top:12px"><code>--with-gateway</code> adds the Pingora edge workspace to any profile; <code>--modules</code> adds individual modules. Acceptance generated and validated three projects: minimal 22/22, SaaS 24/24, throughput 25/25 <code>./dev check</code>.</p>
+  </div>
+</section>
+
+<!-- 10. Not yet proven -->
+<section id="limits" aria-labelledby="l-h">
+  <div class="wrap">
+    <div class="honest">
+      <h2 id="l-h">What is not yet proven</h2>
+      <p>Read this before you rely on the stack.</p>
+      <ul>
+        <li><strong>Kubernetes:</strong> static validation only. No live cluster was used.</li>
+        <li><strong>ZITADEL Cloud and generic OIDC providers:</strong> configuration and discovery check only. Self-hosted ZITADEL was verified live in the blueprint, not in generated projects.</li>
+        <li><strong>GitHub CI has not run</strong>: nothing has been pushed.</li>
+        <li><strong>TLS issuance:</strong> Caddy configuration validated, not exercised.</li>
+        <li><strong>Single-machine benchmarks:</strong> every number comes from one Apple M5 host with services in a 2-CPU / 4 GiB VM. HTTP numbers are lower bounds and do not transfer to other hardware without re-measuring.</li>
+        <li><strong>Still undecided:</strong> PGO, alternative allocators and thread-per-core Tokio need dedicated Linux hardware.</li>
+        <li><strong>Not covered by the failure drill:</strong> network partitions between API instances, and disk-full on the database host.</li>
+        <li><strong>Intermittent on the test host:</strong> <code>sqlx::test</code> connect failures through the colima port forwarder (pass on rerun), one historical E2E flake under full load, and one test that once exceeded its 20 s bound (not reproduced in 14 runs).</li>
+        <li><strong>Delegated to the IdP:</strong> email delivery, password policy and MFA enrolment (simulated by the mock IdP in development).</li>
+        <li><strong>Cosmetic:</strong> an empty "Job queues" chart card when no jobs are queued, and an empty organization switcher on not-found pages.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 11. Footer CTA -->
+<section class="foot-cta" aria-labelledby="f-h">
+  <div class="wrap">
+    <h2 id="f-h">Use it, check it, improve it</h2>
+    <p>⭐ If this project saved you time, star it — it helps other developers discover it.</p>
+    <div class="ctas" style="justify-content:center;margin-bottom:12px">
+      <a class="btn primary" href="https://github.com/OWNER/REPO">Star on GitHub</a>
+      <a class="btn" href="#quickstart">Get started</a>
+    </div>
+    <p class="small muted" style="font-size:.9rem"><a href="https://github.com/sponsors/OWNER">Support development</a></p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <span>Ultimate Web Stack · blueprint 1.0.0</span>
+    <nav aria-label="Documentation">
+      <ul>
+        <li><a href="https://github.com/OWNER/REPO#readme">README</a></li>
+        <li><a href="https://github.com/OWNER/REPO/blob/main/docs/FINAL_REPORT.md">Final report</a></li>
+        <li><a href="https://github.com/OWNER/REPO/blob/main/docs/FINAL_ACCEPTANCE.md">Final acceptance</a></li>
+        <li><a href="https://github.com/OWNER/REPO/blob/main/docs/benchmarks/SUMMARY.md">Benchmark summary</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('button[data-copy]');
+  Array.prototype.forEach.call(buttons, function (btn) {
+    var target = document.getElementById(btn.getAttribute('data-copy'));
+    if (!target) return;
+    btn.hidden = false;
+    btn.addEventListener('click', function () {
+      var text = target.innerText.replace(/\s+$/, '') + '\n';
+      var done = function (ok) {
+        btn.textContent = ok ? 'Copied' : 'Select and copy';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1800);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback()); });
+      } else {
+        done(fallback());
+      }
+      function fallback() {
+        try {
+          var range = document.createRange();
+          range.selectNodeContents(target);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          return document.execCommand('copy');
+        } catch (e) { return false; }
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

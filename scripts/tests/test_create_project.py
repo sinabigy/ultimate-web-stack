@@ -30,6 +30,23 @@ class Generated:
         return self.arch["modules"][module]["enabled"]
 
 
+def broken_links(root: Path) -> list[str]:
+    """Relative markdown links (files and directories) that do not resolve, in tracked .md files."""
+    import re
+    out = []
+    files = subprocess.run(["git", "ls-files", "*.md"], cwd=root, capture_output=True, text=True).stdout.split()
+    for rel in files:
+        text = (root / rel).read_text(errors="replace")
+        text = re.sub(r"```.*?```", "", text, flags=re.S)  # ignore code blocks
+        for target in re.findall(r"\]\(([^)\s]+)\)", text):
+            if re.match(r"^(https?:|mailto:|#)", target) or "«" in target:
+                continue
+            path = target.split("#")[0]
+            if path and not (root / rel).parent.joinpath(path).exists():
+                out.append(f"{rel} -> {target}")
+    return out
+
+
 class CreateProjectTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -68,6 +85,15 @@ class CreateProjectTests(unittest.TestCase):
             self.assertIn("\ndefault = []\n", (g.path / f"backend/apps/{app}/Cargo.toml").read_text(), app)
         self.assertFalse((g.path / "scripts/create-project").exists(), "the generator is blueprint-only")
         self.assertNotIn("create-project", (g.path / "docs/README.md").read_text(), "no links to blueprint-only tools")
+        # The blueprint's open-source machinery stays in the blueprint; license notices travel.
+        for f in ("CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", "CHANGELOG.md", "LICENSE-MIT", "site",
+                  ".github/FUNDING.yml", ".github/ISSUE_TEMPLATE", ".github/workflows/release.yml",
+                  "scripts/release-audit.sh", "docs/FAQ.md", "docs/WHY.md"):
+            self.assertFalse((g.path / f).exists(), f)
+        for f in ("LICENSE-MIT", "LICENSE-APACHE"):
+            self.assertTrue((g.path / "third_party_licenses/ultimate-web-stack" / f).is_file(), f)
+        self.assertTrue((g.path / ".github/workflows/ci.yml").is_file())
+        self.assertEqual(broken_links(g.path), [], "documentation links in the generated project resolve")
         self.assertIn("docs/MODULES.md", (g.path / "README.md").read_text())
         ci = (g.path / ".github/workflows/ci.yml").read_text()
         self.assertNotIn("\n  gateway:", ci)

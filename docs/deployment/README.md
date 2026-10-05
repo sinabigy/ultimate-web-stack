@@ -6,9 +6,9 @@ configuration (`APP__*` environment variables, see `.env.example`), never a diff
 | tier | for | files | verified by |
 |---|---|---|---|
 | **Development** | local work | `infra/docker/compose.yaml`, `./dev up` | `./dev check`, E2E |
-| **VPS** | one host, low ops cost | `infra/systemd/*.service`, `infra/systemd/Caddyfile` | `infra/verify.sh` (`systemd-analyze verify`, `caddy validate`) |
-| **Containers** | one or a few hosts, Docker | `infra/docker/Dockerfile`, `infra/docker/compose.prod.yaml` | `infra/docker/smoke.sh` (build, start, health, public surface) |
-| **Kubernetes** | many replicas, autoscaling | `infra/k8s/base` (kustomize) | `infra/verify.sh` (kubeconform on files and on the rendered kustomization) |
+| **VPS** | one host, low ops cost | `infra/systemd/*.service`, `infra/systemd/Caddyfile` | `infra/verify.sh` (`systemd-analyze verify`, `caddy validate`); **live**: `infra/systemd/live-test.sh` (the release binaries under the real units in a systemd container: start, migrations, non-root, worker, restart, graceful stop, crash restart) |
+| **Containers** | one or a few hosts, Docker | `infra/docker/Dockerfile`, `infra/docker/compose.prod.yaml` | **live**: `infra/docker/smoke.sh` (build, start, health, public surface, non-root and read-only, no secrets in the image, restart, graceful SIGTERM) |
+| **Kubernetes** | many replicas, autoscaling | `infra/k8s/base` (kustomize) | **static only**: `infra/verify.sh` (kubeconform on files and on the rendered kustomization). Not yet run on a live cluster |
 | **Hyperscale edge** | programmable edge on dedicated nodes | `backend/gateway` (Pingora) | `gateway-check`, [benchmarks](../benchmarks/pingora.md) |
 
 Choosing a tier:

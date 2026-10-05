@@ -30,7 +30,7 @@ Gateway resources while proxying (`results/20261004T135911Z-0cd96a42816b-pingora
   - On trivial endpoints, a proxy on the same host costs about as much CPU per request as the app
     itself, so end-to-end throughput roughly halves.
   - It adds about 0.5 ms p50 at concurrency 64.
-  - On database-backed endpoints the cost is 7–14% throughput and about 1–3 ms.
+  - On database-backed endpoints the cost is 7–15% throughput (nginx 7–8%, Pingora 12–15%) and about 1–3 ms.
 - **Pingora and nginx are equivalent here** at equal worker counts. Pingora is slightly ahead at
   high concurrency on trivial routes; nginx is slightly ahead on the database route. Neither is a
   reason to choose one over the other.

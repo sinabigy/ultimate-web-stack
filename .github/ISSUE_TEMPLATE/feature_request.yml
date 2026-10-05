@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest an improvement that doesn't change architectural defaults.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "Changing a default (stack, profile contents, a rejected technology)? Use **Architecture proposal** instead — defaults change on evidence."
+  - type: textarea
+    id: problem
+    attributes: { label: "Problem you're trying to solve" }
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes: { label: Proposed solution }
+    validations: { required: true }
+  - type: textarea
+    id: alternatives
+    attributes: { label: Alternatives considered }
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd like to implement this (maintainers will help scope it)
