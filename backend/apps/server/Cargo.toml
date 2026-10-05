@@ -13,8 +13,13 @@ path = "src/main.rs"
 
 [features]
 cedar = ["app-api/cedar"]
+alloc-mimalloc = ["dep:mimalloc"]
+alloc-jemalloc = ["dep:tikv-jemallocator"]
 
 [dependencies]
+axum.workspace = true
+mimalloc = { version = "0.1", optional = true, default-features = false }
+tikv-jemallocator = { version = "0.7", optional = true }
 app-analytics.workspace = true
 async-trait.workspace = true
 app-cache.workspace = true

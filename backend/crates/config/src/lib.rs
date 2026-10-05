@@ -151,6 +151,10 @@ pub struct HttpConfig {
     pub hsts: bool,
     /// Expose `/bench/*` endpoints used by the benchmark suite.
     pub bench_endpoints: bool,
+    /// Internal operations port. When set, `/metrics` and detailed `/readyz` (per-check errors)
+    /// are served only there; the public port keeps `/healthz`, a status-only `/readyz` and
+    /// `/version`. Never publish this port.
+    pub ops_port: Option<u16>,
     /// Trust `X-Forwarded-For`/`CF-Connecting-IP` for client IPs (only behind a trusted proxy).
     pub trust_forwarded_for: bool,
 }
@@ -169,6 +173,7 @@ impl Default for HttpConfig {
             static_dir: None,
             hsts: false,
             bench_endpoints: false,
+            ops_port: None,
             trust_forwarded_for: false,
         }
     }

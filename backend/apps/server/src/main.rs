@@ -46,11 +46,41 @@ async fn check_config(online: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
+// Optional global allocators (measured in docs/benchmarks/release-profile.md).
+#[cfg(feature = "alloc-mimalloc")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(all(feature = "alloc-jemalloc", not(feature = "alloc-mimalloc")))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+/// `app-server healthcheck [url]`: exit 0 when the local instance reports ready. For container
+/// health checks in images without a shell or curl (distroless).
+async fn healthcheck(url: Option<&str>) -> anyhow::Result<()> {
+    let url = match url {
+        Some(u) => u.to_string(),
+        None => {
+            // Prefer the internal ops port (detailed readiness) when one is configured.
+            let port = ["APP__HTTP__OPS_PORT", "APP__HTTP__PORT"]
+                .iter()
+                .find_map(|k| std::env::var(k).ok().and_then(|p| p.parse::<u16>().ok()))
+                .unwrap_or(8080);
+            format!("http://127.0.0.1:{port}/readyz")
+        }
+    };
+    let res = reqwest::Client::builder().timeout(Duration::from_secs(3)).build()?.get(&url).send().await?;
+    anyhow::ensure!(res.status().is_success(), "{url} answered {}", res.status());
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("check-config") {
         return check_config(args.iter().any(|a| a == "--online")).await;
+    }
+    if args.get(1).map(String::as_str) == Some("healthcheck") {
+        return healthcheck(args.get(2).map(String::as_str)).await;
     }
     let config = AppConfig::load().context("loading configuration")?;
     // Kept until main returns: dropping it flushes pending trace exports.
@@ -167,6 +197,19 @@ async fn main() -> anyhow::Result<()> {
         tokio::spawn(w.run(state.lifecycle.shutdown.clone()))
     });
 
+    // Internal operations listener (metrics, detailed readiness), stopped with the server.
+    if let Some(ops_port) = config.http.ops_port {
+        let ops_addr = SocketAddr::new(config.http.host, ops_port);
+        let ops_listener =
+            tokio::net::TcpListener::bind(ops_addr).await.with_context(|| format!("binding ops port {ops_addr}"))?;
+        let ops_app = app_api::router::ops_router(state.clone());
+        let stop = state.lifecycle.shutdown.clone();
+        tracing::info!(%ops_addr, "ops endpoints listening");
+        tokio::spawn(async move {
+            let _ =
+                axum::serve(ops_listener, ops_app).with_graceful_shutdown(async move { stop.cancelled().await }).await;
+        });
+    }
     let addr = SocketAddr::new(config.http.host, config.http.port);
     let listener = tokio::net::TcpListener::bind(addr).await.with_context(|| format!("binding {addr}"))?;
     tracing::info!(%addr, "listening");

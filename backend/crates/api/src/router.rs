@@ -55,14 +55,19 @@ pub fn build_router(state: AppState) -> Router {
 pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router<AppState>) -> Router {
     let cfg = &state.config.http;
 
+    // With an internal ops port, metrics and detailed readiness live only there (see ops_router).
+    let internal_ops = cfg.ops_port.is_some();
     let mut ordinary = Router::new()
         .route("/healthz", get(ops::healthz))
-        .route("/readyz", get(ops::readyz))
+        .route("/readyz", if internal_ops { get(ops::readyz_public) } else { get(ops::readyz) })
         .route("/version", get(ops::version))
         .merge(api)
         .route("/api/{*rest}", any(api_not_found));
-    if state.config.telemetry.metrics {
+    if state.config.telemetry.metrics && !internal_ops {
         ordinary = ordinary.route("/metrics", get(ops::metrics));
+    } else {
+        // Explicit 404: otherwise the SPA fallback would answer /metrics with index.html.
+        ordinary = ordinary.route("/metrics", any(not_found));
     }
     if cfg.bench_endpoints {
         ordinary = ordinary
@@ -217,4 +222,17 @@ async fn api_not_found() -> ApiError {
 
 async fn not_found() -> ApiError {
     ApiError::NotFound
+}
+
+/// Internal operations listener (`http.ops_port`): liveness, detailed readiness, version and
+/// metrics. No authentication, so bind it to a private interface or leave it unpublished.
+pub fn ops_router(state: AppState) -> Router {
+    let mut r = Router::new()
+        .route("/healthz", get(ops::healthz))
+        .route("/readyz", get(ops::readyz))
+        .route("/version", get(ops::version));
+    if state.config.telemetry.metrics {
+        r = r.route("/metrics", get(ops::metrics));
+    }
+    r.with_state(state)
 }

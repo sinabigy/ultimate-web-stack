@@ -11,6 +11,17 @@ use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if std::env::args().nth(1).as_deref() == Some("healthcheck") {
+        let port = std::env::var("APP__WORKER__PORT").ok().and_then(|p| p.parse::<u16>().ok()).unwrap_or(9091);
+        let res = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
+            .build()?
+            .get(format!("http://127.0.0.1:{port}/readyz"))
+            .send()
+            .await?;
+        anyhow::ensure!(res.status().is_success(), "worker not ready: {}", res.status());
+        return Ok(());
+    }
     let config = AppConfig::load().context("loading configuration")?;
     let mut telemetry_cfg = config.telemetry.clone();
     if telemetry_cfg.service_name == "app" {

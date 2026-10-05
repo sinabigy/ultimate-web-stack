@@ -265,3 +265,33 @@ async fn spa_revalidation_304_keeps_app_csp() {
 fn uuid_like() -> String {
     format!("{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos())
 }
+
+#[tokio::test]
+async fn ops_port_keeps_metrics_and_check_details_off_the_public_port() {
+    let mut cfg = test_config();
+    cfg.http.ops_port = Some(9999);
+    cfg.telemetry.metrics = true;
+    let state = app_api::AppState::builder(cfg, build_info()).metrics(app_telemetry::local_metrics_handle()).build();
+    let public = app_api::build_router(state.clone());
+    let ops = app_api::router::ops_router(state);
+    assert_eq!(
+        send(&public, get_req("/metrics")).await.status(),
+        StatusCode::NOT_FOUND,
+        "no metrics on the public port"
+    );
+    let mut with_spa = test_config();
+    with_spa.http.ops_port = Some(9999);
+    let dir = std::env::temp_dir().join(format!("spa-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html>").unwrap();
+    with_spa.http.static_dir = Some(dir);
+    let spa = app_api::build_router(app_api::AppState::builder(with_spa, build_info()).build());
+    assert_eq!(send(&spa, get_req("/metrics")).await.status(), StatusCode::NOT_FOUND, "not the SPA fallback either");
+    let res = send(&public, get_req("/readyz")).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = body_json(res).await;
+    assert!(body.get("checks").is_none() && body["status"].is_string(), "status only: {body}");
+    assert_eq!(send(&ops, get_req("/metrics")).await.status(), StatusCode::OK);
+    let body = body_json(send(&ops, get_req("/readyz")).await).await;
+    assert!(body["checks"].is_array(), "ops port has the details: {body}");
+}
