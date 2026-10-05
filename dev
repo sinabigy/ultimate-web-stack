@@ -277,8 +277,35 @@ def ensure_postgres() -> None:
         sys.exit("postgres did not become healthy")
 
 
+# Validation commands that need a service: (compose profile, services). `./dev check` starts them
+# itself, so it is reproducible from a cold machine whatever `./dev up` selected.
+CHECK_SERVICES = {
+    "rust-test-cache": ("cache", ["redis"]),
+    "rust-test-nats": ("messaging", ["nats"]),
+    "rust-test-clickhouse": ("analytics", ["clickhouse"]),
+}
+
+
+def ensure_check_services() -> None:
+    ids = {c["id"]: c.get("cmd", "") for c in project().get("validation", {}).get("commands", []) if c.get("confirmed")}
+    profiles, services = [], []
+    for cid, (profile, svcs) in CHECK_SERVICES.items():
+        if cid in ids:
+            profiles.append(profile)
+            services += svcs
+            if cid == "rust-test-cache" and ":56380" in ids[cid]:  # the blueprint also tests Dragonfly
+                profiles.append("dragonfly")
+                services.append("dragonfly")
+    if services:
+        compose("up", "-d", *services, profiles=profiles)
+        for svc in services:
+            if not wait_healthy(f"{compose_project()}-{svc}-1"):
+                sys.exit(f"{svc} did not become healthy")
+
+
 def cmd_check(a) -> None:
     ensure_postgres()
+    ensure_check_services()
     args = [sys.executable, "tools/ai-validate", "--keep-going"] + (["--strict"] if a.strict else [])
     code = sh(args, check=False)
     if a.auth:

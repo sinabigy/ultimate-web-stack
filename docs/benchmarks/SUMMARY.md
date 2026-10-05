@@ -8,9 +8,23 @@ ran in containers on that VM. The method is described in [`benchmarks/README.md`
 - results from different machines are never compared.
 
 Negative and inconclusive results are listed on purpose: they are why some technologies are
-*not* in the default stack.
+*not* in the default stack. The classification is final for blueprint 1.0.0. Differences within
+the measured noise are never reported as wins.
 
-## Kept because measurements support it
+| area | DEFAULT | PROFILE-SPECIFIC | OPTIONAL / INCONCLUSIVE | REJECTED |
+|---|---|---|---|---|
+| outbound API engine | separate rate + concurrency controllers, keep-alive pooling, breaker | – | – | naive retrying client |
+| job queue | PostgreSQL (`SKIP LOCKED`, transactional enqueue) | NATS JetStream (`messaging_nats`) | – | – |
+| analytics | PostgreSQL per-tenant aggregates | ClickHouse (`analytics_clickhouse`) | – | – |
+| cache | in-process `CacheLayer` | Redis (`cache`, several instances) | Dragonfly | Redis session cache |
+| edge | direct Axum behind a TLS proxy (Caddy or nginx) | Pingora gateway for programmable edge logic | – | Pingora or nginx as an extra hop for speed |
+| runtime | Tokio (multi-thread) + axum | – | thread-per-core Tokio | Monoio / io_uring |
+| allocator | system allocator | – | mimalloc, jemalloc | – |
+| LTO | thin LTO, codegen-units 1 | – | – | fat LTO by default |
+| PGO | off | – | PGO (within noise) | – |
+| tracing | W3C propagation on | – | – | – |
+
+## DEFAULT: evidence supports enabling it broadly
 
 | decision | evidence | ADR |
 |---|---|---|
@@ -23,7 +37,7 @@ Negative and inconclusive results are listed on purpose: they are why some techn
 | **PostgreSQL job queue as default** | 4.4k–5.1k jobs/s drain with transactional enqueue: ample for the core profile | [0007](../../.ai/knowledge/DECISIONS/0007-postgres-queue-default-jetstream-for-scale.md) |
 | **In-process cache as default** | 125k req/s cached reads vs 57k via Redis (network hop) on one instance | [benchmarks](latest.md) |
 
-## Rejected because measurements did not support it
+## REJECTED: no benefit, or an unacceptable trade-off
 
 | candidate | evidence | ADR |
 |---|---|---|
@@ -32,21 +46,22 @@ Negative and inconclusive results are listed on purpose: they are why some techn
 | **Redis session cache** | the gain is bounded at about ⅓ of DB round trips on typical endpoints, at the cost of revocation latency or fail-open risk | [0004](../../.ai/knowledge/DECISIONS/0004-no-redis-session-cache.md) |
 | **Fat LTO by default** | 14% smaller than thin LTO for 38% more build time; no throughput gain | [0011](../../.ai/knowledge/DECISIONS/0011-release-profile-thin-lto-system-allocator.md) |
 
-## Inconclusive (not adopted; re-measure on dedicated hardware)
+## OPTIONAL / INCONCLUSIVE: no reliable general win (not enabled; re-measure on dedicated hardware)
 
 | candidate | evidence |
 |---|---|
 | **PGO** | Linux, interleaved A B A B: +7% plaintext, +9% json, +16% db, −3% cached, all within the baseline's 19% round-to-round spread. On macOS, raw profiles of the full dependency graph were unreadable by `llvm-profdata` (a minimal crate worked). Adds a 241 s optimised build plus training. ([release-profile](release-profile.md)) |
 | **mimalloc / jemalloc** | interleaved runs fall inside the baseline's own ±10% band. An earlier sequential run that looked 26–36% *slower* was environmental drift, shown by the interleaving. Peak RSS varied 30–109 MB for the same binary. ([release-profile](release-profile.md)) |
 | **Thread-per-core Tokio for the app** | +3–7% on raw loops, but it would require non-`Send` executors across axum and sqlx ([runtime](runtime.md)) |
+| **Dragonfly instead of Redis** | 54k vs 57k req/s at this scale (within noise, slightly below); no reason to prefer it on one node. Kept as a tested adapter. |
 
-## Optional because workload-dependent
+## PROFILE-SPECIFIC: wins for a particular workload
 
 | module | when it wins (measured) | when it does not |
 |---|---|---|
 | **NATS JetStream** | about 10× the PostgreSQL queue (35k–49k vs 4.4k–5.1k jobs/s drain); cross-service consumers; replay | when enqueue must be transactional with business rows (that needs an outbox) |
 | **ClickHouse** | cross-tenant aggregates about 24× faster (24 ms vs 573 ms over 2M events); 7.7× smaller storage | per-tenant aggregates: PostgreSQL 5.5–6.4 ms vs ClickHouse 3.2–3.8 ms, which is competitive |
-| **Redis / Dragonfly** | shared cache and rate limits across instances | single instance: in-process is 2.2× faster. Dragonfly measured slightly below Redis (54k vs 57k) at this scale |
+| **Redis** (`cache` module) | shared cache and rate limits across instances | single instance: in-process is 2.2× faster |
 | **Pingora gateway** | programmable edge logic on dedicated nodes | as a plain reverse proxy: it is equivalent to nginx and costs a hop |
 
 ## Findings the benchmarks produced (bugs fixed because of them)
