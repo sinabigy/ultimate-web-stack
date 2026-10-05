@@ -1,0 +1,34 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0014",
+  "outcome": "completed",
+  "summary": "Deployment tiers: dev compose (all profiles), VPS (hardened systemd + Caddy), containers (distroless nonroot image + production compose), Kubernetes (kustomize base with probes on the internal ops port, restricted security, HPA/PDB/NetworkPolicy). Verified statically (infra-verify) and dynamically (release-smoke: image builds, both health checks pass, public surface correct). Found/fixed public metrics + check-detail exposure (ops port). Release profile measured: LTO variants, allocators (interleaved), PGO on Linux; ADR 0011 keeps thin LTO + system allocator.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "infra/verify.sh: 12/12 OK (compose x8, systemd-analyze verify, kubeconform files + rendered, caddy validate)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "infra/docker/smoke.sh: release smoke OK",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "./dev check: 26 commands pass (2026-10-05)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "docs/benchmarks/release-profile.md; ADR 0011",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-05T00:42:12Z"
+}
