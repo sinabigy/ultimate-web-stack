@@ -156,7 +156,7 @@ class Stack:
         })
         env.update(EXTRA_ENV)
         env.update(self.extra)
-        self.server = subprocess.Popen([str(BIN / "app-server")], cwd=BACKEND, env=env,
+        self.server = subprocess.Popen([str(SERVER_BIN or BIN / "app-server")], cwd=BACKEND, env=env,
                                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         self.procs.append(self.server)
         if not wait_http(f"{APP}/readyz", 60):
@@ -206,6 +206,7 @@ class Sampler(threading.Thread):
 
 REPEAT = 1  # set from --repeat; measured points run this many times and report the median
 EXTRA_ENV: dict[str, str] = {}  # set from --env; applied to every app-server started
+SERVER_BIN: Path | None = None  # set from --server-bin (release-profile experiments)
 
 
 def oha(url: str, duration: str, conc: int, headers: dict[str, str] | None = None, pid: int | None = None) -> dict:
@@ -459,12 +460,14 @@ def main() -> int:
     ap.add_argument("--label", default="", help="suffix for the result file")
     ap.add_argument("--no-build", action="store_true")
     ap.add_argument("--repeat", type=int, default=None, help="runs per HTTP point, median reported (default 3; smoke 1)")
+    ap.add_argument("--server-bin", help="app-server binary to measure (default: the release build)")
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="extra app-server environment for A/B runs (recorded in the result)")
     a = ap.parse_args()
     suites = [s.strip() for s in a.suite.split(",") if s.strip()]
-    global REPEAT
+    global REPEAT, SERVER_BIN
     REPEAT = a.repeat if a.repeat is not None else (1 if a.smoke else 3)
+    SERVER_BIN = Path(a.server_bin).resolve() if a.server_bin else None
     for kv in a.env:
         k, sep, v = kv.partition("=")
         if not sep or not k.startswith("APP__"):
@@ -482,7 +485,9 @@ def main() -> int:
     ensure_database()
 
     started = dt.datetime.now(dt.timezone.utc)
-    result: dict = {"schema": 1, "repeat": REPEAT, "server_env_overrides": EXTRA_ENV, "started_at": started.isoformat(timespec="seconds"), "smoke": a.smoke,
+    result: dict = {"schema": 1, "repeat": REPEAT, "server_env_overrides": EXTRA_ENV,
+                    "server_bin": str(SERVER_BIN.relative_to(ROOT)) if SERVER_BIN and SERVER_BIN.is_relative_to(ROOT) else (str(SERVER_BIN) if SERVER_BIN else None),
+                    "started_at": started.isoformat(timespec="seconds"), "smoke": a.smoke,
                     "environment": environment(), "suites": {}}
     for s in suites:
         log(f"suite {s}…")

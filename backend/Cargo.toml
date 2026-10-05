@@ -100,3 +100,13 @@ panic = "unwind"
 
 [profile.bench]
 inherits = "release"
+
+# Release-profile experiments (docs/benchmarks/release-profile.md). `release` is the shipped one.
+[profile.release-nolto]
+inherits = "release"
+lto = false
+codegen-units = 16
+
+[profile.release-fatlto]
+inherits = "release"
+lto = "fat"
