@@ -88,8 +88,14 @@ dbg_macro = "warn"
 todo = "warn"
 unwrap_used = "warn"
 
+# Line tables keep file:line backtraces at a fraction of full debug info; dependencies need none.
+# (Full debug info for ~25 test binaries filled tens of GB of target/ during development.)
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.dev.package."*"]
 opt-level = 1
+debug = false
 
 [profile.release]
 lto = "thin"

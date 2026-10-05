@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Optional modules (scripts/create-project rewrites `default` from the selected profile).
+default = ["nats", "clickhouse"]
+nats = ["app-workers/nats"]
+clickhouse = ["app-analytics/clickhouse"]
+
 [dependencies]
 reqwest.workspace = true
 app-analytics.workspace = true

@@ -261,11 +261,13 @@ async fn outage_open_loop(use_engine: bool) -> anyhow::Result<Value> {
     }))
 }
 
+#[cfg(feature = "clickhouse")]
 fn lat_summary(mut v: Vec<f64>) -> Value {
     v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     json!({"p50_ms": pct(&v, 0.5), "p95_ms": pct(&v, 0.95), "max_ms": v.last().copied().unwrap_or(0.0), "runs": v.len()})
 }
 
+#[cfg(feature = "clickhouse")]
 /// ClickHouse vs PostgreSQL for event analytics: ingest through the real batching sink, then the
 /// same aggregate queries over identical data (100 organisations, 60 days).
 async fn analytics_bench(smoke: bool) -> anyhow::Result<Value> {
@@ -437,6 +439,7 @@ impl app_workers::JobHandler for NoopJob {
     }
 }
 
+#[cfg(feature = "nats")]
 #[async_trait::async_trait]
 impl app_messaging::nats::MessageHandler for NoopJob {
     async fn handle(&self, _d: &app_messaging::nats::Delivery<'_>) -> Result<(), app_messaging::nats::HandlerError> {
@@ -522,6 +525,12 @@ async fn queue_bench(smoke: bool) -> anyhow::Result<Value> {
     }
 
     // NATS JetStream
+    #[cfg(not(feature = "nats"))]
+    {
+        let _ = &nats_url;
+        out.insert("jetstream".into(), json!({"skipped": "built without the `nats` feature"}));
+    }
+    #[cfg(feature = "nats")]
     match app_messaging::nats::connect(&nats_url, "bench").await {
         Err(e) => {
             out.insert("jetstream".into(), json!({"skipped": format!("NATS not reachable at {nats_url}: {e}")}));
@@ -828,6 +837,7 @@ async fn main() -> anyhow::Result<()> {
         Some("ensure-db") => ensure_db().await?,
         Some("span-cost") => span_cost(),
         Some("queue") => queue_bench(smoke).await?,
+        #[cfg(feature = "clickhouse")]
         Some("analytics") => analytics_bench(smoke).await?,
         _ => anyhow::bail!("usage: app-bench outbound|db [--smoke]"),
     };

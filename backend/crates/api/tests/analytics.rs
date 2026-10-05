@@ -19,6 +19,7 @@ async fn analytics_is_not_found_when_the_module_is_off(pool: PgPool) {
     assert_eq!(app.get(&b, &format!("/api/v1/orgs/{slug}/analytics/runs")).await.status, StatusCode::NOT_FOUND);
 }
 
+#[cfg(feature = "clickhouse")]
 #[sqlx::test(migrator = "app_db::MIGRATOR")]
 async fn run_analytics_are_recorded_and_tenant_scoped(pool: PgPool) {
     let Ok(url) = std::env::var("TEST_CLICKHOUSE_URL") else {
@@ -28,8 +29,7 @@ async fn run_analytics_are_recorded_and_tenant_scoped(pool: PgPool) {
     let user = std::env::var("TEST_CLICKHOUSE_USER").unwrap_or_else(|_| "app".into());
     let password = std::env::var("TEST_CLICKHOUSE_PASSWORD").unwrap_or_else(|_| "app-dev-only".into());
     let db = format!("api_{}", uuid::Uuid::now_v7().simple());
-    let admin = clickhouse::Client::default().with_url(&url).with_user(&user).with_password(&password);
-    admin.query(&format!("CREATE DATABASE {db}")).execute().await.unwrap();
+    app_analytics::testing::create_database(&url, &user, &password, &db).await.unwrap();
 
     let app = TestApp::with_config(pool, |c| {
         c.analytics.enabled = true;
@@ -76,5 +76,5 @@ async fn run_analytics_are_recorded_and_tenant_scoped(pool: PgPool) {
     assert!(bc.as_array().unwrap().is_empty() || bc[0]["events"] == 1, "B sees only its own: {}", rb.body);
     // Another tenant's analytics: not found (membership), never a cross-tenant read.
     assert_eq!(app.get(&a, &format!("/api/v1/orgs/{sb}/analytics/runs")).await.status, StatusCode::NOT_FOUND);
-    let _ = admin.query(&format!("DROP DATABASE IF EXISTS {db}")).execute().await;
+    app_analytics::testing::drop_database(&url, &user, &password, &db).await;
 }

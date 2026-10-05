@@ -7,15 +7,21 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Scenarios for optional modules (scripts/create-project rewrites `default`).
+default = ["nats", "clickhouse"]
+nats = ["app-messaging/nats", "dep:async-nats"]
+clickhouse = ["app-analytics/clickhouse", "dep:clickhouse"]
+
 [dependencies]
 app-analytics.workspace = true
 anyhow.workspace = true
 time.workspace = true
 uuid.workspace = true
-clickhouse.workspace = true
+clickhouse = { workspace = true, optional = true }
 app-workers.workspace = true
-app-messaging = { workspace = true, features = ["nats"] }
-async-nats.workspace = true
+app-messaging.workspace = true
+async-nats = { workspace = true, optional = true }
 async-trait.workspace = true
 bytes.workspace = true
 tokio-util.workspace = true

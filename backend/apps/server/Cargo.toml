@@ -12,6 +12,11 @@ name = "app-server"
 path = "src/main.rs"
 
 [features]
+# Optional modules (scripts/create-project rewrites `default` from the selected profile).
+default = ["redis", "nats", "clickhouse"]
+redis = ["app-cache/redis"]
+nats = ["app-workers/nats"]
+clickhouse = ["app-analytics/clickhouse", "app-api/clickhouse"]
 cedar = ["app-api/cedar"]
 alloc-mimalloc = ["dep:mimalloc"]
 alloc-jemalloc = ["dep:tikv-jemallocator"]

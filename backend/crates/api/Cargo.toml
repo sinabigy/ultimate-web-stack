@@ -41,10 +41,10 @@ tracing.workspace = true
 uuid.workspace = true
 
 [features]
+clickhouse = ["app-analytics/clickhouse"]
 cedar = ["app-authz/cedar"]
 
 [dev-dependencies]
-clickhouse.workspace = true
 app-workers.workspace = true
 app-networking.workspace = true
 fake-upstream.workspace = true

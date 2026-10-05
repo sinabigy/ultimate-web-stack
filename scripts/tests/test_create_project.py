@@ -62,6 +62,10 @@ class CreateProjectTests(unittest.TestCase):
         self.assertTrue({"rust-test", "e2e", "infra-verify"} <= g.commands)
         self.assertFalse({"rust-test-nats", "rust-test-clickhouse", "rust-test-cache", "gateway-check"} & g.commands)
         self.assertFalse((g.path / "backend/gateway").exists())
+        # unselected modules are not compiled: no optional cargo features by default
+        for app in ("server", "worker", "bench"):
+            self.assertIn("\ndefault = []\n", (g.path / f"backend/apps/{app}/Cargo.toml").read_text(), app)
+        self.assertFalse((g.path / "scripts/create-project").exists(), "the generator is blueprint-only")
         self.assertNotIn("\n  gateway:", (g.path / ".github/workflows/ci.yml").read_text())
         self.assertIn('BRAND = "Core-App"', (g.path / "frontend/src/brand.ts").read_text())
         # fresh protocol instance with provenance, committed, clean
@@ -96,6 +100,8 @@ class CreateProjectTests(unittest.TestCase):
         self.assertEqual((g.config["messaging"]["enabled"], g.config["analytics"]["enabled"]), (True, True))
         self.assertTrue({"rust-test-nats", "rust-test-clickhouse", "rust-test-cache", "gateway-check"} <= g.commands)
         self.assertTrue((g.path / "backend/gateway/src/main.rs").exists())
+        server = (g.path / "backend/apps/server/Cargo.toml").read_text()
+        self.assertIn('default = ["redis", "nats", "clickhouse", "cedar"]', server)
 
     def test_invalid_combinations_are_refused(self):
         r = self.gen("bad1", "--auth", "b2b", "--no-organizations", "--no-git", ok=False)

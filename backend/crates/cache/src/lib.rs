@@ -12,6 +12,7 @@
 //! cross-process lock, and TTL jitter so many keys do not expire at the same instant.
 
 pub mod memory;
+#[cfg(feature = "redis")]
 pub mod redis;
 
 use std::{

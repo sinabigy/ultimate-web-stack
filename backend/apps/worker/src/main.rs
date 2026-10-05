@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut wc = app_workers::WorkerConfig::new("runs", config.jobs.concurrency);
     wc.poll_interval = Duration::from_millis(config.jobs.poll_interval_ms);
-    let analytics = app_analytics::start(&config.analytics).await;
+    let analytics = app_analytics::start(&config.analytics).await.map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let svc = app_workers::JobServices { db: pool.clone(), events, providers, analytics: analytics.sink.clone() };
     let worker =
         app_workers::PgWorker::new(wc, svc, vec![Arc::new(app_workers::handlers::ExecuteRun { parallelism: 16 })]);

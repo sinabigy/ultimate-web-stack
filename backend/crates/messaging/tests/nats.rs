@@ -133,6 +133,22 @@ async fn event_bus_fans_out_across_instances() {
 }
 
 #[tokio::test]
+async fn malformed_events_are_ignored_and_the_bus_keeps_working() {
+    let Some(url) = url() else { return };
+    let subject = unique("events.");
+    let raw = connect(&url, "raw").await.unwrap();
+    let bus = NatsEventBus::start(connect(&url, "bus").await.unwrap(), &subject).await.unwrap();
+    let mut rx = bus.subscribe();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    raw.publish(subject.clone(), Bytes::from_static(b"{not json")).await.unwrap();
+    raw.publish(subject.clone(), Bytes::from_static(b"{\"type\":\"no_such_event\"}")).await.unwrap();
+    raw.flush().await.unwrap();
+    bus.publish(RealtimeEvent::Heartbeat { at_unix_ms: 1 }).await;
+    let got = tokio::time::timeout(Duration::from_secs(3), rx.recv()).await.unwrap().unwrap();
+    assert_eq!(got, RealtimeEvent::Heartbeat { at_unix_ms: 1 }, "garbage skipped, valid event delivered");
+}
+
+#[tokio::test]
 async fn idempotency_key_deduplicates_publishes() {
     let Some(url) = url() else { return };
     let stream = unique("TDEDUP");

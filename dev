@@ -10,7 +10,7 @@
   ./dev status                containers and app health
   ./dev check [--auth] [--strict]
                               canonical validation (tools/ai-validate) + optional identity checks
-  ./dev test [--e2e] [--zitadel]
+  ./dev test [--e2e] [--zitadel] [--system]
                               backend + frontend tests; optional browser suites
   ./dev benchmark [--smoke]   benchmark suites + regression gates + report (benchmarks/)
   ./dev types                 regenerate TypeScript bindings from Rust API types
@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -69,6 +70,14 @@ def spawn_logged(name: str, cmd: list[str], cwd: Path, env: dict) -> subprocess.
 
     threading.Thread(target=pump, daemon=True).start()
     return proc
+
+
+def compose_project() -> str:
+    """COMPOSE_PROJECT_NAME, else the default declared in infra/docker/compose.yaml (single source)."""
+    if os.environ.get("COMPOSE_PROJECT_NAME"):
+        return os.environ["COMPOSE_PROJECT_NAME"]
+    m = re.search(r"name: \$\{COMPOSE_PROJECT_NAME:-([^}]+)\}", (ROOT / "infra/docker/compose.yaml").read_text())
+    return m.group(1) if m else "app"
 
 
 def sh(cmd: list[str] | str, cwd: Path = ROOT, check: bool = True, env: dict | None = None, quiet: bool = False) -> int:
@@ -174,7 +183,7 @@ def cmd_up(a) -> None:
         profiles.append("identity")
         services.append("zitadel")
     compose("up", "-d", *services, profiles=profiles)
-    if not wait_healthy(f"{os.environ.get('COMPOSE_PROJECT_NAME', 'uwsb')}-postgres-1"):
+    if not wait_healthy(f"{compose_project()}-postgres-1"):
         sys.exit("postgres did not become healthy")
     sh(["cargo", "sqlx", "migrate", "run", "--source", "migrations"], cwd=ROOT / "backend")
     if a.identity == "zitadel":
@@ -264,7 +273,7 @@ def cmd_status(_a) -> None:
 
 def ensure_postgres() -> None:
     compose("up", "-d", "postgres", check=True)
-    if not wait_healthy(f"{os.environ.get('COMPOSE_PROJECT_NAME', 'uwsb')}-postgres-1"):
+    if not wait_healthy(f"{compose_project()}-postgres-1"):
         sys.exit("postgres did not become healthy")
 
 
@@ -280,6 +289,9 @@ def cmd_check(a) -> None:
 
 
 def cmd_test(a) -> None:
+    if a.system:
+        # Against the running stack (./dev up, ideally with every module): one journey through all of it.
+        sys.exit(sh([sys.executable, "scripts/system_smoke.py"], check=False))
     ensure_postgres()
     code = sh(["cargo", "test", "--workspace"], cwd=ROOT / "backend", check=False)
     code |= sh(["npm", "test"], cwd=ROOT / "frontend", check=False)
@@ -317,7 +329,7 @@ def cmd_db(a) -> None:
     elif a.action == "prepare":
         sh(["cargo", "sqlx", "prepare", "--workspace"], cwd=b)
     elif a.action == "psql":
-        sh(["docker", "exec", "-it", f"{os.environ.get('COMPOSE_PROJECT_NAME', 'uwsb')}-postgres-1", "psql", "-U", "app", "-d", "app"])
+        sh(["docker", "exec", "-it", f"{compose_project()}-postgres-1", "psql", "-U", "app", "-d", "app"])
 
 
 def cmd_logs(a) -> None:
@@ -346,6 +358,7 @@ def main() -> None:
     te = sub.add_parser("test")
     te.add_argument("--e2e", action="store_true")
     te.add_argument("--zitadel", action="store_true")
+    te.add_argument("--system", action="store_true", help="system smoke test against the running ./dev up stack")
     te.set_defaults(fn=cmd_test)
     be = sub.add_parser("benchmark")
     be.add_argument("--smoke", action="store_true")

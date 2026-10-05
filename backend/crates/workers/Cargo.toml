@@ -7,10 +7,14 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# NATS event bus (messaging module). Without it, realtime events always use PostgreSQL.
+nats = ["app-messaging/nats"]
+
 [dependencies]
 app-db.workspace = true
 app-domain.workspace = true
-app-messaging = { workspace = true, features = ["nats"] }
+app-messaging.workspace = true
 app-config.workspace = true
 app-analytics.workspace = true
 app-networking.workspace = true

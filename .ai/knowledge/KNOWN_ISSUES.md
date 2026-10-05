@@ -13,3 +13,18 @@ _Open problems that a future worker must not rediscover the hard way. Each entry
   - Give the VM at least 6 GiB (`colima start --memory 6`), or stop optional services
     (`./dev down`) before release builds.
   - `./dev up` restarts exited services.
+
+## Disk usage of target/ (2026-10-05)
+- **Seen**: `backend/target` grew to 70 GB (debug `deps` 44 GB, `incremental` 19 GB) and the
+  disk filled during development.
+- **Mitigation**:
+  - `[profile.dev] debug = "line-tables-only"`, with no debug info for dependencies.
+  - Run `cargo clean` occasionally; generated projects have their own target/.
+
+## Intermittent E2E failure under full-validation load (2026-10-05)
+- **Seen**: one `e2e` failure during a full `./dev check`, right after the heavy Rust test and
+  build steps.
+- **Not reproduced**: the immediate rerun and three further consecutive runs passed (13/13).
+- **Unknown**: the failing test, because its report was overwritten.
+- **Mitigation**: CI retries E2E once (`retries: process.env.CI ? 1 : 0`).
+- **Next step**: if it recurs locally, keep `frontend/playwright-report` and fix the specific race.

@@ -97,47 +97,7 @@ async fn main() -> anyhow::Result<()> {
     if config.telemetry.metrics {
         builder = builder.metrics(app_telemetry::init_metrics(&config.telemetry)?);
     }
-    // Cache: in-memory (core) or Redis/Dragonfly (performance profile). Redis is optional
-    // infrastructure: if it is down at startup we log and continue with the in-memory cache.
-    let redis = if config.cache.backend == CacheBackend::Redis || config.rate_limit.backend == CacheBackend::Redis {
-        match app_cache::redis::RedisCache::connect(config.cache.redis_url.expose()).await {
-            Ok(r) => Some(r),
-            Err(e) => {
-                tracing::error!(error = %e, "Redis unavailable at startup; using in-memory cache/limits");
-                None
-            }
-        }
-    } else {
-        None
-    };
-    let cache_backend: Arc<dyn app_cache::Cache> = match (&redis, config.cache.backend) {
-        (Some(r), CacheBackend::Redis) => Arc::new(r.clone()),
-        _ => Arc::new(app_cache::memory::MemoryCache::new(config.cache.memory_max_entries)),
-    };
-    if let Some(r) = &redis {
-        builder = builder.health_check(Arc::new(RedisCheck(r.clone())));
-    }
-    builder = builder.cache(app_cache::CacheLayer::new(cache_backend, &config.cache.namespace));
-    if config.rate_limit.enabled {
-        match (&redis, config.rate_limit.backend) {
-            (Some(r), CacheBackend::Redis) => {
-                builder = builder.rate_limiter(Arc::new(app_cache::redis::RedisRateLimiter::new(
-                    r,
-                    &config.cache.namespace,
-                    config.rate_limit.per_client_rps,
-                    config.rate_limit.burst,
-                )));
-            }
-            _ => {
-                let limiter = Arc::new(MemoryRateLimiter::new(Quota {
-                    per_second: config.rate_limit.per_client_rps,
-                    burst: config.rate_limit.burst,
-                }));
-                limiter.spawn_janitor(Duration::from_secs(60));
-                builder = builder.rate_limiter(limiter);
-            }
-        }
-    }
+    builder = cache_and_limits(&config, builder).await?;
     // PostgreSQL is the core of every profile.
     let pool = app_db::connect(&config.database, "app-server").await?;
     if config.database.migrate_on_start {
@@ -155,7 +115,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .map_err(anyhow::Error::msg)
         .context("starting event bus")?;
-    let analytics = app_analytics::start(&config.analytics).await;
+    let analytics = app_analytics::start(&config.analytics).await.map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if let Some(q) = &analytics.query {
         builder = builder.health_check(Arc::new(AnalyticsCheck(q.clone()))).analytics_query(q.clone());
     }
@@ -237,9 +197,85 @@ impl app_api::health::HealthCheck for AnalyticsCheck {
     }
 }
 
+/// Cache and per-client rate limiting: in-process, or Redis/Dragonfly (feature `redis`).
+#[cfg(feature = "redis")]
+async fn cache_and_limits(
+    config: &AppConfig,
+    mut builder: app_api::state::AppStateBuilder,
+) -> anyhow::Result<app_api::state::AppStateBuilder> {
+    // Cache: in-memory (core) or Redis/Dragonfly (performance profile). Redis is optional
+    // infrastructure: if it is down at startup we log and continue with the in-memory cache.
+    let redis = if config.cache.backend == CacheBackend::Redis || config.rate_limit.backend == CacheBackend::Redis {
+        match app_cache::redis::RedisCache::connect(config.cache.redis_url.expose()).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                tracing::error!(error = %e, "Redis unavailable at startup; using in-memory cache/limits");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let cache_backend: Arc<dyn app_cache::Cache> = match (&redis, config.cache.backend) {
+        (Some(r), CacheBackend::Redis) => Arc::new(r.clone()),
+        _ => Arc::new(app_cache::memory::MemoryCache::new(config.cache.memory_max_entries)),
+    };
+    if let Some(r) = &redis {
+        builder = builder.health_check(Arc::new(RedisCheck(r.clone())));
+    }
+    builder = builder.cache(app_cache::CacheLayer::new(cache_backend, &config.cache.namespace));
+    if config.rate_limit.enabled {
+        match (&redis, config.rate_limit.backend) {
+            (Some(r), CacheBackend::Redis) => {
+                builder = builder.rate_limiter(Arc::new(app_cache::redis::RedisRateLimiter::new(
+                    r,
+                    &config.cache.namespace,
+                    config.rate_limit.per_client_rps,
+                    config.rate_limit.burst,
+                )));
+            }
+            _ => {
+                let limiter = Arc::new(MemoryRateLimiter::new(Quota {
+                    per_second: config.rate_limit.per_client_rps,
+                    burst: config.rate_limit.burst,
+                }));
+                limiter.spawn_janitor(Duration::from_secs(60));
+                builder = builder.rate_limiter(limiter);
+            }
+        }
+    }
+    Ok(builder)
+}
+
+/// Cache and per-client rate limiting, in-process only (built without the `redis` feature).
+#[cfg(not(feature = "redis"))]
+async fn cache_and_limits(
+    config: &AppConfig,
+    mut builder: app_api::state::AppStateBuilder,
+) -> anyhow::Result<app_api::state::AppStateBuilder> {
+    anyhow::ensure!(
+        config.cache.backend != CacheBackend::Redis && config.rate_limit.backend != CacheBackend::Redis,
+        "cache.backend / rate_limit.backend = redis but this binary was built without the `redis` feature"
+    );
+    let cache: Arc<dyn app_cache::Cache> =
+        Arc::new(app_cache::memory::MemoryCache::new(config.cache.memory_max_entries));
+    builder = builder.cache(app_cache::CacheLayer::new(cache, &config.cache.namespace));
+    if config.rate_limit.enabled {
+        let limiter = Arc::new(MemoryRateLimiter::new(Quota {
+            per_second: config.rate_limit.per_client_rps,
+            burst: config.rate_limit.burst,
+        }));
+        limiter.spawn_janitor(Duration::from_secs(60));
+        builder = builder.rate_limiter(limiter);
+    }
+    Ok(builder)
+}
+
 /// Redis is a performance optimisation, never critical: failures report "degraded".
+#[cfg(feature = "redis")]
 struct RedisCheck(app_cache::redis::RedisCache);
 
+#[cfg(feature = "redis")]
 #[async_trait::async_trait]
 impl app_api::health::HealthCheck for RedisCheck {
     fn name(&self) -> &'static str {

@@ -189,7 +189,9 @@ def main() -> int:
         print("create-project: warning: the blueprint has uncommitted changes; they are included", file=sys.stderr)
 
     # 1. copy
-    skip_prefixes = ["backend/experiments/"]  # runtime experiment: blueprint evidence only
+    # Blueprint-only parts: the generator itself, and the runtime experiment (evidence; its result
+    # files and ADR stay). A generated product never depends on the blueprint repository.
+    skip_prefixes = ["backend/experiments/", "benchmarks/runtime/", "scripts/create-project", "scripts/tests/"]
     if not a.with_gateway:
         skip_prefixes.append("backend/gateway/")
     files = [f for f in tracked_files() if not any(f.startswith(p) for p in skip_prefixes)]
@@ -233,9 +235,12 @@ def main() -> int:
         mods["gateway_pingora"]["paths"] = []
         mods["gateway_pingora"]["reason"] = "Removed at generation (create-project --with-gateway keeps it)."
     if "runtime_monoio" in mods:
-        mods["runtime_monoio"]["paths"] = [p for p in mods["runtime_monoio"].get("paths", []) if not p.startswith("backend/experiments")]
+        mods["runtime_monoio"]["paths"] = [p for p in mods["runtime_monoio"].get("paths", [])
+                                           if not p.startswith(("backend/experiments", "benchmarks/runtime"))]
+    arch["knowledge"] = [k for k in arch.get("knowledge", []) if not k.startswith("scripts/create-project")]
     # Validation commands for parts that were removed.
     cmds = project["validation"]["commands"]
+    cmds[:] = [c for c in cmds if c["id"] != "generator-selftest"]
     # Validation that needs a module's service only applies when the module is selected.
     needs = {"rust-test-cache": "cache", "rust-test-nats": "messaging_nats", "rust-test-clickhouse": "analytics_clickhouse"}
     cmds[:] = [c for c in cmds if needs.get(c["id"]) is None or needs[c["id"]] in modules]
@@ -249,6 +254,21 @@ def main() -> int:
         pass  # rust-test-cedar stays: it is part of every project
     pj.write_text(json.dumps(project, indent=2, ensure_ascii=False) + "\n")
 
+    # Optional modules are cargo features: unselected ones are not compiled into the binaries.
+    feats = {"cache": "redis", "messaging_nats": "nats", "analytics_clickhouse": "clickhouse"}
+    def set_default_features(rel: str, wanted: list[str]) -> None:
+        p = dest / rel
+        text = p.read_text()
+        new = re.sub(r"^default = \[[^\]]*\]$", "default = [" + ", ".join(f'"{f}"' for f in wanted) + "]", text,
+                     count=1, flags=re.MULTILINE)
+        if new == text and "default = [" not in text:
+            die(f"{rel}: no default feature list to rewrite")
+        p.write_text(new)
+    selected = [feats[m] for m in ("cache", "messaging_nats", "analytics_clickhouse") if m in modules]
+    set_default_features("backend/apps/server/Cargo.toml", selected + (["cedar"] if a.cedar else []))
+    set_default_features("backend/apps/worker/Cargo.toml", [f for f in selected if f != "redis"])
+    set_default_features("backend/apps/bench/Cargo.toml", [f for f in selected if f != "redis"])
+
     # 4. names
     def sub(rel: str, old: str, new: str, count: int = 1) -> None:
         p = dest / rel
@@ -261,7 +281,6 @@ def main() -> int:
     sub("frontend/index.html", "<title>App</title>", f"<title>{a.name}</title>")
     sub("frontend/package.json", '"name": "app-frontend"', f'"name": "{slug}-frontend"')
     sub("infra/docker/compose.yaml", "name: ${COMPOSE_PROJECT_NAME:-uwsb}", f"name: ${{COMPOSE_PROJECT_NAME:-{slug}}}")
-    sub("dev", "os.environ.get('COMPOSE_PROJECT_NAME', 'uwsb')", f"os.environ.get('COMPOSE_PROJECT_NAME', '{slug}')", 99)
     if not a.with_gateway:
         sub("backend/Cargo.toml", 'exclude = ["gateway", "experiments/runtime"]', "exclude = []")
     else:

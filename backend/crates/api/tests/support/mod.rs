@@ -99,7 +99,11 @@ impl TestApp {
                 burst: cfg.rate_limit.burst,
             }))
         });
-        let analytics = if cfg.analytics.enabled { Some(app_analytics::start(&cfg.analytics).await) } else { None };
+        let analytics = if cfg.analytics.enabled {
+            Some(app_analytics::start(&cfg.analytics).await.expect("analytics"))
+        } else {
+            None
+        };
         let mut builder = AppState::builder(cfg, BuildInfo { name: "t", version: "0", git_sha: "t", profile: "debug" })
             .services(Arc::new(services));
         if let Some(l) = limiter {

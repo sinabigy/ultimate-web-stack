@@ -217,7 +217,7 @@
       {
         "id": "rust-test-cache",
         "stage": "integration",
-        "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache",
+        "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache --features redis",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -243,7 +243,7 @@
       {
         "id": "rust-test-clickhouse",
         "stage": "integration",
-        "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics && cargo test -p app-api --test analytics",
+        "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics --features clickhouse && cargo test -p app-api --features clickhouse --test analytics",
         "cwd": "backend",
         "requires": [
           "cargo"

@@ -75,12 +75,28 @@ pub async fn start_event_bus(
     client_name: &str,
 ) -> Result<std::sync::Arc<dyn app_messaging::EventBus>, String> {
     if cfg.enabled {
-        let client = app_messaging::nats::connect(&cfg.nats_url, client_name).await.map_err(|e| e.to_string())?;
-        let bus =
-            app_messaging::nats::NatsEventBus::start(client, &cfg.events_subject).await.map_err(|e| e.to_string())?;
-        tracing::info!(url = %cfg.nats_url, subject = %cfg.events_subject, "realtime events over NATS");
-        Ok(bus)
-    } else {
-        Ok(PgEventBus::start(pool).await.map_err(|e| e.to_string())?)
+        #[cfg(not(feature = "nats"))]
+        let _ = client_name;
+        #[cfg(not(feature = "nats"))]
+        return Err("messaging.enabled = true but this binary was built without the `nats` feature".into());
+        #[cfg(feature = "nats")]
+        {
+            let started = match app_messaging::nats::connect(&cfg.nats_url, client_name).await {
+                Ok(client) => app_messaging::nats::NatsEventBus::start(client, &cfg.events_subject).await,
+                Err(e) => Err(e),
+            };
+            match started {
+                Ok(bus) => {
+                    tracing::info!(url = %cfg.nats_url, subject = %cfg.events_subject, "realtime events over NATS");
+                    return Ok(bus);
+                }
+                // Realtime fan-out is not critical: run on PostgreSQL rather than refuse to start.
+                Err(e) => {
+                    metrics::counter!("app_event_bus_fallbacks_total").increment(1);
+                    tracing::warn!(error = %e, url = %cfg.nats_url, "NATS unavailable; realtime events fall back to PostgreSQL");
+                }
+            }
+        }
     }
+    Ok(PgEventBus::start(pool).await.map_err(|e| e.to_string())?)
 }

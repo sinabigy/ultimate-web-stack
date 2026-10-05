@@ -10,14 +10,18 @@
 //! - **Tenant isolation**: queries take an [`OrgAccess`] proof and always filter by its
 //!   organisation; the organisation id never comes from the client.
 
+#[cfg(feature = "clickhouse")]
 pub mod schema;
 
 use std::{sync::Arc, time::Duration};
 
 use app_authz::OrgAccess;
+#[cfg(feature = "clickhouse")]
 use clickhouse::Row;
+#[cfg(feature = "clickhouse")]
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+#[cfg(feature = "clickhouse")]
 use tokio::sync::{Mutex, mpsc};
 use uuid::Uuid;
 
@@ -25,6 +29,7 @@ use uuid::Uuid;
 #[error("clickhouse: {0}")]
 pub struct AnalyticsError(pub String);
 
+#[cfg(feature = "clickhouse")]
 impl From<clickhouse::error::Error> for AnalyticsError {
     fn from(e: clickhouse::error::Error) -> Self {
         Self(e.to_string())
@@ -32,14 +37,15 @@ impl From<clickhouse::error::Error> for AnalyticsError {
 }
 
 /// One analytics event as stored.
-#[derive(Debug, Clone, Serialize, Deserialize, Row)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "clickhouse", derive(Serialize, Deserialize, Row))]
 pub struct EventRow {
-    #[serde(with = "clickhouse::serde::time::datetime64::millis")]
+    #[cfg_attr(feature = "clickhouse", serde(with = "clickhouse::serde::time::datetime64::millis"))]
     pub ts: OffsetDateTime,
     pub event: String,
-    #[serde(with = "clickhouse::serde::uuid")]
+    #[cfg_attr(feature = "clickhouse", serde(with = "clickhouse::serde::uuid"))]
     pub organization_id: Uuid,
-    #[serde(with = "clickhouse::serde::uuid::option")]
+    #[cfg_attr(feature = "clickhouse", serde(with = "clickhouse::serde::uuid::option"))]
     pub user_id: Option<Uuid>,
     pub request_id: String,
     /// JSON object (low-cardinality attributes; never secrets or personal data).
@@ -90,6 +96,7 @@ impl AnalyticsSink for NoopSink {
     fn record(&self, _event: EventRow) {}
 }
 
+#[cfg(feature = "clickhouse")]
 pub fn client(cfg: &app_config::AnalyticsConfig) -> clickhouse::Client {
     clickhouse::Client::default()
         .with_url(&cfg.clickhouse_url)
@@ -119,12 +126,14 @@ impl From<&app_config::AnalyticsConfig> for SinkConfig {
 }
 
 /// Batching ClickHouse sink.
+#[cfg(feature = "clickhouse")]
 pub struct ClickHouseSink {
     /// The only sender: taking it on shutdown closes the channel, so the batcher drains and ends.
     sender: std::sync::RwLock<Option<mpsc::Sender<EventRow>>>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
+#[cfg(feature = "clickhouse")]
 impl ClickHouseSink {
     pub fn start(client: clickhouse::Client, cfg: SinkConfig) -> Arc<Self> {
         let (tx, rx) = mpsc::channel(cfg.buffer_capacity);
@@ -141,6 +150,7 @@ impl ClickHouseSink {
     }
 }
 
+#[cfg(feature = "clickhouse")]
 impl AnalyticsSink for ClickHouseSink {
     fn record(&self, event: EventRow) {
         let guard = self.sender.read().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -160,6 +170,7 @@ impl AnalyticsSink for ClickHouseSink {
     }
 }
 
+#[cfg(feature = "clickhouse")]
 async fn run_batcher(client: clickhouse::Client, cfg: SinkConfig, mut rx: mpsc::Receiver<EventRow>) {
     let mut batch: Vec<EventRow> = Vec::with_capacity(cfg.batch_size);
     loop {
@@ -183,6 +194,7 @@ async fn run_batcher(client: clickhouse::Client, cfg: SinkConfig, mut rx: mpsc::
     }
 }
 
+#[cfg(feature = "clickhouse")]
 async fn flush(client: &clickhouse::Client, cfg: &SinkConfig, batch: &mut Vec<EventRow>) {
     if batch.is_empty() {
         return;
@@ -212,6 +224,7 @@ async fn flush(client: &clickhouse::Client, cfg: &SinkConfig, batch: &mut Vec<Ev
     batch.clear();
 }
 
+#[cfg(feature = "clickhouse")]
 async fn insert_batch(client: &clickhouse::Client, batch: &[EventRow]) -> Result<(), AnalyticsError> {
     let mut insert = client.insert::<EventRow>("events").await?;
     for row in batch {
@@ -222,19 +235,40 @@ async fn insert_batch(client: &clickhouse::Client, batch: &[EventRow]) -> Result
 }
 
 /// One day of an event series for one organisation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Row)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "clickhouse", derive(Serialize, Deserialize, Row))]
 pub struct DailyPoint {
-    #[serde(with = "clickhouse::serde::time::date")]
+    #[cfg_attr(feature = "clickhouse", serde(with = "clickhouse::serde::time::date"))]
     pub day: time::Date,
     pub events: u64,
     pub value: f64,
 }
 
-/// Tenant-scoped analytics reads.
+/// Tenant-scoped analytics reads. Only constructible when built with the `clickhouse` feature.
 pub struct AnalyticsQuery {
+    #[cfg(feature = "clickhouse")]
     client: clickhouse::Client,
+    #[cfg(not(feature = "clickhouse"))]
+    _never: std::convert::Infallible,
 }
 
+#[cfg(not(feature = "clickhouse"))]
+impl AnalyticsQuery {
+    pub async fn daily(
+        &self,
+        _access: &OrgAccess,
+        _event: &str,
+        _days: u32,
+    ) -> Result<Vec<DailyPoint>, AnalyticsError> {
+        match self._never {}
+    }
+
+    pub async fn ping(&self) -> Result<(), AnalyticsError> {
+        match self._never {}
+    }
+}
+
+#[cfg(feature = "clickhouse")]
 impl AnalyticsQuery {
     pub fn new(client: clickhouse::Client) -> Self {
         Self { client }
@@ -267,17 +301,24 @@ impl AnalyticsQuery {
 /// shutdown when ClickHouse is enabled.
 pub struct Analytics {
     pub sink: Arc<dyn AnalyticsSink>,
+    #[cfg(feature = "clickhouse")]
     pub clickhouse: Option<Arc<ClickHouseSink>>,
     pub query: Option<Arc<AnalyticsQuery>>,
 }
 
 impl Analytics {
     pub fn disabled() -> Self {
-        Self { sink: Arc::new(NoopSink), clickhouse: None, query: None }
+        Self {
+            sink: Arc::new(NoopSink),
+            #[cfg(feature = "clickhouse")]
+            clickhouse: None,
+            query: None,
+        }
     }
 
     /// Flush buffered events (call on shutdown).
     pub async fn shutdown(&self) {
+        #[cfg(feature = "clickhouse")]
         if let Some(s) = &self.clickhouse {
             s.shutdown().await;
         }
@@ -286,10 +327,21 @@ impl Analytics {
 
 /// Start analytics from configuration. ClickHouse being down never prevents startup: the
 /// schema migration is retried on the next start and inserts are retried, then dropped.
-pub async fn start(cfg: &app_config::AnalyticsConfig) -> Analytics {
+/// Asking for analytics in a binary built without the `clickhouse` feature is an error.
+pub async fn start(cfg: &app_config::AnalyticsConfig) -> Result<Analytics, AnalyticsError> {
     if !cfg.enabled {
-        return Analytics::disabled();
+        return Ok(Analytics::disabled());
     }
+    #[cfg(not(feature = "clickhouse"))]
+    return Err(AnalyticsError(
+        "analytics.enabled = true but this binary was built without the `clickhouse` feature".into(),
+    ));
+    #[cfg(feature = "clickhouse")]
+    start_clickhouse(cfg).await
+}
+
+#[cfg(feature = "clickhouse")]
+async fn start_clickhouse(cfg: &app_config::AnalyticsConfig) -> Result<Analytics, AnalyticsError> {
     let ch = client(cfg);
     match schema::migrate(&ch).await {
         Ok(ran) if !ran.is_empty() => tracing::info!(?ran, "analytics schema migrated"),
@@ -298,5 +350,25 @@ pub async fn start(cfg: &app_config::AnalyticsConfig) -> Analytics {
     }
     let sink = ClickHouseSink::start(ch.clone(), SinkConfig::from(cfg));
     tracing::info!(url = %cfg.clickhouse_url, "analytics events to ClickHouse");
-    Analytics { sink: sink.clone(), clickhouse: Some(sink), query: Some(Arc::new(AnalyticsQuery::new(ch))) }
+    Ok(Analytics { sink: sink.clone(), clickhouse: Some(sink), query: Some(Arc::new(AnalyticsQuery::new(ch))) })
+}
+
+/// Test support: create and drop throwaway ClickHouse databases.
+#[cfg(feature = "clickhouse")]
+pub mod testing {
+    pub async fn create_database(
+        url: &str,
+        user: &str,
+        password: &str,
+        name: &str,
+    ) -> Result<(), super::AnalyticsError> {
+        admin(url, user, password).query(&format!("CREATE DATABASE {name}")).execute().await?;
+        Ok(())
+    }
+    pub async fn drop_database(url: &str, user: &str, password: &str, name: &str) {
+        let _ = admin(url, user, password).query(&format!("DROP DATABASE IF EXISTS {name}")).execute().await;
+    }
+    fn admin(url: &str, user: &str, password: &str) -> clickhouse::Client {
+        clickhouse::Client::default().with_url(url).with_user(user).with_password(password)
+    }
 }

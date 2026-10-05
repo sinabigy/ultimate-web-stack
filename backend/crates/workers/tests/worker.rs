@@ -260,3 +260,19 @@ async fn pg_event_bus_delivers_across_processes(pool: PgPool) {
     let ev = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await.unwrap().unwrap();
     assert_eq!(ev, RealtimeEvent::Heartbeat { at_unix_ms: 42 });
 }
+
+#[cfg(feature = "nats")]
+#[sqlx::test(migrator = "app_db::MIGRATOR")]
+async fn nats_unavailable_at_startup_falls_back_to_postgres_events(pool: PgPool) {
+    let cfg = app_config::MessagingConfig {
+        enabled: true,
+        nats_url: "nats://127.0.0.1:9".into(), // nothing listens here
+        ..Default::default()
+    };
+    let bus = app_workers::events::start_event_bus(&cfg, pool, "test").await.expect("starts without NATS");
+    let mut rx = bus.subscribe();
+    tokio::time::sleep(Duration::from_millis(200)).await; // LISTEN registered
+    bus.publish(RealtimeEvent::Heartbeat { at_unix_ms: 7 }).await;
+    let got = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await.expect("delivered").unwrap();
+    assert_eq!(got, RealtimeEvent::Heartbeat { at_unix_ms: 7 }, "events still flow (over PostgreSQL)");
+}
