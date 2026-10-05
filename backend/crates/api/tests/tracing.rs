@@ -82,7 +82,16 @@ async fn run_worker_until(app: &TestApp, up: &Running, calls: u64) {
     let stop = CancellationToken::new();
     let w = tokio::spawn(PgWorker::new(cfg, svc, vec![Arc::new(ExecuteRun { parallelism: 2 })]).run(stop.clone()));
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
-    while up.upstream.stats().ok < calls && std::time::Instant::now() < deadline {
+    // Wait for the provider calls *and* for the job to be recorded as succeeded: the worker
+    // acknowledges the job (and counts it) only after the last call returns.
+    loop {
+        let done: i64 = sqlx::query_scalar("SELECT count(*) FROM jobs WHERE status = 'succeeded'")
+            .fetch_one(&app.pool)
+            .await
+            .unwrap();
+        if (up.upstream.stats().ok >= calls && done >= 1) || std::time::Instant::now() > deadline {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     stop.cancel();

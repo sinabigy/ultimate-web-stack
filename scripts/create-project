@@ -240,7 +240,7 @@ def main() -> int:
     arch["knowledge"] = [k for k in arch.get("knowledge", []) if not k.startswith("scripts/create-project")]
     # Validation commands for parts that were removed.
     cmds = project["validation"]["commands"]
-    cmds[:] = [c for c in cmds if c["id"] != "generator-selftest"]
+    cmds[:] = [c for c in cmds if c["id"] not in ("generator-selftest", "rust-clippy-minimal")]
     # Validation that needs a module's service only applies when the module is selected.
     needs = {"rust-test-cache": "cache", "rust-test-nats": "messaging_nats", "rust-test-clickhouse": "analytics_clickhouse"}
     cmds[:] = [c for c in cmds if needs.get(c["id"]) is None or needs[c["id"]] in modules]

@@ -70,7 +70,11 @@ def main() -> int:
     root = Path(a.path).expanduser().resolve()
     env = {"PATH": f"{Path.home()}/.cargo/bin:/opt/homebrew/bin:{os.environ.get('PATH', '')}"}
     project = json.loads((root / ".ai/config/project.json").read_text())
-    modules = {m for m, v in project["architecture"]["modules"].items() if v.get("enabled")}
+    mods = project["architecture"]["modules"]
+    modules = {m for m, v in mods.items() if v.get("enabled")}
+    # The in-process cache is core; the `cache` module counts as selected only with a Redis adapter.
+    if mods.get("cache", {}).get("adapter", "memory") == "memory":
+        modules.discard("cache")
     compose_name = re.search(r"COMPOSE_PROJECT_NAME:-([^}]+)\}", (root / "infra/docker/compose.yaml").read_text()).group(1)
     print(f"validating {root} (compose project {compose_name}; modules: {sorted(modules)})")
 

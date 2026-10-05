@@ -71,6 +71,19 @@
         "timeout_s": 1800
       },
       {
+        "id": "rust-clippy-minimal",
+        "stage": "lint",
+        "cmd": "SQLX_OFFLINE=true cargo clippy --workspace --all-targets --no-default-features -- -D warnings",
+        "cwd": "backend",
+        "requires": [
+          "cargo"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1800,
+        "note": "Every optional module (redis, nats, clickhouse) compiled out, as in a core-profile generated project: no feature-gating gaps."
+      },
+      {
         "id": "gateway-check",
         "stage": "lint",
         "cmd": "cargo clippy --release -q -- -D warnings",
