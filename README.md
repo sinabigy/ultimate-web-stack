@@ -10,7 +10,7 @@ generated with one command.
 Rust · SolidJS · PostgreSQL · OIDC · RBAC/Cedar · Jobs · Realtime · Observability · Docker · systemd · Kubernetes · AI project protocol
 
 [![CI](https://github.com/sinabigy/ultimate-web-stack/actions/workflows/ci.yml/badge.svg)](https://github.com/sinabigy/ultimate-web-stack/actions/workflows/ci.yml)
-![release](https://img.shields.io/badge/release-v1.0.0-blue)
+![release](https://img.shields.io/badge/release-v1.0.1-blue)
 ![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)
 
 | 29/29 | 294 | 14/14 | 17/17 | 2/2 |

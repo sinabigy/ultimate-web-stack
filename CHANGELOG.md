@@ -4,9 +4,17 @@ All notable changes to the blueprint. Versions are git tags (`vX.Y.Z`). Generate
 the version they came from in `.ai/config/project.json → architecture.origin.version` and in
 their README.
 
-## Unreleased
+## 1.0.1 — 2026-10-05
 
-Open-source packaging of 1.0.0. The architecture and generated application code are unchanged.
+First public release: open-source packaging of 1.0.0, plus fixes found by the first GitHub-hosted
+CI runs, a clean-clone test and a public quickstart test. The architecture is unchanged. The
+generated application code is unchanged, except for `./dev`, the E2E setup script and the smoke
+tests (see *Fixed*). The 1.0.0 evidence (29/29 checks and the rest) was measured on the `v1.0.0`
+tree; this release's CI is green on GitHub-hosted runners.
+
+**Upgrading a project generated from 1.0.0:** copy `dev`, `frontend/scripts/e2e-prepare.mjs`,
+`infra/docker/smoke.sh`, `infra/systemd/live-test.sh` and `.gitleaks.toml` from a freshly
+generated 1.0.1 project, and add the license notices in `third_party_licenses/`.
 
 ### Added
 - **Licensing:** `LICENSE-MIT` and `LICENSE-APACHE` (the dual license `Cargo.toml` already
@@ -38,6 +46,9 @@ Open-source packaging of 1.0.0. The architecture and generated application code 
 - **Intermittent smoke failures:** `cmd | grep -q` under `pipefail` fails on SIGPIPE even when it
   matches. In the image-secret check and the release audit this could have hidden a real match.
   Output is now captured before matching.
+- **Troubleshooting:** documents the colima shared-directory trap. A project outside `$HOME`
+  gets an empty PostgreSQL config mount, and PostgreSQL refuses to start. Found by running the
+  public quickstart from `/tmp`.
 - **CI coverage and hardening:** generator and gate self-tests and minimal-feature clippy were
   missing from CI. Third-party actions are now pinned to commit SHAs. The release smoke and the
   live systemd test run as visible steps.

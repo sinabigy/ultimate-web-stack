@@ -8,6 +8,7 @@ enabled modules.
 |---|---|
 | `docker compose` not found | `./dev` falls back to `docker-compose`; install either one (Docker Desktop, or colima plus the compose plugin) |
 | a service container exits with code 137 | out of memory in the Docker VM: give it ≥ 6 GiB (`colima start --memory 6`), or `./dev down` before release builds. ClickHouse is the usual victim |
+| PostgreSQL exits with `configuration file "/etc/postgresql/postgresql.conf" contains errors` | the project lives outside the directories your Docker VM shares (colima shares only your home directory by default), so the config bind mount is empty. Keep projects under `$HOME`, or add the path to the VM's mounts |
 | `port is already allocated` | another stack uses the dev ports. Run `./dev down` in the other project; see the port list below |
 | the first `./dev up` is slow | the first Rust build of a fresh `target/` takes several minutes; later starts are incremental |
 | `set DATABASE_URL to use query macros online` | you added or changed a SQL query. Start the database (`./dev up --no-app`), export the dev URL, build, then `./dev db prepare` ([CONVENTIONS](../.ai/knowledge/CONVENTIONS.md)) |
