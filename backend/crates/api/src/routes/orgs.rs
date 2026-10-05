@@ -36,16 +36,17 @@ async fn require(state: &AppState, o: &Org, meta: &ReqMeta, p: P, resource: &Res
     match state.svc()?.authz.authorize(&o.access, p, resource) {
         Ok(()) => Ok(()),
         Err(d) => {
-            // Denials on administrative permissions are evidence of probing/escalation attempts.
-            if matches!(
+            // Every denied non-read permission is evidence of probing or escalation (invariant 10).
+            // Reads are not audited here: cross-tenant reads are audited at membership resolution.
+            if !matches!(
                 p,
-                P::MembersRemove
-                    | P::MembersUpdateRole
-                    | P::RolesManage
-                    | P::ApiKeysManage
-                    | P::OrgDelete
-                    | P::AuditRead
-                    | P::SettingsManage
+                P::OrgRead
+                    | P::MembersRead
+                    | P::TeamsRead
+                    | P::RolesRead
+                    | P::RunsRead
+                    | P::ApiKeysRead
+                    | P::BillingRead
             ) {
                 let e = audit::event(
                     Some(&o.principal),
@@ -382,7 +383,7 @@ pub async fn revoke_invitation(
     meta: ReqMeta,
     Path((_slug, id)): Path<(String, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
-    o.access.require(P::MembersInvite).api()?;
+    require(&state, &o, &meta, P::MembersInvite, &Resource::Organization).await?;
     let svc = state.svc()?;
     let mut tx = svc.db.begin().await.api()?;
     orgs::revoke_invitation(&mut *tx, &o.access, id).await.api()?;
@@ -480,7 +481,7 @@ pub async fn create_team(
     meta: ReqMeta,
     Json(b): Json<CreateTeam>,
 ) -> Result<(StatusCode, Json<dto::Created>), ApiError> {
-    o.access.require(P::TeamsManage).api()?;
+    require(&state, &o, &meta, P::TeamsManage, &Resource::Organization).await?;
     let name = validate_org_name(&b.name).map_err(|e| ApiError::validation("name", e.message))?;
     let svc = state.svc()?;
     let mut tx = svc.db.begin().await.api()?;
@@ -499,7 +500,7 @@ pub async fn delete_team(
     meta: ReqMeta,
     Path((_s, id)): Path<(String, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
-    o.access.require(P::TeamsManage).api()?;
+    require(&state, &o, &meta, P::TeamsManage, &Resource::Organization).await?;
     let svc = state.svc()?;
     let mut tx = svc.db.begin().await.api()?;
     orgs::delete_team(&mut *tx, &o.access, id).await.api()?;
@@ -520,7 +521,7 @@ pub async fn add_team_member(
     Path((_s, team)): Path<(String, Uuid)>,
     Json(b): Json<TeamMember>,
 ) -> Result<StatusCode, ApiError> {
-    o.access.require(P::TeamsManage).api()?;
+    require(&state, &o, &meta, P::TeamsManage, &Resource::Organization).await?;
     let svc = state.svc()?;
     let mut tx = svc.db.begin().await.api()?;
     orgs::add_team_member(&mut *tx, &o.access, team, b.user_id).await.api()?;
@@ -540,7 +541,7 @@ pub async fn remove_team_member(
     meta: ReqMeta,
     Path((_s, team, user)): Path<(String, Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
-    o.access.require(P::TeamsManage).api()?;
+    require(&state, &o, &meta, P::TeamsManage, &Resource::Organization).await?;
     let svc = state.svc()?;
     let mut tx = svc.db.begin().await.api()?;
     orgs::remove_team_member(&mut *tx, &o.access, team, user).await.api()?;
@@ -919,7 +920,7 @@ pub async fn create_run(
     meta: ReqMeta,
     Json(b): Json<NewRun>,
 ) -> Result<(StatusCode, Json<app_domain::Run>), ApiError> {
-    o.access.require(P::RunsCreate).api()?;
+    require(&state, &o, &meta, P::RunsCreate, &Resource::Organization).await?;
     let new = b.validate().map_err(|errs| {
         ApiError::Validation(
             errs.into_iter().map(|e| app_errors::FieldError { field: e.field.into(), message: e.message }).collect(),
