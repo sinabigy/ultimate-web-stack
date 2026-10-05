@@ -344,6 +344,8 @@ def cmd_test(a) -> None:
 
 def cmd_benchmark(a) -> None:
     """Run suites, then apply the gates and render docs/benchmarks/latest.md (full runs only)."""
+    ensure_postgres()  # reproducible from a cold machine, like `./dev check`
+    ensure_check_services()  # module suites (cache, messaging, analytics) need their services
     smoke = ["--smoke"] if a.smoke else []
     rc = sh([sys.executable, "benchmarks/run.py"] + smoke + a.extra, check=False)
     gate = sh([sys.executable, "benchmarks/compare.py"] + smoke, check=False)

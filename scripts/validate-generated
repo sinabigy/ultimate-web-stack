@@ -64,12 +64,17 @@ def wait_http(url: str, seconds: int) -> bool:
     return False
 
 
-def runtime_configuration(root: Path, modules: set[str]) -> None:
+def runtime_configuration(root: Path, modules: set[str]) -> bool:
     """The running server logs what it runs with; it must match the selection (e.g. Cedar is not
     only compiled in but the active engine)."""
     log = root / "var/log/app-server.log"
     text = re.sub(r"\x1b\[[0-9;]*m", "", log.read_text(errors="replace")) if log.exists() else ""
-    line = next((ln for ln in text.splitlines() if ln.rstrip().endswith(" configuration")), "")
+    # Pretty format: "... INFO app_server: configuration authorization=Cedar ..."; JSON format:
+    # {"message":"configuration","authorization":"Cedar",...}.
+    line = next((ln for ln in text.splitlines()
+                 if "app_server: configuration " in ln or '"message":"configuration"' in ln), "")
+    if line.lstrip().startswith("{"):
+        line = " ".join(f"{k}={v}" for k, v in json.loads(line).items())
     fields = dict(re.findall(r"(\w+)=(\S+)", line))
     expect = {
         "authorization": "Cedar" if "cedar" in modules else "Rbac",
@@ -80,7 +85,7 @@ def runtime_configuration(root: Path, modules: set[str]) -> None:
         "analytics_clickhouse": str("analytics_clickhouse" in modules).lower(),
     }
     wrong = {k: (fields.get(k), v) for k, v in expect.items() if fields.get(k) != v}
-    step("running server configuration matches the selection", bool(line) and not wrong,
+    return step("running server configuration matches the selection", bool(line) and not wrong,
          " ".join(f"{k}={v}" for k, v in expect.items()) + (f" MISMATCH {wrong}" if wrong else ""))
 
 

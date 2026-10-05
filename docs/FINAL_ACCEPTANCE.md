@@ -39,8 +39,8 @@ Generator acceptance (`scripts/tests/test_create_project.py`, 5 tests, part of `
 - an injected failure after copying removes the partial destination;
 - names with spaces and hyphens (`"My Cool-App 2"` → slug `my-cool-app-2` in compose, package
   and brand);
-- **no source-machine paths** (blueprint path, home directory, `~/Coding/`) anywhere in the
-  generated tree.
+- **no source-machine paths** (the blueprint's absolute path, the home directory, or the
+  checkout's parent folder) anywhere in the generated tree.
 
 ## Can it run without the blueprint repository?
 **Yes.** Generated projects are written outside the blueprint, with:
