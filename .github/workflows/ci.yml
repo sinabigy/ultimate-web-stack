@@ -19,7 +19,7 @@ jobs:
     # Protocol state, generator and benchmark-gate self-tests (Python + git only).
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: python3 tools/ai-validate --strict --only ai-check --only generator-selftest --only bench-gates-selftest
 
   backend:
@@ -44,7 +44,7 @@ jobs:
         ports: ["58123:8123"]
         options: --ulimit nofile=262144:262144 --health-cmd "wget -qO- http://localhost:8123/ping" --health-interval 2s --health-retries 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }  # full history for the secret scan
       - name: Free runner disk (unused preinstalled toolchains)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
@@ -80,7 +80,7 @@ jobs:
     # Pingora edge gateway (hyperscale profile): separate workspace, compile + lint only.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - working-directory: backend
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -90,7 +90,7 @@ jobs:
   frontend:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with: { node-version: 26, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - name: Validate (frontend)
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Free runner disk (unused preinstalled toolchains)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - run: python3 tools/ai-validate --strict --only infra-verify
@@ -126,7 +126,7 @@ jobs:
         ports: ["55432:5432"]
         options: --health-cmd "pg_isready -U app" --health-interval 2s --health-retries 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Free runner disk (unused preinstalled toolchains)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - working-directory: backend
