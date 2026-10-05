@@ -1,13 +1,13 @@
 {
   "project_schema_version": 1,
-  "ai_protocol_version": "1.1.0",
+  "ai_protocol_version": "1.2.0",
   "name": "ultimate-web-stack-blueprint",
   "objective": "A reusable, evidence-driven web application blueprint (SolidJS + TypeScript frontend, Rust/Axum/Tokio backend, PostgreSQL via SQLx) with progressively activated profiles (cache, messaging, analytics, gateway, specialised runtimes), its own benchmark suite, and a generator that creates new projects compatible with ai-project-template.",
   "instance": {
     "state": "initialized",
     "origin": "greenfield",
     "initialized_at": "2026-10-04T07:53:18Z",
-    "template_version": "1.1.0"
+    "template_version": "1.2.0"
   },
   "stack": {
     "languages": [
@@ -336,6 +336,30 @@
         "confirmed": true,
         "timeout_s": 2400,
         "note": "Full stack in a real browser: app-server serving the built SPA (strict CSP), PostgreSQL (fresh app_e2e database), mock OIDC. Needs ./dev up and `npx playwright install chromium` once."
+      },
+      {
+        "id": "infra-verify",
+        "stage": "other",
+        "cmd": "infra/verify.sh",
+        "requires": [
+          "docker"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 1200,
+        "note": "Every deployment tier, statically: compose config (all dev profiles + production), systemd-analyze verify, kubeconform on files and rendered kustomization, caddy validate."
+      },
+      {
+        "id": "release-smoke",
+        "stage": "build",
+        "cmd": "infra/docker/smoke.sh",
+        "requires": [
+          "docker"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 3600,
+        "note": "Builds the release image and runs the production compose stack: both health checks pass, public surface correct (SPA, /metrics 404, status-only /readyz), non-root + read-only."
       }
     ]
   },
@@ -590,8 +614,8 @@
       }
     },
     "deployment": {
-      "target": "dev-compose",
-      "notes": "Tiers planned in T-0014: VPS/systemd, containers, Kubernetes/bare metal."
+      "target": "multi-tier",
+      "notes": "dev compose; VPS (systemd + Caddy); containers (distroless image + compose.prod); Kubernetes (kustomize base); optional Pingora edge. See docs/deployment/."
     },
     "knowledge": [
       ".ai/knowledge/ARCHITECTURE.md",
@@ -607,7 +631,10 @@
       "docs/architecture/analytics.md",
       "docs/architecture/messaging.md",
       "docs/benchmarks/pingora.md",
-      "docs/benchmarks/runtime.md"
+      "docs/benchmarks/runtime.md",
+      "docs/deployment/README.md",
+      "docs/benchmarks/release-profile.md",
+      "docs/README.md"
     ]
   }
 }
