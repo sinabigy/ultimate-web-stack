@@ -82,7 +82,15 @@ async fn rate_limited_provider_is_respected_and_work_completes() {
     let waste = s.rate_limited as f64 / s.requests as f64;
     assert!(waste < 0.35, "429s were {:.0}% of requests sent ({} of {})", waste * 100.0, s.rate_limited, s.requests);
     assert_eq!(s.distinct_idempotency_keys, 600, "retries reuse the same idempotency key");
-    assert!(start.elapsed() < Duration::from_secs(20));
+    // About 5 s normally (2 s ideal + learning pauses); the bound only catches a stuck controller.
+    let elapsed = start.elapsed();
+    assert!(
+        elapsed < Duration::from_secs(20),
+        "took {elapsed:?}: {} 429s of {} requests, rate cap {:?}",
+        s.rate_limited,
+        s.requests,
+        p.health().rate_cap_rps
+    );
 }
 
 #[tokio::test]

@@ -300,7 +300,55 @@ Inside a generated project:
 6. Programmable edge: the Pingora gateway on dedicated nodes.
 
 ## Known limitations
-<!-- LIMITATIONS -->
+- **Not verified live:**
+  - Kubernetes (static validation only);
+  - ZITADEL Cloud and generic OIDC providers (configuration and discovery check only; self-hosted
+    ZITADEL was verified live in the blueprint);
+  - GitHub CI (nothing pushed);
+  - TLS issuance (Caddy configuration validated, not exercised).
+- **One machine:** every number comes from one Apple M5 host, with services in a 2-CPU / 4 GiB VM.
+  HTTP numbers are lower bounds, and results do not transfer to other hardware without
+  re-measuring.
+- **Still undecided:** PGO, alternative allocators and thread-per-core Tokio need dedicated Linux
+  hardware.
+- **Intermittent on this host:**
+  - `sqlx::test` connect failures through the colima port forwarder (pass on rerun);
+  - one historical E2E flake under full load.
+- **Cosmetic:** an empty "Job queues" chart card when no jobs are queued, and an empty
+  organization switcher on not-found pages.
+- **Delegated to the IdP:** email delivery, password policy and MFA enrolment (simulated by the
+  mock IdP in development).
+- **Not covered by the failure drill:** network partitions between API instances, and disk-full on
+  the database host.
+- **Upstream protocol-tool improvements** (ai-project-template, not this blueprint): document the
+  result-packet `lessons` shape, and stream `ai-validate` output when redirected.
 
 ## Final validation results
-<!-- VALIDATION -->
+All on the environment in [FINAL_ACCEPTANCE.md](FINAL_ACCEPTANCE.md#environment), 2026-10-05.
+
+| proof | result |
+|---|---|
+| blueprint `./dev check` on the release tree (tag `v1.0.0`; 05:13–05:18 UTC) | **29 pass, 0 fail, 0 skip**: fmt, clippy (full and minimal features), gateway, sqlx offline data, cargo audit and deny, npm audit, gitleaks, config check, Rust tests, Cedar, cache (Redis + Dragonfly), NATS, ClickHouse, gate and generator self-tests, TS bindings, frontend typecheck, lint, unit, build and bundle budget, E2E, deployment-tier verification, release smoke, live systemd |
+| tests in the suite | 294 Rust tests (all features), 14 frontend unit, 11 E2E, 6 browser acceptance, 5 generator, 6 gate self-tests |
+| authorization matrix | passes under RBAC and Cedar, with audit counts; Cedar read-policy test mutation-checked |
+| browser acceptance (`./dev test --journey`) | 6/6 per role against the full stack; 27 screenshots |
+| failure drill (`./dev test --drill`) | 14/14 |
+| live systemd test / release smoke | pass / pass (no secrets in image, restart, graceful SIGTERM) |
+| benchmark harness (`./dev benchmark --smoke`, `9efafc8`) | 17/17 invariant gates |
+| generated projects (fresh, from the release candidate) | minimal 22/22, SaaS 24/24, throughput 25/25 `./dev check`, plus live smoke and module checks; regeneration from the final commit differs only in provenance stamps |
+| clean-room runs | 2/2 features built from repository-local information; 23/23 and 22/22 |
+
+Failures and retries during release, all recorded:
+- **Release-candidate runs:**
+  - `generator-selftest` failed twice; both times the path-leak guard caught an absolute path
+    in my own acceptance documents, which were then fixed;
+  - `rust-test-cache` failed once because Redis and Dragonfly were not running, so `./dev check`
+    now starts them;
+  - the benchmark smoke failed once because PostgreSQL was stopped, so `./dev benchmark` now
+    starts it.
+- **One intermittent failure in the final tree's first run:** `rate_limited_provider_is_respected_and_work_completes`
+  exceeded its 20 s bound, against a normal 5 s. Not reproduced in 14 runs; the assertion now
+  reports its diagnostics, and it is recorded in `KNOWN_ISSUES.md`. The immediate rerun of the
+  full check passed 29/29.
+- **The validator's runtime-configuration step** was re-evaluated from saved server logs after a
+  parser bug in the validator was fixed (`acceptance/generated-projects.md`).

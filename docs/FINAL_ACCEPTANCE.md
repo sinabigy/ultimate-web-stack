@@ -19,7 +19,7 @@ original conversation?
 | toolchains | Rust 1.99.0 (pinned), Node 26.0.0, Python 3.14.5 |
 | protocol | ai-project-template / AI protocol 1.2.0 |
 | date | 2026-10-05 |
-| release commit | <!-- COMMIT --> |
+| release | tag `v1.0.0` (its commit is the release; `./dev check` 29/29 on that tree) |
 
 Linux behaviour (systemd, release image, PGO and io_uring experiments) was exercised in
 containers on that VM. CI on GitHub-hosted Linux runners has **not** run, because nothing has
@@ -194,7 +194,7 @@ validation could not see it. It is fixed (`worker.port`) and guarded by
 - A/B decisions near the noise (allocators, PGO) used interleaved runs.
 - Linux-only experiments have scripts: `benchmarks/runtime/run.py`,
   `benchmarks/release/pgo_linux.py`.
-- Final harness check: <!-- BENCH -->.
+- Final harness check: `./dev benchmark --smoke` on `9efafc8` passed all 17 invariant gates. These cover zero errors, 401 for every missing credential (382,179 requests), 404 for every cross-tenant probe (10,429), engine waste and outage amplification bounds, every queued job processed (PostgreSQL and JetStream, 2,000 each), and no analytics events lost (200,000). Regression gates are skipped in smoke mode, by design.
 - **Not reproducible across machines by design**: results from other hardware are not
   comparable and the gates say so.
 
@@ -217,4 +217,22 @@ validation could not see it. It is fixed (`worker.port`) and guarded by
   the database host.
 
 ## Generated projects
-<!-- RESULTS -->
+Generated from release candidate `60f7e91` and validated with `scripts/validate-generated`.
+Regenerating from the final commit `9efafc8` differs only in provenance stamps, the `./dev
+benchmark` service start, and one documentation sentence (file-by-file comparison). Every
+project's `./dev check` includes:
+- the release image smoke;
+- the live systemd test;
+- E2E;
+- supply-chain and secret scans.
+
+| project | flags | result | `./dev check` | live system smoke | optional modules (service + compiled + config) |
+|---|---|---|---|---|---|
+| minimal | `--profile core --auth basic --no-admin` | **OK** | OK — 22 pass, 0 fail, 0 skip (6 min) | OK — 10 pass, 0 fail, 3 skip | Redis, NATS, ClickHouse all **absent** ✓ |
+| saas | `--profile performance --auth b2b --admin --cedar` | **OK** | OK — 24 pass, 0 fail, 0 skip (8 min) | OK — 10 pass, 0 fail, 3 skip | Redis **present** ✓; NATS, ClickHouse **absent** ✓; Cedar active ✓ |
+| throughput | `--profile distributed --auth b2b` | **OK** | OK — 25 pass, 0 fail, 0 skip (22 min) | OK — 12 pass, 0 fail, 1 skip (Tempo: observability not selected) | Redis, NATS, ClickHouse all **present** ✓ |
+
+The "running server configuration" step was first evaluated with a validator log-parser bug, which
+could not read the pretty log format. It was re-evaluated from each project's saved server log
+with the fixed parser, and all three match. Details per step:
+[acceptance/generated-projects.md](acceptance/generated-projects.md).

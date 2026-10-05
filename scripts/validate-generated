@@ -169,7 +169,7 @@ def validate(root: Path, env: dict, modules: set[str], compose_name: str, report
     code, ps, _ = run(["docker", "ps", "--format", "{{.Names}}"], root)
     server = root / "backend/target/debug/app-server"
     blob = server.read_bytes() if server.exists() else b""
-    step("server binary present for the compiled-in probes", bool(blob), str(server))
+    step("server binary present for the compiled-in probes", bool(blob), str(server.relative_to(root)))
     config = (root / "backend/config/app.toml").read_text()
     for module, (service, symbol) in MODULES.items():
         selected = module in modules

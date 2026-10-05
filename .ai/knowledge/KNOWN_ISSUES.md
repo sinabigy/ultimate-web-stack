@@ -49,3 +49,15 @@ _Open problems that a future worker must not rediscover the hard way. Each entry
 - On an organization "Not found" page, the organization switcher shows an empty selection instead
   of the user's current workspace.
 - **Impact**: cosmetic only; authorization and data are correct. Not release blockers.
+
+## Intermittent outbound-engine test timeout (2026-10-05)
+- **Seen**: once, in a full `./dev check` on the release tree.
+  `rate_limited_provider_is_respected_and_work_completes` (`backend/crates/networking/tests/engine.rs`)
+  exceeded its 20 s bound; it normally takes about 5 s.
+- **Not reproduced**: 14 further runs passed, including 6 under 3× concurrent load, plus about
+  10 earlier full workspace runs.
+- **Unknown**: the cause. The `ai-validate` failure excerpt shows the output tail, which was
+  compiler lines, so the panic message was lost.
+- **Mitigation**: the assertion now reports elapsed time, the 429 count, requests sent and the
+  learned rate cap, so the next occurrence explains itself. The bound was not loosened: a
+  4× slowdown would be a real controller problem worth seeing.

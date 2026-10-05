@@ -14,6 +14,121 @@ generated into a sibling directory outside the blueprint (`../uwsb-generated/<na
 ## 1. Three representative projects (`scripts/validate-generated`)
 
 <!-- RESULTS -->
+Note: the "running server configuration" step was re-evaluated from each project's saved
+`var/log/app-server.log` after fixing a validator log-parser bug, which could not read the pretty
+format. All three match their selection.
+
+| project | command | blueprint commit | result | `./dev check` | system smoke |
+|---|---|---|---|---|---|
+| minimal | `create-project … --profile core --auth basic --no-admin` | `60f7e91` | **OK** (2026-10-05T04:26:54Z) | OK — 22 pass, 0 fail, 0 skip in 374 s | OK — 10 pass, 0 fail, 3 skip |
+| saas | `create-project … --profile performance --auth b2b --admin --cedar` | `60f7e91` | **OK** (2026-10-05T04:34:58Z) | OK — 24 pass, 0 fail, 0 skip in 468 s | OK — 10 pass, 0 fail, 3 skip |
+| throughput | `create-project … --profile distributed --auth b2b` | `60f7e91` | **OK** (2026-10-05T04:57:20Z) | OK — 25 pass, 0 fail, 0 skip in 1324 s | OK — 12 pass, 0 fail, 1 skip |
+
+### minimal
+Modules: api_keys, authorization, benchmarks, identity, jobs, outbound_engine, security_gates, sessions.
+`./dev check` commands: ai-check, rust-fmt, rust-clippy, sqlx-offline-fresh, rust-audit, rust-deny, web-audit, secret-scan, config-check, rust-test, bench-gates-selftest, ts-bindings-fresh, web-install, web-typecheck, web-lint, web-test, web-build, web-bundle-budget, e2e, infra-verify, release-smoke, systemd-live.
+
+System smoke:
+- PASS readiness (critical dependencies up): postgres=ok, identity_provider=ok
+- PASS login (BFF + OIDC + PKCE, cookie session): smoke-486f036d@example.com
+- PASS create run (PostgreSQL + job enqueue, audite: d) 01a10a50-8f4d-752b-bad8-ab92e066a3ab
+- PASS worker → outbound engine → provider: 20/20 calls succeeded
+- PASS simulated provider received the calls: 20 requests
+- PASS trace context reached the provider: 506cc3062d73c4a9eafbb4025faaddcd
+- PASS realtime event over SSE: 22 event(s) received
+- SKIP NATS: monitor not reachable (messaging module off)
+- SKIP analytics (ClickHouse): module off
+- PASS cache read path
+- PASS audit trail records the run: run.created
+- PASS metrics (HTTP + provider series)
+- SKIP Tempo trace: observability module not running
+
+Other steps:
+- PASS git repository initialised: e5aa81d Generate Minimal from ultimate-web-stack-blueprint (60f7e91)
+- PASS ai-check: ai-check: OK — 0 fail, 1 warn, 0 runtime; validation_level: baseline (documented subset; see docs/protocol/validation.md)
+- PASS ai-map
+- PASS ./dev setup
+- PASS ./dev up --no-app (services):  Container minimal-postgres-1 Started
+- PASS ./dev up (API + SPA + mock IdP + simulated provider)
+- PASS SPA served by Vite (frontend)
+- PASS running server configuration matches the selection
+- PASS server binary present for the compiled-in probes: ../uwsb-generated/minimal/backend/target/debug/app-server
+- PASS cache: not selected → no service, not compiled: service=False compiled=False
+- PASS messaging_nats: not selected → no service, not compiled: service=False compiled=False
+- PASS analytics_clickhouse: not selected → no service, not compiled: service=False compiled=False
+- PASS config [messaging] enabled = false
+- PASS config [analytics] enabled = false
+
+### saas
+Modules: admin, api_keys, authorization, benchmarks, cache, cedar, identity, jobs, organizations, outbound_engine, security_gates, sessions.
+`./dev check` commands: ai-check, rust-fmt, rust-clippy, sqlx-offline-fresh, rust-audit, rust-deny, web-audit, secret-scan, config-check, rust-test, rust-test-cedar, bench-gates-selftest, rust-test-cache, ts-bindings-fresh, web-install, web-typecheck, web-lint, web-test, web-build, web-bundle-budget, e2e, infra-verify, release-smoke, systemd-live.
+
+System smoke:
+- PASS readiness (critical dependencies up): redis=ok, postgres=ok, identity_provider=ok
+- PASS login (BFF + OIDC + PKCE, cookie session): smoke-bcdb3f18@example.com
+- PASS create run (PostgreSQL + job enqueue, audite: d) 01a10a57-f197-7213-80f0-c58fb9b5f63f
+- PASS worker → outbound engine → provider: 20/20 calls succeeded
+- PASS simulated provider received the calls: 20 requests
+- PASS trace context reached the provider: d9641a38d102e2de62b808bc59b7683c
+- PASS realtime event over SSE: 22 event(s) received
+- SKIP NATS: monitor not reachable (messaging module off)
+- SKIP analytics (ClickHouse): module off
+- PASS cache read path
+- PASS audit trail records the run: run.created
+- PASS metrics (HTTP + provider series)
+- SKIP Tempo trace: observability module not running
+
+Other steps:
+- PASS git repository initialised: af28985 Generate SaaS from ultimate-web-stack-blueprint (60f7e91)
+- PASS ai-check: ai-check: OK — 0 fail, 1 warn, 0 runtime; validation_level: baseline (documented subset; see docs/protocol/validation.md)
+- PASS ai-map
+- PASS ./dev setup
+- PASS ./dev up --no-app (services):  Container saas-redis-1 Started
+- PASS ./dev up (API + SPA + mock IdP + simulated provider)
+- PASS SPA served by Vite (frontend)
+- PASS running server configuration matches the selection
+- PASS server binary present for the compiled-in probes: ../uwsb-generated/saas/backend/target/debug/app-server
+- PASS cache: selected → service running and compiled in: service=True compiled=True
+- PASS messaging_nats: not selected → no service, not compiled: service=False compiled=False
+- PASS analytics_clickhouse: not selected → no service, not compiled: service=False compiled=False
+- PASS config [messaging] enabled = false
+- PASS config [analytics] enabled = false
+
+### throughput
+Modules: admin, analytics_clickhouse, api_keys, authorization, benchmarks, cache, identity, jobs, messaging_nats, organizations, outbound_engine, security_gates, sessions.
+`./dev check` commands: ai-check, rust-fmt, rust-clippy, sqlx-offline-fresh, rust-audit, rust-deny, web-audit, secret-scan, config-check, rust-test, bench-gates-selftest, rust-test-cache, rust-test-nats, rust-test-clickhouse, ts-bindings-fresh, web-install, web-typecheck, web-lint, web-test, web-build, web-bundle-budget, e2e, infra-verify, release-smoke, systemd-live.
+
+System smoke:
+- PASS readiness (critical dependencies up): redis=ok, messaging=ok, analytics=ok, postgres=ok, identity_provider=ok
+- PASS login (BFF + OIDC + PKCE, cookie session): smoke-431ac3f8@example.com
+- PASS create run (PostgreSQL + job enqueue, audite: d) 01a10a6c-68eb-7053-bed6-f387e7e03c49
+- PASS worker → outbound engine → provider: 20/20 calls succeeded
+- PASS simulated provider received the calls: 20 requests
+- PASS trace context reached the provider: 5e89179e032031d5ea1e44fb75145bc3
+- PASS realtime event over SSE: 22 event(s) received
+- PASS NATS carried realtime events: 23 messages
+- PASS analytics events in ClickHouse: {"days": 1, "created": [{"day": "2026-10-05", "events": 1, "value": 20.0}], "finished": [{"day": "20
+- PASS cache read path
+- PASS audit trail records the run: run.created
+- PASS metrics (HTTP + provider series)
+- SKIP Tempo trace: observability module not running
+
+Other steps:
+- PASS git repository initialised: 285897c Generate Throughput from ultimate-web-stack-blueprint (60f7e91)
+- PASS ai-check: ai-check: OK — 0 fail, 1 warn, 0 runtime; validation_level: baseline (documented subset; see docs/protocol/validation.md)
+- PASS ai-map
+- PASS ./dev setup
+- PASS ./dev up --no-app (services):  Container throughput-clickhouse-1 Started
+- PASS ./dev up (API + SPA + mock IdP + simulated provider)
+- PASS SPA served by Vite (frontend)
+- PASS running server configuration matches the selection
+- PASS server binary present for the compiled-in probes: ../uwsb-generated/throughput/backend/target/debug/app-server
+- PASS cache: selected → service running and compiled in: service=True compiled=True
+- PASS messaging_nats: selected → service running and compiled in: service=True compiled=True
+- PASS analytics_clickhouse: selected → service running and compiled in: service=True compiled=True
+- PASS config [messaging] enabled = true
+- PASS config [analytics] enabled = true
+
 
 What each step proves:
 
@@ -29,7 +144,10 @@ What each step proves:
 
 ## 2. Clean-room acceptance
 
-<!-- CLEANROOM -->
+Two runs, each by an agent given only a generated repository. Both built a complete
+organization-scoped feature (run 1: Projects; run 2: Announcements with notifications), passed
+`./dev check` and proved member and cross-tenant denials live. Neither looked outside the
+repository. Scorecard and fixed friction: [../FINAL_REPORT.md](../FINAL_REPORT.md#clean-room-findings).
 
 ## Limits of this evidence
 - Identity used the in-repo mock OIDC provider. Live ZITADEL was verified in the blueprint

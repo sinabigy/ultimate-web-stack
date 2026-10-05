@@ -75,7 +75,7 @@
       "id": "M6",
       "title": "Reuse",
       "goal": "Deployment profiles, generator and a validated generated example application.",
-      "status": "in_progress",
+      "status": "done",
       "tasks": [
         "T-0014",
         "T-0015",
@@ -86,7 +86,7 @@
       "id": "M7",
       "title": "Completion",
       "goal": "Full validation, benchmark report, documentation and compacted state.",
-      "status": "in_progress",
+      "status": "done",
       "tasks": [
         "T-0017"
       ]
