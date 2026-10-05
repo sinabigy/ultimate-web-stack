@@ -15,8 +15,9 @@ _One line per major component: name, responsibility and source path. Machine-rea
 | networking | outbound API engine: adaptive concurrency, learned rate, breaker, retries, pools | `backend/crates/networking` |
 | cache | `CacheLayer` (single-flight, locks, TTL jitter): memory / Redis / Dragonfly; Redis GCRA | `backend/crates/cache` |
 | rate_limit | in-process GCRA limiter for inbound requests | `backend/crates/rate_limit` |
-| messaging | `EventBus` trait, local bus (PostgreSQL bus in workers) | `backend/crates/messaging` |
-| workers | PostgreSQL job queue runtime (SKIP LOCKED, leases, DLQ), `PgEventBus` | `backend/crates/workers` |
+| messaging | `EventBus` trait, local bus; NATS bus + JetStream queue (feature `nats`) | `backend/crates/messaging` |
+| workers | PostgreSQL job queue runtime (SKIP LOCKED, leases, DLQ), `PgEventBus`, event-bus selection with PostgreSQL fallback | `backend/crates/workers` |
+| analytics | `AnalyticsSink` (no-op by default); ClickHouse sink, schema, tenant-scoped queries (feature `clickhouse`) | `backend/crates/analytics` |
 | server | API binary (`check-config` subcommand), in-process worker option | `backend/apps/server` |
 | worker | standalone job worker binary | `backend/apps/worker` |
 | mock-oidc / fake-upstream | test doubles: OIDC provider with faults; simulated external API | `backend/apps/mock-oidc`, `backend/apps/fake-upstream` |
@@ -24,6 +25,7 @@ _One line per major component: name, responsibility and source path. Machine-rea
 | frontend | SolidJS + TS + Vite: AppShell, auth, dashboard, account, org, admin; generated API types | `frontend/` |
 | dev CLI | setup/doctor/up/down/check/test/benchmark; validation delegated to `tools/ai-validate` | `dev` |
 | benchmarks | harness, gates (invariants + same-machine regressions), reports | `benchmarks/`, `docs/benchmarks/` |
-| infra | compose profiles (postgres, cache, dragonfly, identity) | `infra/docker` |
+| infra | dev compose profiles (postgres, cache, dragonfly, messaging, analytics, identity, observability); production compose, systemd, Kubernetes base; `infra/verify.sh` | `infra/` |
 | CI | functional (ai-validate), perf-smoke (invariants), manual benchmark | `.github/workflows` |
-| (planned) NATS, ClickHouse, Pingora, Monoio experiment, deployment tiers, generator | see ROADMAP | – |
+| gateway | optional Pingora edge (separate workspace, `--with-gateway`) | `backend/gateway` |
+| optional modules | how each is switched on or off after generation | `docs/MODULES.md` |

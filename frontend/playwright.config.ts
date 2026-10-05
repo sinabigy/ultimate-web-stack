@@ -1,9 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // Full-stack E2E: real app-server (serving the built SPA, same origin), real PostgreSQL,
-// mock OIDC provider. Ports are dedicated so a running dev stack is not disturbed.
+// mock OIDC provider, simulated provider. Every port differs from `./dev up` (8080, 5190, 59081,
+// 59090), so E2E (and therefore `./dev check`) runs while a dev stack is up.
 const APP = "http://localhost:18080";
 const IDP = "http://127.0.0.1:59082";
+const UPSTREAM_PORT = "59091";
 
 const backendEnv = {
   APP__ENVIRONMENT: "test",
@@ -13,6 +15,7 @@ const backendEnv = {
   APP__HTTP__STATIC_DIR: "../frontend/dist",
   APP__RATE_LIMIT__ENABLED: "false",
   APP__AUTH__PROVIDER: "oidc",
+  APP__PROVIDERS__DEFINITIONS__SIMULATED__BASE_URL: `http://127.0.0.1:${UPSTREAM_PORT}`,
   APP__AUTH__ISSUER_URL: IDP,
   APP__AUTH__CLIENT_ID: "app-web",
   APP__AUTH__PUBLIC_ORIGIN: APP,
@@ -42,8 +45,8 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
-      command: "../backend/target/debug/fake-upstream 59090",
-      url: "http://127.0.0.1:59090/healthz",
+      command: `../backend/target/debug/fake-upstream ${UPSTREAM_PORT}`,
+      url: `http://127.0.0.1:${UPSTREAM_PORT}/healthz`,
       reuseExistingServer: false,
       stdout: "ignore",
     },

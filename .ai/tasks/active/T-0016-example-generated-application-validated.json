@@ -27,7 +27,7 @@
   "task_class": "feature",
   "required_capabilities": [],
   "context_class": "medium",
-  "status": "queue",
+  "status": "active",
   "blocked_reason": null,
   "template": null,
   "result": null,
@@ -37,6 +37,13 @@
       "event": "created",
       "from": null,
       "to": "queue",
+      "note": null
+    },
+    {
+      "at": "2026-10-05T02:53:01Z",
+      "event": "transition",
+      "from": "queue",
+      "to": "active",
       "note": null
     }
   ]

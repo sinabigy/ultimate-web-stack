@@ -77,6 +77,8 @@ class CreateProjectTests(unittest.TestCase):
             self.assertNotIn(absent, ci, absent)
         self.assertIn("postgres:", ci)
         self.assertNotIn("rust-test-cedar", g.commands)
+        unconfirmed = [c["id"] for c in g.project["validation"]["commands"] if not c.get("confirmed")]
+        self.assertEqual(unconfirmed, [], "no inferred placeholder commands")
         self.assertIn('BRAND = "Core-App"', (g.path / "frontend/src/brand.ts").read_text())
         # fresh protocol instance with provenance, committed, clean
         self.assertEqual(g.project["instance"]["origin"], "derived")

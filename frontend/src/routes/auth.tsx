@@ -3,7 +3,7 @@
 // entry point that shows only the methods the deployment has configured.
 import { A, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createEffect, createResource, createSignal, For, type JSX, Show } from "solid-js";
-import { ApiError } from "../api/client";
+import { ApiError, setCsrfToken } from "../api/client";
 import { api, authUrls } from "../api/endpoints";
 import { FullPageLoading, reauthenticate, useSession } from "../auth/session";
 import { Icon } from "../components/icons";
@@ -325,7 +325,19 @@ export function AuthCallbackPage() {
 }
 
 export function LogoutPage() {
+  const { session } = useSession();
+  let started = false;
+  // Logout is a CSRF-protected POST: wait for the session (which carries the token) instead of
+  // racing it, set the token explicitly, and only then post. Anonymous visitors go to /login.
   createEffect(async () => {
+    if (session.loading || started) return;
+    started = true;
+    const s = session.error ? undefined : session();
+    if (!s?.authenticated) {
+      window.location.assign("/login");
+      return;
+    }
+    setCsrfToken(s.csrf_token ?? null);
     try {
       const r = await api.logout();
       window.location.assign(r.redirect);

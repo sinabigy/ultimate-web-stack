@@ -22,7 +22,50 @@ use support::*;
 
 #[sqlx::test(migrator = "app_db::MIGRATOR")]
 async fn authorization_matrix(pool: PgPool) {
+    matrix(pool, app_config::AuthorizationEngine::Rbac).await;
+}
+
+/// The same boundaries with Cedar as the engine: both engines must give identical HTTP outcomes.
+#[cfg(feature = "cedar")]
+#[sqlx::test(migrator = "app_db::MIGRATOR")]
+async fn authorization_matrix_cedar(pool: PgPool) {
+    matrix(pool, app_config::AuthorizationEngine::Cedar).await;
+}
+
+/// A project Cedar policy is enforced on reads as well as writes, through the HTTP API.
+#[cfg(feature = "cedar")]
+#[sqlx::test(migrator = "app_db::MIGRATOR")]
+async fn cedar_project_policy_forbids_a_read_over_http(pool: PgPool) {
+    let dir = std::env::temp_dir().join(format!("cedar-api-{}", uuid::Uuid::now_v7()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // Project rule: whoever cannot invite (i.e. plain members) may not read runs.
+    std::fs::write(
+        dir.join("project.cedar"),
+        r#"@reason("members_no_runs") forbid (principal, action == Action::"runs:read", resource) when { !principal.permissions.contains("members:invite") };"#,
+    )
+    .unwrap();
+    let policy_dir = dir.clone();
+    let app = TestApp::with_config(pool, move |c| {
+        c.authorization.engine = app_config::AuthorizationEngine::Cedar;
+        c.authorization.cedar_policy_dir = policy_dir;
+    })
+    .await;
+    let owner = app.login("owner@cedar-read.example").await;
+    let org = app.create_org(&owner, "Cedar Read", "cedar-read").await;
+    let member = app.login("member@cedar-read.example").await;
+    app.add_member(&owner, &org, &member, "member").await;
+
+    assert_eq!(app.get(&owner, &format!("/api/v1/orgs/{org}/runs")).await.status, StatusCode::OK);
+    let denied = app.get(&member, &format!("/api/v1/orgs/{org}/runs")).await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN, "project policy applies to reads: {:?}", denied.body);
+    // Other reads are unaffected.
+    assert_eq!(app.get(&member, &format!("/api/v1/orgs/{org}/members")).await.status, StatusCode::OK);
+    std::fs::remove_dir_all(dir).ok();
+}
+
+async fn matrix(pool: PgPool, engine: app_config::AuthorizationEngine) {
     let app = TestApp::with_config(pool, |c| {
+        c.authorization.engine = engine;
         c.providers.definitions.insert("simulated".into(), Default::default());
     })
     .await;

@@ -27,12 +27,18 @@ use crate::{
     state::AppState,
 };
 
-fn ev(state: &AppState, o: &Org, meta: &ReqMeta, action: &'static str) -> app_db::audit::AuditEvent {
+pub(crate) fn ev(state: &AppState, o: &Org, meta: &ReqMeta, action: &'static str) -> app_db::audit::AuditEvent {
     audit::event(Some(&o.principal), meta, state.config.auth.store_client_ip, action, Outcome::Success)
         .org(o.access.org_id())
 }
 
-async fn require(state: &AppState, o: &Org, meta: &ReqMeta, p: P, resource: &Resource) -> Result<(), ApiError> {
+pub(crate) async fn require(
+    state: &AppState,
+    o: &Org,
+    meta: &ReqMeta,
+    p: P,
+    resource: &Resource,
+) -> Result<(), ApiError> {
     match state.svc()?.authz.authorize(&o.access, p, resource) {
         Ok(()) => Ok(()),
         Err(d) => {
@@ -62,6 +68,13 @@ async fn require(state: &AppState, o: &Org, meta: &ReqMeta, p: P, resource: &Res
             Err(crate::errors::denied(d))
         }
     }
+}
+
+/// Reads go through the configured engine too (RBAC or Cedar), so a policy that forbids a read is
+/// enforced. Denied reads are not audited here: cross-tenant reads are audited at membership
+/// resolution, and in-tenant read denials are UI navigation, not escalation attempts.
+pub(crate) fn require_read(state: &AppState, o: &Org, p: P, resource: &Resource) -> Result<(), ApiError> {
+    state.svc()?.authz.authorize(&o.access, p, resource).map_err(crate::errors::denied)
 }
 
 // ------------------------------------------------------------------ organisations
@@ -183,12 +196,14 @@ pub async fn overview(
     o: Org,
     Query(q): Query<DaysQuery>,
 ) -> Result<Json<dto::OrgOverview>, ApiError> {
-    o.access.require(P::OrgRead).api()?;
+    require_read(&state, &o, P::OrgRead, &Resource::Organization)?;
     let svc = state.svc()?;
     let days = q.days.unwrap_or(14).clamp(1, 90);
     let since = OffsetDateTime::now_utc() - time::Duration::days(i64::from(days));
     let mut widgets = dto::OrgWidgets::default();
-    if o.access.can(P::RunsRead) {
+    // Each widget is decided by the engine, like the endpoint behind it.
+    let allowed = |p: P| require_read(&state, &o, p, &Resource::Organization).is_ok();
+    if allowed(P::RunsRead) {
         // Cached aggregate (15s, jittered). The cache key covers only authorization-independent
         // data (org + range); permission gating happens after retrieval, never via the key.
         let key = state.cache.key("org-usage", 1, &[&o.access.org_id().to_string(), &days.to_string()]);
@@ -208,13 +223,13 @@ pub async fn overview(
         widgets.runs = Some(stats);
         widgets.usage = Some(usage);
     }
-    if o.access.can(P::MembersRead) {
+    if allowed(P::MembersRead) {
         widgets.members = Some(orgs::list_members(&svc.db, &o.access).await.api()?.len());
     }
-    if o.access.can(P::MembersInvite) {
+    if allowed(P::MembersInvite) {
         widgets.pending_invitations = Some(orgs::list_pending_invitations(&svc.db, &o.access).await.api()?.len());
     }
-    if o.access.can(P::AuditRead) {
+    if allowed(P::AuditRead) {
         let page = app_db::audit::list(&svc.db, Some(o.access.org_id()), &Default::default(), None, 10).await.api()?;
         widgets.recent_audit = Some(page.items);
     }
@@ -227,7 +242,7 @@ pub async fn list_members(
     State(state): State<AppState>,
     o: Org,
 ) -> Result<Json<dto::ListResponse<orgs::MemberRow>>, ApiError> {
-    o.access.require(P::MembersRead).api()?;
+    require_read(&state, &o, P::MembersRead, &Resource::Organization)?;
     Ok(Json(dto::ListResponse::new(orgs::list_members(&state.svc()?.db, &o.access).await.api()?)))
 }
 
@@ -327,7 +342,7 @@ pub async fn list_invitations(
     State(state): State<AppState>,
     o: Org,
 ) -> Result<Json<dto::ListResponse<orgs::InvitationRow>>, ApiError> {
-    o.access.require(P::MembersInvite).api()?;
+    require_read(&state, &o, P::MembersInvite, &Resource::Organization)?;
     Ok(Json(dto::ListResponse::new(orgs::list_pending_invitations(&state.svc()?.db, &o.access).await.api()?)))
 }
 
@@ -464,7 +479,7 @@ pub async fn list_teams(
     State(state): State<AppState>,
     o: Org,
 ) -> Result<Json<dto::ListResponse<orgs::TeamRow>>, ApiError> {
-    o.access.require(P::TeamsRead).api()?;
+    require_read(&state, &o, P::TeamsRead, &Resource::Organization)?;
     Ok(Json(dto::ListResponse::new(orgs::list_teams(&state.svc()?.db, &o.access).await.api()?)))
 }
 
@@ -560,7 +575,7 @@ pub async fn list_team_members(
     o: Org,
     Path((_s, team)): Path<(String, Uuid)>,
 ) -> Result<Json<dto::ListResponse<Uuid>>, ApiError> {
-    o.access.require(P::TeamsRead).api()?;
+    require_read(&state, &o, P::TeamsRead, &Resource::Organization)?;
     Ok(Json(dto::ListResponse::new(orgs::list_team_members(&state.svc()?.db, &o.access, team).await.api()?)))
 }
 
@@ -570,7 +585,7 @@ pub async fn list_roles(
     State(state): State<AppState>,
     o: Org,
 ) -> Result<Json<dto::ListResponse<orgs::RoleRow>>, ApiError> {
-    o.access.require(P::RolesRead).api()?;
+    require_read(&state, &o, P::RolesRead, &Resource::Organization)?;
     Ok(Json(dto::ListResponse::new(orgs::list_roles(&state.svc()?.db, &o.access).await.api()?)))
 }
 
@@ -702,7 +717,7 @@ pub async fn list_api_keys(
     State(state): State<AppState>,
     o: Org,
 ) -> Result<Json<dto::ListResponse<app_db::api_keys::ApiKeyRow>>, ApiError> {
-    o.access.require(P::ApiKeysRead).api()?;
+    require_read(&state, &o, P::ApiKeysRead, &Resource::Organization)?;
     Ok(Json(dto::ListResponse::new(app_db::api_keys::list(&state.svc()?.db, &o.access).await.api()?)))
 }
 
@@ -901,7 +916,7 @@ pub async fn list_runs(
     o: Org,
     Query(q): Query<RunsQuery>,
 ) -> Result<Json<app_db::pagination::Page<app_domain::Run>>, ApiError> {
-    o.access.require(P::RunsRead).api()?;
+    require_read(&state, &o, P::RunsRead, &Resource::Organization)?;
     let cursor = match &q.cursor {
         Some(c) => Some(Cursor::decode(c).ok_or(ApiError::BadRequest("invalid cursor".into()))?),
         None => None,
@@ -974,7 +989,7 @@ pub async fn get_run(
     o: Org,
     Path((_s, id)): Path<(String, Uuid)>,
 ) -> Result<Json<app_domain::Run>, ApiError> {
-    o.access.require(P::RunsRead).api()?;
+    require_read(&state, &o, P::RunsRead, &Resource::Organization)?;
     Ok(Json(runs::get(&state.svc()?.db, &o.access, id).await.api()?))
 }
 
@@ -1006,7 +1021,7 @@ pub async fn run_analytics(
     o: Org,
     Query(q): Query<AnalyticsParams>,
 ) -> Result<Json<dto::RunAnalytics>, ApiError> {
-    o.access.require(P::RunsRead).api()?;
+    require_read(&state, &o, P::RunsRead, &Resource::Organization)?;
     let Some(analytics) = state.analytics_query.clone() else { return Err(ApiError::NotFound) };
     let days = q.days.unwrap_or(30).clamp(1, 365);
     let (created, finished) = tokio::try_join!(

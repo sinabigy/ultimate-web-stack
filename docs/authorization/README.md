@@ -25,7 +25,7 @@ System roles and organisation roles are independent (invariant 9):
 - System-admin actions can require a session authenticated with MFA
   (`auth.require_mfa_for_system_admin`) and recent re-authentication.
 
-## Organisation permissions (22)
+## Organisation permissions
 
 | permission | viewer | member | manager | admin | owner |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -39,7 +39,7 @@ Custom roles are per-organisation subsets of this catalogue (`roles:manage`). Th
 code (`backend/crates/authz/src/permission.rs`) and is synced to the `permissions` table at
 startup.
 
-## System permissions (10)
+## System permissions
 
 `system:users:read|manage`, `system:orgs:read|manage`, `system:audit:read`,
 `system:jobs:read|manage`, `system:providers:read`, `system:health:read`, `system:roles:read`.
@@ -54,7 +54,7 @@ flowchart LR
   F --> Q{member / bound to this org?}
   Q -- no --> NF[404 Not Found + audit organization.access_denied]
   Q -- yes --> OA[OrgAccess proof value]
-  OA --> H[handler: access.require permission]
+  OA --> H[handler: require / require_read<br/>through the configured engine]
   H -- missing --> D403[403 problem+json + audit authz.denied]
   H -- ok --> RES[resource rule: ownership, escalation, last owner]
   RES --> Q2[tenant-scoped SQL<br/>WHERE organization_id = access.org_id]
@@ -77,13 +77,58 @@ flowchart LR
   - A key can never exceed what its creator can currently do. If the creator is removed from the
     organisation, the key stops working.
 
+## Adding a permission and protecting a new endpoint
+
+This works the same with RBAC and Cedar. Cedar needs no policy change: `base.cedar` permits any
+organisation permission the principal holds (`allow_org`). The steps:
+
+1. **Declare the permission** in `backend/crates/authz/src/permission.rs`, as
+   `ProjectsRead => "projects:read", "View projects";`. It is synced to the `permissions` table at
+   startup, so custom roles can use it.
+2. **Grant it to built-in roles** in `builtin_permissions` (`backend/crates/authz/src/rbac.rs`).
+   If API keys must not hold it, exclude it in `assignable_to_credentials` (`permission.rs`);
+   membership administration is always excluded.
+3. **Pin the decision** with rows in `role_permission_matrix`
+   (`backend/crates/authz/tests/conformance.rs`). These run against both engines, and the
+   differential property test picks up the new permission automatically.
+4. **Protect the handler** with the helpers in `backend/crates/api/src/routes/orgs.rs`. Both go
+   through the configured engine (`AppState` → `authz.authorize`):
+   - writes: `require(&state, &o, &meta, P::X, &resource).await?`, which audits denials as
+     `authz.denied` (invariant 10);
+   - reads: `require_read(&state, &o, P::X, &resource)?`, which does not audit (cross-tenant probes
+     are already audited when the organisation is resolved).
+
+   Use `Resource::Owned { owner_id }` when ownership matters (see the run handlers). Never decide
+   with `access.can()` or `access.require()` in a handler: those read the precomputed set and skip
+   resource rules.
+5. **Scope the data** with repository functions that take `&OrgAccess`, never an organisation
+   id. Write the change and its audit event in one transaction
+   (`app_db::audit::insert(&mut *tx, &ev(&state, &o, &meta, "thing.created"))`).
+6. **Test through HTTP** (`backend/crates/api/tests/`, harness `support::TestApp`):
+   - the allowed role;
+   - a denied role (403, and the `authz.denied` audit for writes);
+   - another tenant (404 by slug and by id);
+   - anonymous (401).
+
+   For engine-specific behaviour, set `c.authorization.engine` in `TestApp::with_config`;
+   `authorization_matrix.rs` runs the whole matrix under both engines.
+7. **Frontend**: `./dev types` regenerates bindings. Hide controls by checking the permission
+   list the overview returns (`permissions`), but remember that hiding is only convenience: the
+   server already enforces every decision (invariant 2).
+
 ## Policy engines
 
 - **RBAC** (default) is `backend/crates/authz/src/rbac.rs`.
 - **Cedar** (optional, feature `cedar`, `authorization.engine = "cedar"`) uses the same
   `Authorizer` trait, with policies in `backend/crates/authz/policies/base.cedar`.
 - A conformance test and a differential property test check that RBAC and Cedar make identical
-  decisions for generated principals, roles and actions.
+  decisions for generated principals, roles and actions. `authorization_matrix.rs` also runs the
+  HTTP boundary matrix under both engines.
+- **How Cedar decides.** When the organisation is resolved, Cedar filters every candidate
+  permission, so project `forbid` policies shape `OrgAccess`. Then `require` and `require_read`
+  evaluate each request against the concrete resource (ownership, escalation). A project policy
+  therefore applies to reads and writes alike;
+  `cedar_project_policy_forbids_a_read_over_http` proves it.
 
 ## Security tests (invariant 8)
 

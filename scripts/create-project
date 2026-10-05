@@ -362,6 +362,12 @@ def main() -> int:
     if a.objective:
         init += ["--objective", a.objective]
     subprocess.run(init, cwd=dest, check=True, stdout=subprocess.DEVNULL)
+    # The blueprint ships a complete, confirmed command set; drop guesses the stack inference adds
+    # (e.g. `python -m unittest discover`, which finds no tests in a product).
+    project = json.loads(pj.read_text())
+    cmds = project["validation"]["commands"]
+    cmds[:] = [c for c in cmds if c.get("confirmed") or c.get("source") != "conventional-default"]
+    pj.write_text(json.dumps(project, indent=2, ensure_ascii=False) + "\n")
 
     # 6. git
     if not a.no_git:
