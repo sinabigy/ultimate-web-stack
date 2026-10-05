@@ -25,7 +25,12 @@ fi
 # 2. Machine- and person-identifying strings in tracked files and in every historical diff.
 user=$(id -un); host=$(hostname -s 2>/dev/null || hostname)
 patterns=("$HOME" "/Users/$user" "/home/$user")
-[ ${#user} -ge 4 ] && patterns+=("$user")
+allowed=$(sed -e 's/#.*//' -e 's/[[:space:]]//g' scripts/release-audit.allow 2>/dev/null | grep -v '^$' || true)
+is_allowed() { echo "$allowed" | grep -qxF -- "$1"; }
+if [ ${#user} -ge 4 ]; then
+  if is_allowed "$user"; then pass "'$user' is an intentionally public handle (scripts/release-audit.allow); paths still checked"
+  else patterns+=("$user"); fi
+fi
 [ ${#host} -ge 4 ] && [ "$host" != "localhost" ] && patterns+=("$host")
 for p in "${patterns[@]}"; do
   hits=$(git ls-files -z | xargs -0 grep -IlF -- "$p" 2>/dev/null | head -5)
@@ -38,7 +43,7 @@ done
 idents=$( { git log --all --format='%an <%ae>%n%cn <%ce>'
             git for-each-ref --format='%(taggername) %(taggeremail)' refs/tags | grep -v '^ *$'; } | sort -u)
 echo "$idents" | while read -r line; do echo "        identity in history: $line"; done
-if echo "$idents" | grep -qiE '\.(local|lan|home|mymodem)>|@[a-z0-9-]+\.(local|lan|home)'; then
+if echo "$idents" | grep -qiE '\.(local|lan|home|mymodem|localdomain)>|@[A-Za-z0-9-]+\.(local|lan|home)>|@Mac[.>]'; then
   fail "history identities include a machine hostname email; rewrite authorship (launch: rewrite-author.sh) or confirm"
 else
   warn "confirm the identities above are the ones you want public"
