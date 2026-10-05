@@ -202,6 +202,19 @@
         "note": "Benchmark regression gates: a synthetic slowdown fails, noise within tolerance passes, other machines are not compared, invariants always apply."
       },
       {
+        "id": "generator-selftest",
+        "stage": "unit",
+        "cmd": "python3 -m unittest discover -s scripts/tests",
+        "requires": [
+          "python3",
+          "git"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "timeout_s": 600,
+        "note": "create-project: generated projects match their flags (architecture, config, validation, removed parts) and pass ai-check."
+      },
+      {
         "id": "rust-test-cache",
         "stage": "integration",
         "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache",
@@ -634,7 +647,8 @@
       "docs/benchmarks/runtime.md",
       "docs/deployment/README.md",
       "docs/benchmarks/release-profile.md",
-      "docs/README.md"
+      "docs/README.md",
+      "scripts/create-project"
     ]
   }
 }

@@ -20,6 +20,10 @@ const backendEnv = {
   APP__AUTH__POST_LOGOUT_REDIRECT_URL: `${APP}/login`,
   APP__AUTH__SYSTEM_ROLES_FROM_IDP: "true",
   APP__AUTH__REQUIRE_MFA_FOR_SYSTEM_ADMIN: "true",
+  // E2E exercises the full feature set whatever profile config/app.toml selects.
+  APP__TENANCY__ORGANIZATIONS: "true",
+  APP__TENANCY__ALLOW_ORG_CREATION: "true",
+  APP__ADMIN__ENABLED: "true",
   APP__LOG__FORMAT: "json",
   RUST_LOG: "warn",
 };

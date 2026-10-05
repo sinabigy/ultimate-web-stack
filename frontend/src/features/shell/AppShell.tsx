@@ -12,6 +12,7 @@ import {
 } from "solid-js";
 import { api } from "../../api/endpoints";
 import { useSession } from "../../auth/session";
+import { BRAND } from "../../brand";
 import { RealtimeIndicator } from "../../components/data";
 import { Icon, type IconName } from "../../components/icons";
 import { Avatar, Badge, Kbd, Menu, MenuItem } from "../../components/ui";
@@ -51,7 +52,7 @@ function Sidebar(props: { open: boolean; onNavigate: () => void }) {
         <span class="brand-mark" aria-hidden="true">
           <Icon name="activity" size={16} />
         </span>
-        App
+        {BRAND}
       </div>
       <Show when={session()?.features.organizations && (session()?.organizations.length ?? 0) > 0}>
         <div class="org-switch">
