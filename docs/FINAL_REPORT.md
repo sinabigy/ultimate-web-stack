@@ -217,7 +217,54 @@ Deployment and correctness fixes found the same way:
   (generator acceptance).
 
 ## Clean-room findings
-<!-- CLEANROOM -->
+Two agents were each given only a freshly generated repository and a product request.
+
+| | run 1 | run 2 (release candidate) |
+|---|---|---|
+| project | `performance`, `b2b`, Cedar | default `core`, `b2b` |
+| feature | organization Projects (CRUD, permissions, audit, UI) | organization Announcements with member notifications |
+| `./dev check` | 23/23 | 22/22 (includes release smoke and live systemd) |
+| live proof | member 403, cross-tenant 404 | member writes 403 (audited), cross-tenant 404 by slug and id, notifications only to the other members |
+| looked outside the repo | no | no |
+
+Run 2 scorecard (all **yes**):
+1. discover architecture;
+2. retrieve knowledge;
+3. authorization conventions;
+4. database state;
+5. backend API;
+6. frontend;
+7. tenant isolation;
+8. audit;
+9. tests;
+10. validation;
+11. durable AI knowledge.
+
+The authorization recipe and `CONVENTIONS.md` were named as the decisive documents.
+
+Reusable gaps found, all fixed in the blueprint:
+- **Run 1:**
+  - the logout CSRF race (a real bug);
+  - E2E collided with a running dev stack;
+  - two authorization call paths with no guidance;
+  - no "add a permission" guide;
+  - an empty conventions file;
+  - the sqlx `DATABASE_URL` workflow undocumented;
+  - stale constraints and architecture entries;
+  - an inferred placeholder validation command.
+- **Run 2:**
+  - `./dev test --journey` needed an undocumented env var (now set by `./dev up` with the mock
+    IdP);
+  - no guidance for a feature request arriving before discovery;
+  - the notification system undocumented;
+  - a hand-maintained read-permission list in `deny()` (now derived from the `:read` suffix);
+  - org navigation in three places undocumented;
+  - `./dev check` duration and VM memory undocumented.
+
+Not fixed in the blueprint, because they are protocol-tool issues that belong to
+ai-project-template:
+- the result-packet `lessons` shape is not shown in `docs/protocol/task-lifecycle.md`;
+- `ai-validate` output is buffered when redirected.
 
 ## Deployment options
 | tier | artefact | verified |

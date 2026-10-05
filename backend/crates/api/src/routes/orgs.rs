@@ -50,10 +50,9 @@ pub(crate) async fn require(
 /// reads are audited at membership resolution. Use it for structural checks that follow
 /// `require` (escalation, credential scopes) so their denials are audited too.
 pub(crate) async fn deny(state: &AppState, o: &Org, meta: &ReqMeta, p: P, d: app_authz::Denied) -> ApiError {
-    let read = matches!(
-        p,
-        P::OrgRead | P::MembersRead | P::TeamsRead | P::RolesRead | P::RunsRead | P::ApiKeysRead | P::BillingRead
-    );
+    // Reads are the `*:read` permissions (no list to maintain when one is added). Exception: a
+    // denied attempt to read the audit trail is itself security evidence.
+    let read = p.key().ends_with(":read") && p != P::AuditRead;
     if !read && let Ok(svc) = state.svc() {
         let e =
             audit::event(Some(&o.principal), meta, state.config.auth.store_client_ip, "authz.denied", Outcome::Denied)

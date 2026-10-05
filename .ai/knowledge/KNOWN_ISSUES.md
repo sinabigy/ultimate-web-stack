@@ -32,9 +32,20 @@ _Open problems that a future worker must not rediscover the hard way. Each entry
   unexpected response from SSLRequest: 0x00`. This happened in 2 of 3 full validations of
   generated projects (inside `./dev check`, `rust-test`), each time a different test.
 - **Not reproduced**: seven standalone `cargo test --workspace` runs right afterwards all passed.
-- **Suspected cause (unverified)**: the colima 0.10.3 host port forwarder under bursts of new
-  connections. `sqlx::test` creates a database and a pool per test, in parallel. A PostgreSQL
-  refusal would be an `E` message, not `0x00`.
+- **Likely cause**: the colima 0.10.3 host port forwarder. The failure drill showed the
+  forwarder producing exactly this error (`SSLRequest: 0x00`) whenever it cannot reach the
+  container: with PostgreSQL stopped, the host port still accepts the TCP connection. Under a burst
+  of new connections (`sqlx::test` creates a database and a pool per test, in parallel), it
+  occasionally fails the same way while PostgreSQL is up. Not reproduced on Linux.
+- **Hardening that came out of it**: protocol errors now map to a retryable 503 (`app-db`
+  `outages_are_unavailable_not_internal`), not a 500.
 - **Impact**: a red `rust-test` that passes on rerun. CI on Linux (no VM forwarder) has not run yet, because nothing has been pushed.
 - **Next step**: if it recurs, try lima's SSH port forwarder or run the tests inside the VM to
   confirm the cause. Do not add blind retries to the test harness.
+
+## Cosmetic UI gaps seen in browser acceptance (2026-10-05)
+- The admin overview "Job queues" chart renders an empty card when no jobs are queued, instead of
+  an empty-state message (`frontend/test-results/journey/acceptance-09-admin-overview.png`).
+- On an organization "Not found" page, the organization switcher shows an empty selection instead
+  of the user's current workspace.
+- **Impact**: cosmetic only; authorization and data are correct. Not release blockers.

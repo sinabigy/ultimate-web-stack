@@ -1,8 +1,8 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { signIn, unique } from "../e2e/helpers";
 
-// Browser acceptance against a RUNNING full stack (`./dev up`, started with
-// APP__AUTH__SYSTEM_ROLES_FROM_IDP=true so the mock IdP can assert system roles). One test per
+// Browser acceptance against a RUNNING stack (`./dev up`: with the mock IdP it lets the login form
+// assert system roles, which the auditor and admin tests need). One test per
 // role; every boundary is checked in the browser AND at the API, because hiding a control is
 // never the evidence. Screenshots: test-results/journey/acceptance-*.png.
 //   ./dev test --journey

@@ -38,7 +38,9 @@ Two options:
 - **`auth.bootstrap_system_admins = ["ops@example.com"]`**: granted at first login, and only if the
   IdP reports the email as *verified*. A test covers this.
 - **`auth.system_roles_from_idp = true`**: the system role is taken from the IdP's role claim at
-  every login. With ZITADEL this is the project role `system_admin` or `system_auditor` on the
+  every login. `./dev up` with the mock IdP turns this on (development only), so entering
+  `system_admin` or `system_auditor` in the mock form's "IdP roles" field, with method
+  "Password + TOTP", opens the console. With ZITADEL this is the project role `system_admin` or `system_auditor` on the
   user; `scripts/zitadel_bootstrap.py` grants it to the dev user `alice@example.com`.
 
 ## Tests

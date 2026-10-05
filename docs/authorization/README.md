@@ -83,7 +83,8 @@ This works the same with RBAC and Cedar. Cedar needs no policy change: `base.ced
 organisation permission the principal holds (`allow_org`). The steps:
 
 1. **Declare the permission** in `backend/crates/authz/src/permission.rs`, as
-   `ProjectsRead => "projects:read", "View projects";`. It is synced to the `permissions` table at
+   `ProjectsRead => "projects:read", "View projects";`. Read permissions must end in `:read`:
+   denial auditing treats those as reads. It is synced to the `permissions` table at
    startup, so custom roles can use it.
 2. **Grant it to built-in roles** in `builtin_permissions` (`backend/crates/authz/src/rbac.rs`).
    If API keys must not hold it, exclude it in `assignable_to_credentials` (`permission.rs`);

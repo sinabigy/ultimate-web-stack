@@ -1,0 +1,82 @@
+# Changelog
+
+All notable changes to the blueprint. Versions are git tags (`vX.Y.Z`). Generated projects record
+the version they came from in `.ai/config/project.json → architecture.origin.version` and in
+their README.
+
+## 1.0.0 — 2026-10-05
+
+First stable blueprint. Architecture frozen; changes from here on need a failing acceptance test
+or new evidence (see the ADR reversal conditions).
+
+### Compatibility
+- **AI protocol**: ai-project-template / `ai_protocol_version` 1.2.0 (`tools/ai-init --derive` for
+  generated projects).
+- **Toolchains**: Rust 1.99.0 (pinned), Node ≥ 22, Python ≥ 3.11, Docker with compose.
+- **Services**:
+  - PostgreSQL 18;
+  - optional: Redis 8, NATS 2.14.7, ClickHouse 26.3.25.2;
+  - ZITADEL v4.19.4 for local identity;
+  - observability: Prometheus v3.15.0, Tempo 3.1.0, Loki 3.7.8, Alloy v1.20.1, Grafana 13.2.3.
+- **Benchmark environment** for every recorded number: Apple M5 (10 cores, 16 GB), macOS 26.5.1,
+  colima 0.10.3 VM with 2 CPU / 4 GiB; 2026-10-04 and 2026-10-05.
+
+### Included
+- **Core:**
+  - SolidJS + TypeScript + Vite SPA;
+  - Rust (Tokio, axum, SQLx) API and worker;
+  - PostgreSQL as the single source of truth.
+- **Identity and access:**
+  - OIDC BFF with cookie sessions, CSRF and MFA step-up;
+  - organizations, invitations, teams and custom roles;
+  - RBAC or Cedar, with an `OrgAccess` proof type;
+  - API keys and service accounts;
+  - an append-only audit trail;
+  - a separate system admin and auditor trust level.
+- **Dashboards:** user, organization and system admin.
+- **Platform:**
+  - PostgreSQL job queue;
+  - realtime (SSE and WebSocket);
+  - an outbound API engine (learned rate, adaptive concurrency, breaker);
+  - W3C tracing, Prometheus metrics, an internal ops port.
+- **Optional modules** (cargo feature + config + compose + CI + validation command):
+  - Redis cache;
+  - NATS/JetStream;
+  - ClickHouse analytics;
+  - the observability stack;
+  - the Pingora gateway.
+- **Deployment tiers:** a distroless image with production compose, systemd + Caddy, and a
+  Kubernetes base.
+- **Generator and validator:** `scripts/create-project`, `scripts/validate-generated`.
+- **Evidence:**
+  - the benchmark harness with gates;
+  - the system smoke test, browser acceptance and failure drill;
+  - the live systemd test and release smoke;
+  - ADRs 0003–0011.
+
+### Decided by measurement
+See `docs/benchmarks/SUMMARY.md`.
+- **Default:** split outbound controllers, the PostgreSQL queue, the in-process cache, Tokio +
+  axum, thin LTO, trace propagation.
+- **Profile-specific:** NATS, ClickHouse, Redis, Pingora.
+- **Inconclusive:** PGO, mimalloc, jemalloc, thread-per-core Tokio, Dragonfly.
+- **Rejected:** Monoio/io_uring, a default proxy hop, a Redis session cache, fat LTO by default.
+
+### Fixed during release acceptance
+- **Authorization:**
+  - an empty organization update ran without an authorization decision;
+  - escalation and credential-scope denials were not audited;
+  - organization reads now share the engine path.
+- **Logout:** it could race the CSRF token and leave the user signed in.
+- **Worker crash-loop:** under systemd and Kubernetes, `APP__WORKER__PORT` was rejected. It is
+  now the `worker.port` config key, and every deployment `APP__` variable is checked by a test.
+- **Readiness:** PostgreSQL shutdown codes and protocol errors now return 503 instead of 500;
+  NATS outages now show in readiness.
+- **Reproducibility:**
+  - E2E runs beside a running dev stack;
+  - `./dev check` starts the services its commands need.
+- **Generator:**
+  - failure cleanup;
+  - no source-machine paths;
+  - no inferred placeholder commands;
+  - unselected modules leave no CI services.
