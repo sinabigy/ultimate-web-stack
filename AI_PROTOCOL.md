@@ -1,6 +1,6 @@
 # AI Protocol
 
-ai_protocol_version: 1.1.0. This is the hot path: invariants only. Detailed guidance is in `docs/protocol/`; retrieve it only when a rule below is not enough.
+ai_protocol_version: 1.2.0. This is the hot path: invariants only. Detailed guidance is in `docs/protocol/`; retrieve it only when a rule below is not enough.
 
 The repository owns the project. Workers (any AI model, agent or human) are replaceable. Tools establish facts. Tests establish executable truth. The user defines the objective.
 

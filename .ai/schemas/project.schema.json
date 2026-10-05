@@ -47,6 +47,7 @@
           "enum": [
             "greenfield",
             "retrofit",
+            "derived",
             null
           ]
         },
@@ -58,6 +59,33 @@
         },
         "template_version": {
           "type": "string"
+        },
+        "derived_from": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Provenance when this instance was derived (ai-init --derive) from another protocol-enabled project, e.g. a blueprint.",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "derived_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "name"
+          ]
         }
       }
     },
@@ -201,7 +229,7 @@
         },
         "components": {
           "type": "object",
-          "description": "Role \u2192 technology id, e.g. {\"frontend\": \"solidjs\", \"backend\": \"rust-axum\"}.",
+          "description": "Role → technology id, e.g. {\"frontend\": \"solidjs\", \"backend\": \"rust-axum\"}.",
           "propertyNames": {
             "pattern": "^[a-z][a-z0-9_]*$"
           },
@@ -212,7 +240,7 @@
         },
         "modules": {
           "type": "object",
-          "description": "Optional capability \u2192 state. Disabled modules are recorded so a worker knows they exist and why they are off.",
+          "description": "Optional capability → state. Disabled modules are recorded so a worker knows they exist and why they are off.",
           "propertyNames": {
             "pattern": "^[a-z][a-z0-9_]*$"
           },

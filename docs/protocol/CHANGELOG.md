@@ -1,5 +1,16 @@
 # Template changelog
 
+## 1.2.0 (protocol 1.2.0)
+- **`ai-init --derive`.** Starts a new project instance from a copy of an initialized project,
+  for example one generated from a blueprint (ADR 0003).
+  - Reset: task history, task summaries and state.
+  - Kept: knowledge, decisions, constraints, confirmed validation commands and the architecture
+    block.
+  - Recorded: provenance, in `instance.derived_from` and `architecture.origin`.
+
+  Plain `ai-init` on an initialized repository still changes nothing.
+- Schema: `instance.origin` accepts `derived`; new optional `instance.derived_from`.
+
 ## 1.1.0 (protocol 1.1.0)
 - **Fix: OS metadata files.** `.DS_Store`, `Thumbs.db`, `desktop.ini` and AppleDouble `._*` files are excluded from listings and ignored by `.gitignore`. On macOS, Finder's `.DS_Store` made a fresh template copy initialize as a *retrofit* (and failed `test_greenfield_init`).
 - **`project.json → architecture` (optional).** Machine-readable architecture state: `profile`, `components` (role → technology), `modules` (name → `{enabled, adapter, paths, reason, evidence}`), `deployment`, `knowledge`, and `origin` provenance for projects generated from a blueprint. `ai-check` validates it and warns when an enabled module's paths, evidence or knowledge entries are missing. Disabled modules are recorded deliberately so workers know an option exists and why it is off.

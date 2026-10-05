@@ -16,8 +16,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-TEMPLATE_VERSION = "1.1.0"
-AI_PROTOCOL_VERSION = "1.1.0"
+TEMPLATE_VERSION = "1.2.0"
+AI_PROTOCOL_VERSION = "1.2.0"
 MAPPER_VERSION = "1.1.0"
 
 TASK_STATUSES = ("queue", "active", "blocked", "completed")

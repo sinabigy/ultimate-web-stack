@@ -3,6 +3,8 @@
 
   python3 tools/ai-init [--name "Project"] [--objective "..."]          # in a copied template
   python3 /path/to/template/tools/ai-init --target /path/to/repo [...]  # retrofit an existing repo
+  python3 tools/ai-init --derive --name "New" [--origin-name B --origin-version V]
+                                                  # new project from a copy of an initialized one
 
 Behaviour:
 - Never overwrites existing files. --force only refreshes protocol-owned files (AI_PROTOCOL.md,
@@ -12,6 +14,11 @@ Behaviour:
 - Inferred validation commands are recorded with provenance and confirmed=false. They are never run.
 - Resets template state, instantiates the project-discovery task, maps the repo, runs ai-check.
 - Idempotent: re-running on an initialized repository only refreshes the map and runs ai-check.
+- --derive (in a copy of an initialized project, e.g. one generated from a blueprint): starts a
+  new instance. Task history, task summaries and state are reset (they belong to the source
+  project); knowledge, decisions, constraints, confirmed validation commands and the
+  architecture block are kept (inherited). Provenance goes to instance.derived_from and, when
+  present, architecture.origin.
 """
 from __future__ import annotations
 
@@ -187,6 +194,35 @@ def initialize(root: Path, name: str | None, objective: str | None, origin: str 
     mapper.main(["--root", str(root), "--quiet"])  # refresh after writing files
 
 
+def derive(root: Path, name: str | None, objective: str | None, origin_name: str | None,
+           origin_version: str | None, log: list[str]) -> None:
+    project = L.load_json(root / ".ai/config/project.json")
+    if project["instance"]["state"] != "initialized":
+        raise SystemExit("ai-init --derive: run it in a copy of an initialized project (use plain ai-init for a template)")
+    source = project.get("name") or "unknown"
+    removed = 0
+    for status in ("queue", "active", "blocked", "completed"):
+        for f in (root / ".ai/tasks" / status).glob("*.json"):
+            f.unlink()
+            removed += 1
+    for f in (root / ".ai/context/summaries").glob("*.json"):
+        f.unlink()
+    log.append(f"derived from {source!r}: removed {removed} inherited task(s) and their summaries")
+    derived_from = {"name": origin_name or source, "version": origin_version, "derived_at": L.now_iso()}
+    arch = project.get("architecture")
+    if isinstance(arch, dict):
+        arch["origin"] = {"name": derived_from["name"], "version": origin_version or "unversioned",
+                          "source": source, "generated_at": derived_from["derived_at"]}
+    project["instance"] = {"state": "template", "origin": None, "initialized_at": None,
+                           "template_version": project["instance"].get("template_version", L.TEMPLATE_VERSION),
+                           "derived_from": derived_from}
+    L.dump_json(root, ".ai/config/project.json", project)
+    initialize(root, name, objective, "derived", [], log)
+    project = L.load_json(root / ".ai/config/project.json")
+    project["instance"]["derived_from"] = derived_from
+    L.dump_json(root, ".ai/config/project.json", project)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--name")
@@ -194,10 +230,16 @@ def main(argv=None) -> int:
     ap.add_argument("--target", help="retrofit into this existing directory instead of initializing in place")
     ap.add_argument("--force", action="store_true", help="refresh protocol-owned files during retrofit")
     ap.add_argument("--no-check", action="store_true")
+    ap.add_argument("--derive", action="store_true", help="start a new instance from a copy of an initialized project")
+    ap.add_argument("--origin-name", help="with --derive: what it was derived from (default: the source project name)")
+    ap.add_argument("--origin-version", help="with --derive: version of the source (e.g. blueprint release)")
     a = ap.parse_args(argv)
     log: list[str] = []
     src = L.TEMPLATE_ROOT
-    if a.target and Path(a.target).resolve() != src:
+    if a.derive:
+        root = Path(a.target).resolve() if a.target else src
+        derive(root, a.name, a.objective, a.origin_name, a.origin_version, log)
+    elif a.target and Path(a.target).resolve() != src:
         root = Path(a.target).resolve()
         bad = retrofit(src, root, a.force, log)
         initialize(root, a.name, a.objective, None, bad, log)
