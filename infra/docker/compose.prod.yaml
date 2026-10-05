@@ -1,0 +1,61 @@
+# Container deployment tier (single host): API + worker + PostgreSQL from the release image.
+#   APP_ENV_FILE=/etc/app/app.env docker compose -f infra/docker/compose.prod.yaml up -d
+# Put a TLS-terminating proxy (Caddy, nginx, cloud LB) in front of port 8080.
+# Every secret comes from the environment file; the compose file refuses to start without them.
+name: ${COMPOSE_PROJECT_NAME:-app}
+
+x-app: &app
+  image: ${APP_IMAGE:-app:latest}
+  env_file: [ "${APP_ENV_FILE:?set APP_ENV_FILE to the production environment file}" ]
+  environment:
+    APP__ENVIRONMENT: production
+    APP__DATABASE__URL: postgres://app:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/app
+  depends_on:
+    postgres: { condition: service_healthy }
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [ /tmp ]
+  cap_drop: [ ALL ]
+  security_opt: [ "no-new-privileges:true" ]
+  logging:
+    driver: json-file
+    options: { max-size: "50m", max-file: "5" }
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: [ pgdata:/var/lib/postgresql ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U app -d app" ]
+      interval: 2s
+      retries: 30
+    restart: unless-stopped
+
+  api:
+    <<: *app
+    environment:
+      APP__ENVIRONMENT: production
+      APP__DATABASE__URL: postgres://app:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/app
+      APP__DATABASE__MIGRATE_ON_START: "true"
+      APP__JOBS__RUN_IN_PROCESS: "false"   # the worker service runs jobs
+    ports: [ "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:8080" ]
+
+  worker:
+    <<: *app
+    entrypoint: [ "/app/app-worker" ]
+    healthcheck:
+      test: [ "CMD", "/app/app-worker", "healthcheck" ]
+      interval: 10s
+      timeout: 4s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      postgres: { condition: service_healthy }
+      api: { condition: service_healthy }   # the API applies migrations first
+
+volumes:
+  pgdata:

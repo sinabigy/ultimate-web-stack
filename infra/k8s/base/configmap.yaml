@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP__ENVIRONMENT: production
+  APP__HTTP__HOST: "0.0.0.0"
+  APP__HTTP__PORT: "8080"
+  APP__HTTP__OPS_PORT: "9090"
+  APP__HTTP__TRUST_FORWARDED_FOR: "true"      # only behind the cluster ingress
+  APP__LOG__FORMAT: json
+  APP__JOBS__RUN_IN_PROCESS: "false"          # the worker Deployment runs jobs
+  APP__DATABASE__MIGRATE_ON_START: "true"     # sqlx takes an advisory lock: safe with replicas
+  APP__AUTH__COOKIE_SECURE: "true"
+  # Set per environment (or patch in an overlay):
+  APP__AUTH__PUBLIC_ORIGIN: https://app.example.com
+  APP__AUTH__REDIRECT_URL: https://app.example.com/auth/callback
+  APP__AUTH__POST_LOGOUT_REDIRECT_URL: https://app.example.com/login
+  APP__AUTH__ISSUER_URL: https://id.example.com

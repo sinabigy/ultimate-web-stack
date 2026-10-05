@@ -1,0 +1,4 @@
+# Application configuration (non-secret). Precedence: built-in defaults < this file < APP__* env vars.
+# Secrets (database URL with password, client secret, token encryption key, API key pepper) must come
+# from the environment, never from this file. scripts/create-project writes a profile-specific version.
+# The blueprint itself runs on the built-in defaults (auth profile b2b, organizations, admin, RBAC).

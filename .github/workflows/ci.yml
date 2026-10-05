@@ -95,6 +95,14 @@ jobs:
           python3 tools/ai-validate --strict --keep-going
           --only web-install --only web-audit --only web-typecheck --only web-lint --only web-test --only web-build --only web-bundle-budget
 
+  deploy-tiers:
+    # Every deployment tier verified statically, then the release image built and smoke-tested.
+    runs-on: ubuntu-24.04
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 tools/ai-validate --strict --only infra-verify --only release-smoke
+
   e2e:
     runs-on: ubuntu-24.04
     needs: [backend, frontend]

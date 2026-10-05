@@ -1,0 +1,20 @@
+# Hyperscale tier (Kubernetes). kubectl apply -k infra/k8s/base after creating the `app-secrets`
+# Secret (see secret.example.yaml) and pointing the image at your registry:
+#   kustomize edit set image app=registry.example.com/app:<tag>
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs: { app.kubernetes.io/part-of: app }
+    includeSelectors: false
+resources:
+  - configmap.yaml
+  - api.yaml
+  - worker.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+images:
+  - name: app
+    newName: app
+    newTag: latest
