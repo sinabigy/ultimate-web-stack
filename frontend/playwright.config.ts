@@ -24,6 +24,8 @@ const backendEnv = {
   APP__TENANCY__ORGANIZATIONS: "true",
   APP__TENANCY__ALLOW_ORG_CREATION: "true",
   APP__ADMIN__ENABLED: "true",
+  APP__AUTH__METHODS__PASSKEY: "true",
+  APP__AUTH__METHODS__PASSWORD: "true",
   APP__LOG__FORMAT: "json",
   RUST_LOG: "warn",
 };

@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""validate-generated: prove a generated project works on its own (blueprint-only tool).
+
+    scripts/validate-generated PATH [--report FILE]
+
+Runs inside the generated project only (it never reads the blueprint):
+   1. git history present, ai-check, ai-map               (protocol)
+   2. ./dev setup                                         (toolchains, dependencies, hooks)
+   3. ./dev up --no-app                                   (services of the selected modules only)
+   4. ./dev check                                         (every canonical validation command,
+                                                           incl. tests, frontend/backend builds,
+                                                           E2E, infra verification, release image)
+   5. ./dev up + ./dev test --system                      (frontend/API/DB/auth/jobs/modules live)
+   6. absence of unselected modules: no service container, no client library in the server
+      binary, no enabled configuration
+Writes a JSON report (default: <project>/var/validation-report.json). Exit 1 on any failure.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+# module → (compose service, symbol that proves its client library is compiled in)
+MODULES = {
+    "cache": ("redis", "redis::"),
+    "messaging_nats": ("nats", "async_nats"),
+    "analytics_clickhouse": ("clickhouse", "clickhouse::"),
+}
+steps: list[dict] = []
+
+
+def step(name: str, ok: bool, detail: str = "", seconds: float | None = None) -> bool:
+    steps.append({"step": name, "ok": ok, "detail": detail, "seconds": seconds})
+    print(f"[{'PASS' if ok else 'FAIL'}] {name}{f' ({seconds:.0f}s)' if seconds else ''} {detail}", flush=True)
+    return ok
+
+
+def run(cmd: list[str] | str, cwd: Path, timeout: int = 3600, env: dict | None = None) -> tuple[int, str, float]:
+    t = time.time()
+    r = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str), capture_output=True, text=True, timeout=timeout,
+                       env={**os.environ, **(env or {})})
+    return r.returncode, (r.stdout + r.stderr), time.time() - t
+
+
+def wait_http(url: str, seconds: int) -> bool:
+    end = time.time() + seconds
+    while time.time() < end:
+        try:
+            with urllib.request.urlopen(url, timeout=2):
+                return True
+        except Exception:  # noqa: BLE001
+            time.sleep(2)
+    return False
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("path")
+    ap.add_argument("--report")
+    a = ap.parse_args()
+    root = Path(a.path).expanduser().resolve()
+    env = {"PATH": f"{Path.home()}/.cargo/bin:/opt/homebrew/bin:{os.environ.get('PATH', '')}"}
+    project = json.loads((root / ".ai/config/project.json").read_text())
+    modules = {m for m, v in project["architecture"]["modules"].items() if v.get("enabled")}
+    compose_name = re.search(r"COMPOSE_PROJECT_NAME:-([^}]+)\}", (root / "infra/docker/compose.yaml").read_text()).group(1)
+    print(f"validating {root} (compose project {compose_name}; modules: {sorted(modules)})")
+
+    code, out, _ = run(["git", "log", "--oneline"], root)
+    step("git repository initialised", code == 0 and bool(out.strip()), out.strip().splitlines()[0] if out.strip() else "")
+    code, out, s = run([sys.executable, "tools/ai-check"], root)
+    step("ai-check", code == 0, out.strip().splitlines()[-1] if out.strip() else "", s)
+    code, out, s = run([sys.executable, "tools/ai-map"], root)
+    step("ai-map", code == 0, "", s)
+    code, out, s = run(["./dev", "setup"], root, env=env)
+    step("./dev setup", code == 0, "", s)
+    code, out, s = run(["./dev", "up", "--no-app"], root, env=env)
+    step("./dev up --no-app (services)", code == 0, out.strip().splitlines()[-1][:100] if out.strip() else "", s)
+    code, out, s = run(["./dev", "check"], root, env=env, timeout=7200)
+    results = re.findall(r"^\[(PASS|FAIL|SKIP)\]\s+(\S+)", out, re.MULTILINE)
+    failed = [n for st, n in results if st != "PASS"]
+    summary = re.search(r"ai-validate: .*", out)
+    step("./dev check (all canonical validation)", code == 0, (summary.group(0) if summary else "") + (f" failed={failed}" if failed else ""), s)
+    steps[-1]["commands"] = [{"id": n, "status": st} for st, n in results]
+
+    # Live application: start it, then run the system smoke journey.
+    app = subprocess.Popen(["./dev", "up"], cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           env={**os.environ, **env}, start_new_session=True)
+    try:
+        up = wait_http("http://localhost:8080/readyz", 600) and wait_http("http://localhost:5190/", 120)
+        step("./dev up (API + SPA + mock IdP + simulated provider)", up)
+        if up:
+            code, out, s = run(["./dev", "test", "--system"], root, env=env, timeout=600)
+            smoke = re.search(r"system smoke: .*", out)
+            step("./dev test --system", code == 0, smoke.group(0) if smoke else out[-300:], s)
+            steps[-1]["checks"] = re.findall(r"^\s+(PASS|FAIL|SKIP)\s+(.+?)\s{2,}", out, re.MULTILINE)
+            code, out, _ = run(["curl", "-s", "http://localhost:5190/"], root)
+            step("SPA served by Vite (frontend)", "<div id=" in out or "<!doctype html>" in out.lower())
+    finally:
+        os.killpg(app.pid, signal.SIGINT)
+        try:
+            app.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(app.pid, signal.SIGKILL)
+
+    # Unselected modules leave nothing behind.
+    code, ps, _ = run(["docker", "ps", "--format", "{{.Names}}"], root)
+    server = root / "backend/target/debug/app-server"
+    blob = server.read_bytes() if server.exists() else b""
+    config = (root / "backend/config/app.toml").read_text()
+    for module, (service, symbol) in MODULES.items():
+        selected = module in modules
+        running = f"{compose_name}-{service}-1" in ps
+        compiled = symbol.encode() in blob
+        if selected:
+            step(f"{module}: selected → service running and compiled in", running and compiled,
+                 f"service={running} compiled={compiled}")
+        else:
+            step(f"{module}: not selected → no service, not compiled", not running and not compiled,
+                 f"service={running} compiled={compiled}")
+    for section, module in (("messaging", "messaging_nats"), ("analytics", "analytics_clickhouse")):
+        enabled = re.search(rf"\[{section}\]\nenabled = (true|false)", config)
+        expect = "true" if module in modules else "false"
+        step(f"config [{section}] enabled = {expect}", bool(enabled) and enabled.group(1) == expect)
+
+    run(["./dev", "down"], root, env=env)
+    ok = all(s["ok"] for s in steps)
+    report = Path(a.report) if a.report else root / "var" / "validation-report.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps({"project": root.name, "modules": sorted(modules), "ok": ok,
+                                  "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "steps": steps}, indent=2) + "\n")
+    print(f"validate-generated: {'OK' if ok else 'FAILED'} — report {report}")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

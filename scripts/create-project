@@ -191,7 +191,7 @@ def main() -> int:
     # 1. copy
     # Blueprint-only parts: the generator itself, and the runtime experiment (evidence; its result
     # files and ADR stay). A generated product never depends on the blueprint repository.
-    skip_prefixes = ["backend/experiments/", "benchmarks/runtime/", "scripts/create-project", "scripts/tests/"]
+    skip_prefixes = ["backend/experiments/", "benchmarks/runtime/", "scripts/create-project", "scripts/validate-generated", "scripts/tests/"]
     if not a.with_gateway:
         skip_prefixes.append("backend/gateway/")
     files = [f for f in tracked_files() if not any(f.startswith(p) for p in skip_prefixes)]
