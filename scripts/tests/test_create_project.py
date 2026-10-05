@@ -67,7 +67,16 @@ class CreateProjectTests(unittest.TestCase):
         for app in ("server", "worker", "bench"):
             self.assertIn("\ndefault = []\n", (g.path / f"backend/apps/{app}/Cargo.toml").read_text(), app)
         self.assertFalse((g.path / "scripts/create-project").exists(), "the generator is blueprint-only")
-        self.assertNotIn("\n  gateway:", (g.path / ".github/workflows/ci.yml").read_text())
+        self.assertNotIn("create-project", (g.path / "docs/README.md").read_text(), "no links to blueprint-only tools")
+        self.assertIn("docs/MODULES.md", (g.path / "README.md").read_text())
+        ci = (g.path / ".github/workflows/ci.yml").read_text()
+        self.assertNotIn("\n  gateway:", ci)
+        # CI starts no service and runs no command for unselected modules.
+        for absent in ("redis:", "dragonfly:", "clickhouse:", "NATS with JetStream", "rust-test-cache",
+                       "rust-test-nats", "rust-test-clickhouse", "rust-test-cedar"):
+            self.assertNotIn(absent, ci, absent)
+        self.assertIn("postgres:", ci)
+        self.assertNotIn("rust-test-cedar", g.commands)
         self.assertIn('BRAND = "Core-App"', (g.path / "frontend/src/brand.ts").read_text())
         # fresh protocol instance with provenance, committed, clean
         self.assertEqual(g.project["instance"]["origin"], "derived")
@@ -103,6 +112,12 @@ class CreateProjectTests(unittest.TestCase):
         # A selected Redis backend must come with a usable (credential-free) development address.
         self.assertEqual(g.config["cache"]["redis_url"], "redis://127.0.0.1:56379")
         self.assertEqual(g.arch["modules"]["cache"]["adapter"], "redis", "./dev up starts Redis only for this adapter")
+        ci = (g.path / ".github/workflows/ci.yml").read_text()
+        for present in ("redis:", "clickhouse:", "NATS with JetStream", "--only rust-test-cache", "--only rust-test-nats",
+                        "--only rust-test-clickhouse", "--only rust-test-cedar"):
+            self.assertIn(present, ci, present)
+        self.assertNotIn("dragonfly:", ci)
+        self.assertIn("rust-test-cedar", g.commands)
         check = subprocess.run(["bash", "-n", str(g.path / "infra/docker/smoke.sh")], capture_output=True, text=True)
         self.assertEqual(check.returncode, 0, check.stderr)
         self.assertTrue((g.path / "backend/gateway/src/main.rs").exists())

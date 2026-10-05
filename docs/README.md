@@ -9,7 +9,9 @@
 | **Security** | [threat model](security/threat-model.md) |
 | **Evidence** | [benchmark results](benchmarks/latest.md) · [Pingora gateway](benchmarks/pingora.md) · [runtime / io_uring](benchmarks/runtime.md) · [release profile](benchmarks/release-profile.md) · [`../benchmarks/README.md`](../benchmarks/README.md) (methodology, gates, measured noise) |
 | **Decisions** | `.ai/knowledge/DECISIONS/` (ADRs with evidence, alternatives, consequences and reversal conditions) |
-| **Generating a project** | [`../scripts/create-project`](../scripts/create-project) (`--help`) |
+| **Modules** | [capability matrix](BLUEPRINT_CAPABILITY_MATRIX.md) (profiles and what they contain) · [enabling a module later](MODULES.md) |
+| **Evidence summary** | [kept / rejected / inconclusive / optional](benchmarks/SUMMARY.md) · [generated-project acceptance](acceptance/generated-projects.md) |
+| **Generating a project** | [`../scripts/create-project`](../scripts/create-project) (`--help`), [`../scripts/validate-generated`](../scripts/validate-generated) (blueprint only) |
 
 Conventions:
 - Every performance claim links to a result file in `benchmarks/results/`. Numbers come from runs on

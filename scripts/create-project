@@ -79,6 +79,32 @@ def blueprint_version() -> str:
     return r.stdout.strip() or "unversioned"
 
 
+def prune_ci(ci: Path, modules: set[str], cedar: bool) -> None:
+    """CI starts only the services of selected modules and runs only their commands
+    (docs/MODULES.md says how to add them back)."""
+    if not ci.exists():
+        return
+    text = ci.read_text()
+    drop_services = ["dragonfly"]  # generated projects test the Redis adapter against Redis only
+    drop_ids = []
+    if "cache" not in modules:
+        drop_services.append("redis")
+        drop_ids.append("rust-test-cache")
+    if "analytics_clickhouse" not in modules:
+        drop_services.append("clickhouse")
+        drop_ids.append("rust-test-clickhouse")
+    if "messaging_nats" not in modules:
+        drop_ids.append("rust-test-nats")
+        text = re.sub(r"      - name: NATS with JetStream[^\n]*\n        run: [^\n]*\n", "", text)
+    if not cedar:
+        drop_ids.append("rust-test-cedar")
+    for svc in drop_services:  # a service block: "      name:" plus its 8-space-indented lines
+        text = re.sub(rf"      {svc}:\n(?:        [^\n]*\n)+", "", text)
+    for cid in drop_ids:
+        text = text.replace(f" --only {cid}", "")
+    ci.write_text(text)
+
+
 def app_toml(a: argparse.Namespace, modules: set[str]) -> str:
     """Non-secret configuration for the generated project (secrets stay in environment variables)."""
     orgs = a.organizations
@@ -256,8 +282,9 @@ def main() -> int:
         if ci.exists():
             # Drop the gateway job (from "  gateway:" up to the next top-level job).
             ci.write_text(re.sub(r"\n  gateway:\n(?:    .*\n|\s*\n)*?(?=  [a-z0-9-]+:\n)", "\n", ci.read_text()))
-    if a.cedar:
-        pass  # rust-test-cedar stays: it is part of every project
+    if not a.cedar:
+        cmds[:] = [c for c in cmds if c["id"] != "rust-test-cedar"]
+    prune_ci(dest / ".github/workflows/ci.yml", modules, a.cedar)
     pj.write_text(json.dumps(project, indent=2, ensure_ascii=False) + "\n")
 
     # Optional modules are cargo features: unselected ones are not compiled into the binaries.
@@ -319,10 +346,15 @@ def main() -> int:
         "",
         "Configuration: `backend/config/app.toml` (non-secret), `APP__*` environment variables (see `.env.example`).",
         "Architecture, decisions and constraints inherited from the blueprint: `.ai/knowledge/`, `docs/`.",
+        "Switching optional modules (Redis, NATS, ClickHouse, Cedar) on or off later: `docs/MODULES.md`.",
         "AI agents: read `AI_PROTOCOL.md` first.",
         "",
     ]
     (dest / "README.md").write_text("\n".join(readme))
+    index = dest / "docs/README.md"
+    if index.exists():  # the generator and its validator are blueprint-only
+        index.write_text("".join(ln for ln in index.read_text().splitlines(keepends=True)
+                                 if not ln.startswith("| **Generating a project**")))
 
     # 5. fresh protocol instance (template's own mechanism)
     init = [sys.executable, "tools/ai-init", "--derive", "--name", a.name, "--origin-name", BLUEPRINT_NAME,

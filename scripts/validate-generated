@@ -151,7 +151,9 @@ def validate(root: Path, env: dict, modules: set[str], compose_name: str, report
             code, out, s = run(["./dev", "test", "--system"], root, env=env, timeout=600)
             smoke = re.search(r"system smoke: .*", out)
             step("./dev test --system", code == 0, smoke.group(0) if smoke else out[-300:], s)
-            steps[-1]["checks"] = re.findall(r"^\s+(PASS|FAIL|SKIP)\s+(.+?)\s{2,}", out, re.MULTILINE)
+            # system_smoke.py prints f"  {status:4}  {name:44} {detail}"
+            steps[-1]["checks"] = [[ln[2:6].strip(), ln[8:52].strip(), ln[52:].strip()] for ln in out.splitlines()
+                                   if ln[2:6].strip() in ("PASS", "FAIL", "SKIP") and ln.startswith("  ")]
             code, out, _ = run(["curl", "-s", "http://localhost:5190/"], root)
             step("SPA served by Vite (frontend)", "<div id=" in out or "<!doctype html>" in out.lower())
             runtime_configuration(root, modules)
