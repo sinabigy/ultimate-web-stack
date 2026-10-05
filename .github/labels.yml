@@ -1,14 +1,23 @@
-# Label set for the public repository (apply once with: gh label create … or a label-sync action).
+# Label set for the repository. Applied with `gh label create --force` (idempotent); GitHub's
+# defaults (bug, documentation, duplicate, enhancement, good first issue, help wanted, invalid,
+# question, wontfix) are kept and recoloured where listed here.
 - { name: bug, color: d73a4a, description: "Doesn't work as documented" }
+- { name: documentation, color: 0075ca, description: Documentation }
 - { name: enhancement, color: a2eeef, description: Improvement without changing defaults }
+- { name: question, color: d876e3, description: "Question (prefer Discussions → Q&A)" }
+- { name: performance, color: fef2c0, description: Performance work or regressions }
+- { name: benchmark, color: 0e8a16, description: Benchmark results or the benchmark harness }
+- { name: evidence, color: 0e8a16, description: New evidence for an existing decision }
 - { name: architecture, color: 5319e7, description: Changes a default or adds a module (needs evidence) }
 - { name: needs-evidence, color: fbca04, description: Waiting for measurements or a failing test }
-- { name: benchmark, color: 0e8a16, description: Benchmark results or harness }
-- { name: evidence, color: 0e8a16, description: New evidence for an existing decision }
+- { name: needs-triage, color: ededed, description: Not yet reviewed }
 - { name: security, color: b60205, description: Security hardening (vulnerabilities go to private reporting) }
-- { name: docs, color: 0075ca, description: Documentation }
 - { name: generator, color: c5def5, description: scripts/create-project and generated output }
-- { name: ai-protocol, color: bfdadc, description: AI working protocol, agent experience }
+- { name: frontend, color: 1d76db, description: SolidJS SPA }
+- { name: backend, color: 5319e7, description: Rust API, worker and crates }
+- { name: auth, color: d93f0b, description: "Authentication, sessions, authorization, tenancy" }
+- { name: database, color: 006b75, description: "PostgreSQL schema, queries, migrations" }
+- { name: infrastructure, color: bfd4f2, description: "Deployment tiers, Docker, systemd, Kubernetes, CI" }
+- { name: ai-agents, color: bfdadc, description: AI working protocol and agent experience }
 - { name: good first issue, color: 7057ff, description: Small, well-scoped, mentored }
 - { name: help wanted, color: 008672, description: Maintainers would welcome a contribution }
-- { name: needs-triage, color: ededed, description: Not yet reviewed }

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v5
       - working-directory: backend
         run: rustup show active-toolchain || rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with: { workspaces: backend }
       - run: cargo install oha --locked
       - run: python3 benchmarks/run.py --smoke --suite http,auth,outbound,db
