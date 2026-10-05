@@ -156,7 +156,8 @@ We publish this as prominently as the results:
 - **Kubernetes** is validated statically only, never on a live cluster.
 - **Identity providers:** ZITADEL Cloud and other OIDC providers are configuration-only. Self-hosted
   ZITADEL was verified live.
-- **GitHub-hosted CI** has not run yet. Every result above comes from local runs.
+- **Benchmarks were not re-run on CI.** GitHub-hosted CI runs every functional, security and
+  deployment check (green), but benchmark numbers come from local runs.
 - **One machine:** the benchmarks come from one Apple M5, with services in a small VM, so HTTP
   numbers are lower bounds.
 - **Undecided:** PGO, alternative allocators and thread-per-core Tokio need dedicated Linux

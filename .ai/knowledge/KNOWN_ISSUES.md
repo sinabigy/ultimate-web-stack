@@ -39,7 +39,7 @@ _Open problems that a future worker must not rediscover the hard way. Each entry
   occasionally fails the same way while PostgreSQL is up. Not reproduced on Linux.
 - **Hardening that came out of it**: protocol errors now map to a retryable 503 (`app-db`
   `outages_are_unavailable_not_internal`), not a 500.
-- **Impact**: a red `rust-test` that passes on rerun. CI on Linux (no VM forwarder) has not run yet, because nothing has been pushed.
+- **Impact**: a red `rust-test` that passes on rerun. Not seen on GitHub-hosted Linux CI (no VM forwarder), across the release-candidate runs.
 - **Next step**: if it recurs, try lima's SSH port forwarder or run the tests inside the VM to
   confirm the cause. Do not add blind retries to the test harness.
 

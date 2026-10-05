@@ -304,7 +304,6 @@ Inside a generated project:
   - Kubernetes (static validation only);
   - ZITADEL Cloud and generic OIDC providers (configuration and discovery check only; self-hosted
     ZITADEL was verified live in the blueprint);
-  - GitHub CI (nothing pushed);
   - TLS issuance (Caddy configuration validated, not exercised).
 - **One machine:** every number comes from one Apple M5 host, with services in a 2-CPU / 4 GiB VM.
   HTTP numbers are lower bounds, and results do not transfer to other hardware without

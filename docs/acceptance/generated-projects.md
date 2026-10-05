@@ -152,6 +152,7 @@ repository. Scorecard and fixed friction: [../FINAL_REPORT.md](../FINAL_REPORT.m
 ## Limits of this evidence
 - Identity used the in-repo mock OIDC provider. Live ZITADEL was verified in the blueprint
   (`frontend/tests/zitadel/`), not in generated projects; ZITADEL Cloud was not verified.
-- One machine, one OS. CI on Linux has not run, because nothing has been pushed.
+- Generated-project validation ran on one machine (macOS host, Linux containers). GitHub-hosted CI
+  validates the blueprint itself on Linux, including the generator tests.
 - Intermittent `sqlx::test` connect failures through the colima port forwarder were seen during
   validation; see `.ai/knowledge/KNOWN_ISSUES.md`.

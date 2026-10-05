@@ -5,7 +5,8 @@ proven**. Items that would change a default need evidence first (see
 [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Now: 1.0.x, close the evidence gaps
-- [ ] **First run on GitHub-hosted CI.** Every check has only run locally so far.
+- [x] **First run on GitHub-hosted CI.** All jobs green, including the live systemd test (private
+      release-candidate phase).
 - [ ] **Live Kubernetes test.** Deploy the base manifests to a real cluster (kind or k3d in CI,
       then a cloud cluster) and cover probes, HPA, PDB, NetworkPolicy and rolling restart.
       Today they are statically validated only.

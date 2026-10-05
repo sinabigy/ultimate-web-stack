@@ -29,6 +29,19 @@ Open-source packaging of 1.0.0. The architecture and generated application code 
 - **Generator:** blueprint-only project files stay out of generated projects. A test checks that
   every relative documentation link in a generated project resolves.
 
+### Fixed (found by the first GitHub-hosted CI runs and a clean-clone test)
+- **`./dev check` as the first command on a fresh machine:** it now applies migrations. Without
+  them, compile-time-checked SQL failed against an empty schema.
+- **E2E in CI:** compiles against the committed sqlx metadata, and creates its database over TCP
+  when there is no local compose container.
+- **Generator:** commits with a neutral identity when git has none configured (fresh CI runners).
+- **Intermittent smoke failures:** `cmd | grep -q` under `pipefail` fails on SIGPIPE even when it
+  matches. In the image-secret check and the release audit this could have hidden a real match.
+  Output is now captured before matching.
+- **CI coverage and hardening:** generator and gate self-tests and minimal-feature clippy were
+  missing from CI. Third-party actions are now pinned to commit SHAs. The release smoke and the
+  live systemd test run as visible steps.
+
 ### Fixed (documentation accuracy)
 - **Benchmark summary**, checked against the raw tables:
   - keep-alive pooling is 40.9k vs 26.0k req/s (the summary said 35k);

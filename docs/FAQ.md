@@ -43,7 +43,9 @@ anywhere else ([FINAL_REPORT.md](FINAL_REPORT.md#clean-room-findings)).
   graceful shutdown and crash recovery.
 - **Failure drill:** database, NATS and ClickHouse outages, and provider faults, were exercised
   against a running stack.
-- **Not proven:** Kubernetes (statically validated only), and GitHub CI, which has not run yet.
+- **CI:** every check, including the live systemd test and the release image smoke, runs green on
+  GitHub-hosted runners.
+- **Not proven:** Kubernetes (statically validated only).
 
 The full list is in [FINAL_ACCEPTANCE.md](FINAL_ACCEPTANCE.md#known-limitations). Read it before
 you decide.

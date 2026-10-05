@@ -22,8 +22,11 @@ original conversation?
 | release | tag `v1.0.0` (its commit is the release; `./dev check` 29/29 on that tree) |
 
 Linux behaviour (systemd, release image, PGO and io_uring experiments) was exercised in
-containers on that VM. CI on GitHub-hosted Linux runners has **not** run, because nothing has
-been pushed.
+containers on that VM. **GitHub-hosted CI** (ubuntu-24.04 runners) is green on every job:
+protocol, backend with all services, gateway, frontend, E2E, and deploy tiers, including the
+release image smoke and the live systemd test. First fully green: [run 37276816196](https://github.com/sinabigy/ultimate-web-stack/actions/runs/37276816196) on
+commit `856d3e7`, during the private release-candidate phase. The first runs found four
+portability problems, all fixed (see CHANGELOG).
 
 ## Can a new project be generated?
 **Yes.** `scripts/create-project` generated three representative profiles from the final commit,
@@ -202,7 +205,6 @@ validation could not see it. It is fixed (`worker.port`) and guarded by
 - **Live verification gaps:**
   - Kubernetes was validated statically only;
   - ZITADEL Cloud and generic OIDC providers are configuration-only;
-  - CI has not run on GitHub;
   - all measurements come from one machine, with services in a small VM (HTTP numbers are lower
     bounds).
 - **Inconclusive optimizations:** PGO, alternative allocators and thread-per-core Tokio need

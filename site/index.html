@@ -506,7 +506,7 @@ python3 tools/ai-check
       <ul>
         <li><strong>Kubernetes:</strong> static validation only. No live cluster was used.</li>
         <li><strong>ZITADEL Cloud and generic OIDC providers:</strong> configuration and discovery check only. Self-hosted ZITADEL was verified live in the blueprint, not in generated projects.</li>
-        <li><strong>GitHub CI has not run</strong>: nothing has been pushed.</li>
+        <li><strong>Benchmarks on CI:</strong> GitHub-hosted CI runs every functional, security and deployment check, but the benchmark numbers come from local runs on one machine.</li>
         <li><strong>TLS issuance:</strong> Caddy configuration validated, not exercised.</li>
         <li><strong>Single-machine benchmarks:</strong> every number comes from one Apple M5 host with services in a 2-CPU / 4 GiB VM. HTTP numbers are lower bounds and do not transfer to other hardware without re-measuring.</li>
         <li><strong>Still undecided:</strong> PGO, alternative allocators and thread-per-core Tokio need dedicated Linux hardware.</li>
