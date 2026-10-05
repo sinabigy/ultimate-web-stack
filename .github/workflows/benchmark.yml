@@ -39,5 +39,5 @@ jobs:
       - run: python3 benchmarks/compare.py
         continue-on-error: true
       - run: python3 benchmarks/report.py -o benchmark-report.md && cat benchmark-report.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: benchmark-results, path: "benchmarks/results/*.json\nbenchmark-report.md" }

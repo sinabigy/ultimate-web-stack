@@ -73,7 +73,7 @@ jobs:
           --only rust-fmt --only rust-clippy --only rust-clippy-minimal --only sqlx-offline-fresh --only rust-audit --only rust-deny --only secret-scan --only config-check
           --only rust-test --only rust-test-cedar --only rust-test-cache --only rust-test-nats --only rust-test-clickhouse --only ts-bindings-fresh
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with: { name: ai-validate-backend, path: ai-validate-backend.json }
 
   gateway:
@@ -141,5 +141,5 @@ jobs:
       - name: Validate (end-to-end)
         run: python3 tools/ai-validate --strict --only web-build --only e2e
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with: { name: playwright-report, path: frontend/playwright-report }

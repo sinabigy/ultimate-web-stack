@@ -28,5 +28,5 @@ jobs:
       - run: python3 benchmarks/run.py --smoke --suite http,auth,outbound,db
       - run: python3 benchmarks/compare.py --smoke
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with: { name: bench-smoke, path: benchmarks/results/latest-smoke.json }
