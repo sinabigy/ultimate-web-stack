@@ -10,7 +10,7 @@
   ./dev status                containers and app health
   ./dev check [--auth] [--strict]
                               canonical validation (tools/ai-validate) + optional identity checks
-  ./dev test [--e2e] [--zitadel] [--system]
+  ./dev test [--e2e] [--zitadel] [--system] [--journey]
                               backend + frontend tests; optional browser suites
   ./dev benchmark [--smoke]   benchmark suites + regression gates + report (benchmarks/)
   ./dev types                 regenerate TypeScript bindings from Rust API types
@@ -292,6 +292,10 @@ def cmd_test(a) -> None:
     if a.system:
         # Against the running stack (./dev up, ideally with every module): one journey through all of it.
         sys.exit(sh([sys.executable, "scripts/system_smoke.py"], check=False))
+    if a.journey:
+        # A person's day one in a real browser against the running stack; screenshots in
+        # frontend/test-results/journey/.
+        sys.exit(sh("npx playwright test -c playwright.journey.config.ts", cwd=ROOT / "frontend", check=False))
     ensure_postgres()
     code = sh(["cargo", "test", "--workspace"], cwd=ROOT / "backend", check=False)
     code |= sh(["npm", "test"], cwd=ROOT / "frontend", check=False)
@@ -359,6 +363,7 @@ def main() -> None:
     te.add_argument("--e2e", action="store_true")
     te.add_argument("--zitadel", action="store_true")
     te.add_argument("--system", action="store_true", help="system smoke test against the running ./dev up stack")
+    te.add_argument("--journey", action="store_true", help="browser journey with screenshots against the running stack")
     te.set_defaults(fn=cmd_test)
     be = sub.add_parser("benchmark")
     be.add_argument("--smoke", action="store_true")

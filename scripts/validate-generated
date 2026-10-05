@@ -62,6 +62,21 @@ def wait_http(url: str, seconds: int) -> bool:
     return False
 
 
+def stop(app: subprocess.Popen) -> None:
+    """Stop `./dev up` and its children. EPERM/ESRCH mean the group already exited (macOS reports a
+    group of zombies as EPERM)."""
+    for sig, wait in ((signal.SIGINT, 30), (signal.SIGKILL, 5)):
+        try:
+            os.killpg(app.pid, sig)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            app.wait(timeout=wait)
+            return
+        except subprocess.TimeoutExpired:
+            continue
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("path")
@@ -78,6 +93,13 @@ def main() -> int:
     compose_name = re.search(r"COMPOSE_PROJECT_NAME:-([^}]+)\}", (root / "infra/docker/compose.yaml").read_text()).group(1)
     print(f"validating {root} (compose project {compose_name}; modules: {sorted(modules)})")
 
+    try:
+        return validate(root, env, modules, compose_name, a.report)
+    finally:
+        run(["./dev", "down"], root, env=env)
+
+
+def validate(root: Path, env: dict, modules: set[str], compose_name: str, report_path: str | None) -> int:
     code, out, _ = run(["git", "log", "--oneline"], root)
     step("git repository initialised", code == 0 and bool(out.strip()), out.strip().splitlines()[0] if out.strip() else "")
     code, out, s = run([sys.executable, "tools/ai-check"], root)
@@ -109,11 +131,7 @@ def main() -> int:
             code, out, _ = run(["curl", "-s", "http://localhost:5190/"], root)
             step("SPA served by Vite (frontend)", "<div id=" in out or "<!doctype html>" in out.lower())
     finally:
-        os.killpg(app.pid, signal.SIGINT)
-        try:
-            app.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            os.killpg(app.pid, signal.SIGKILL)
+        stop(app)
 
     # Unselected modules leave nothing behind.
     code, ps, _ = run(["docker", "ps", "--format", "{{.Names}}"], root)
@@ -135,9 +153,8 @@ def main() -> int:
         expect = "true" if module in modules else "false"
         step(f"config [{section}] enabled = {expect}", bool(enabled) and enabled.group(1) == expect)
 
-    run(["./dev", "down"], root, env=env)
     ok = all(s["ok"] for s in steps)
-    report = Path(a.report) if a.report else root / "var" / "validation-report.json"
+    report = Path(report_path) if report_path else root / "var" / "validation-report.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps({"project": root.name, "modules": sorted(modules), "ok": ok,
                                   "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "steps": steps}, indent=2) + "\n")

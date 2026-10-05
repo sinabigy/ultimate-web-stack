@@ -35,10 +35,23 @@ services:
       retries: 30
     restart: unless-stopped
 
+  # Optional (cache module): COMPOSE_PROFILES=cache. Without it a Redis-configured app logs the
+  # outage and serves from its in-process cache.
+  redis:
+    profiles: ["cache"]
+    image: redis:8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+    restart: unless-stopped
+
   api:
     <<: *app
     environment:
       APP__ENVIRONMENT: production
+      APP__CACHE__REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379}
       APP__DATABASE__URL: postgres://app:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/app
       APP__DATABASE__MIGRATE_ON_START: "true"
       APP__JOBS__RUN_IN_PROCESS: "false"   # the worker service runs jobs

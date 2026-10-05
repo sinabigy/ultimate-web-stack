@@ -20,6 +20,8 @@ APP__AUTH__TOKEN_ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
 APP__AUTH__API_KEY_PEPPER=$(head -c 32 /dev/urandom | base64)
 ENV
 f="$root/infra/docker/compose.prod.yaml"
+# Start the optional services the project's configuration selects.
+if grep -Eq '^backend = "redis"' "$root/backend/config/app.toml" 2>/dev/null; then export COMPOSE_PROFILES=cache; fi
 cleanup() { compose -f "$f" down -v >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 

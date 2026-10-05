@@ -99,6 +99,10 @@ class CreateProjectTests(unittest.TestCase):
         self.assertEqual(g.config["auth"]["methods"]["enterprise_sso"], True)
         self.assertEqual((g.config["messaging"]["enabled"], g.config["analytics"]["enabled"]), (True, True))
         self.assertTrue({"rust-test-nats", "rust-test-clickhouse", "rust-test-cache", "gateway-check"} <= g.commands)
+        # A selected Redis backend must come with a usable (credential-free) development address.
+        self.assertEqual(g.config["cache"]["redis_url"], "redis://127.0.0.1:56379")
+        check = subprocess.run(["bash", "-n", str(g.path / "infra/docker/smoke.sh")], capture_output=True, text=True)
+        self.assertEqual(check.returncode, 0, check.stderr)
         self.assertTrue((g.path / "backend/gateway/src/main.rs").exists())
         server = (g.path / "backend/apps/server/Cargo.toml").read_text()
         self.assertIn('default = ["redis", "nats", "clickhouse", "cedar"]', server)
