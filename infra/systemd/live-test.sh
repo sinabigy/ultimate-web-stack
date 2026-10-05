@@ -35,7 +35,7 @@ docker run -d --name "$pg" --network "$net" -e POSTGRES_USER=app -e POSTGRES_DB=
 docker run -d --name "$host" --network "$net" --privileged --cgroupns=host \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock "$sdimage" >/dev/null
 for _ in $(seq 1 30); do docker exec "$pg" pg_isready -U app -d app >/dev/null 2>&1 && break; sleep 1; done
-for _ in $(seq 1 30); do docker exec "$host" systemctl is-system-running 2>/dev/null | grep -Eq 'running|degraded' && break; sleep 1; done
+for _ in $(seq 1 30); do state=$(docker exec "$host" systemctl is-system-running 2>/dev/null || true); grep -Eq 'running|degraded' <<<"$state" && break; sleep 1; done
 
 # Install as docs/deployment/vps.md (steps 2–3).
 docker cp "$work/app" "$host:/tmp/app" >/dev/null
@@ -79,7 +79,8 @@ docker exec "$host" systemctl start app-worker && sleep 3
 [ "$(docker exec "$host" systemctl is-active app-worker)" = active ] && ok "app-worker active" || fail "app-worker"
 docker exec "$host" systemctl restart app-server && wait_health && ok "restart: healthy again" || fail "restart"
 docker exec "$host" systemctl stop app-server
-docker exec "$host" journalctl -u app-server --no-pager | grep -q "server stopped cleanly" \
+journal=$(docker exec "$host" journalctl -u app-server --no-pager)
+grep -q "server stopped cleanly" <<<"$journal" \
   && ok "stop: SIGTERM drained, 'server stopped cleanly'" || fail "stop not graceful"
 [ "$(docker exec "$host" systemctl show -p Result --value app-server)" = success ] && ok "stop result: success" || fail "stop result"
 docker exec "$host" systemctl kill -s SIGKILL app-worker; sleep 4

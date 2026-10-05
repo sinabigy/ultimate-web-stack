@@ -309,6 +309,9 @@ def ensure_check_services() -> None:
 
 def cmd_check(a) -> None:
     ensure_postgres()
+    # Compile-time-checked SQL needs the current schema: apply migrations like `./dev up` does, so
+    # `./dev check` works as the very first command on a fresh machine.
+    sh(["cargo", "sqlx", "migrate", "run", "--source", "migrations"], cwd=ROOT / "backend")
     ensure_check_services()
     args = [sys.executable, "tools/ai-validate", "--keep-going"] + (["--strict"] if a.strict else [])
     code = sh(args, check=False)

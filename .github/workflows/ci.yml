@@ -106,7 +106,9 @@ jobs:
       - uses: actions/checkout@v5
       - name: Free runner disk (unused preinstalled toolchains)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
-      - run: python3 tools/ai-validate --strict --only infra-verify --only release-smoke
+      - run: python3 tools/ai-validate --strict --only infra-verify
+      - name: Release image smoke test (release-smoke; run directly so every check is in the log)
+        run: infra/docker/smoke.sh
       - name: Live systemd deployment test (systemd-live; run directly so every check is in the log)
         run: infra/systemd/live-test.sh
 
