@@ -1,3 +1,0 @@
-# Reviewed false positives only. Each entry: why it is not a secret.
-# Unsigned alg=none JWT ({"sub":"svc-reporting"}) used by credentials.rs to prove such tokens are rejected.
-4383b7ac7a4d2aad4a87e745fd9fabca3df28c00:backend/crates/api/tests/credentials.rs:jwt:159

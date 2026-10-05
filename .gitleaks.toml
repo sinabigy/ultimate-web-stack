@@ -1,0 +1,11 @@
+# gitleaks configuration: the default rules plus reviewed false positives. Entries match exact
+# content and paths, never commit hashes, so they survive history rewrites.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Unsigned alg=none JWT ({\"sub\":\"svc-reporting\"}) used to prove such tokens are rejected"
+condition = "AND"
+paths = ['''^backend/crates/api/tests/credentials\.rs$''']
+regexTarget = "match"
+regexes = ['''eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0\.eyJzdWIiOiJzdmMtcmVwb3J0aW5nIn0\.''']
