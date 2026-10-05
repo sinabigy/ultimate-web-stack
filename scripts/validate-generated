@@ -64,6 +64,26 @@ def wait_http(url: str, seconds: int) -> bool:
     return False
 
 
+def runtime_configuration(root: Path, modules: set[str]) -> None:
+    """The running server logs what it runs with; it must match the selection (e.g. Cedar is not
+    only compiled in but the active engine)."""
+    log = root / "var/log/app-server.log"
+    text = re.sub(r"\x1b\[[0-9;]*m", "", log.read_text(errors="replace")) if log.exists() else ""
+    line = next((ln for ln in text.splitlines() if ln.rstrip().endswith(" configuration")), "")
+    fields = dict(re.findall(r"(\w+)=(\S+)", line))
+    expect = {
+        "authorization": "Cedar" if "cedar" in modules else "Rbac",
+        "organizations": str("organizations" in modules).lower(),
+        "admin": str("admin" in modules).lower(),
+        "cache": "Redis" if "cache" in modules else "Memory",
+        "messaging_nats": str("messaging_nats" in modules).lower(),
+        "analytics_clickhouse": str("analytics_clickhouse" in modules).lower(),
+    }
+    wrong = {k: (fields.get(k), v) for k, v in expect.items() if fields.get(k) != v}
+    step("running server configuration matches the selection", bool(line) and not wrong,
+         " ".join(f"{k}={v}" for k, v in expect.items()) + (f" MISMATCH {wrong}" if wrong else ""))
+
+
 def stop(app: subprocess.Popen) -> None:
     """Stop `./dev up` and its children. EPERM/ESRCH mean the group already exited (macOS reports a
     group of zombies as EPERM)."""
@@ -134,6 +154,7 @@ def validate(root: Path, env: dict, modules: set[str], compose_name: str, report
             steps[-1]["checks"] = re.findall(r"^\s+(PASS|FAIL|SKIP)\s+(.+?)\s{2,}", out, re.MULTILINE)
             code, out, _ = run(["curl", "-s", "http://localhost:5190/"], root)
             step("SPA served by Vite (frontend)", "<div id=" in out or "<!doctype html>" in out.lower())
+            runtime_configuration(root, modules)
     finally:
         stop(app)
 

@@ -92,6 +92,17 @@ async fn main() -> anyhow::Result<()> {
         profile: if cfg!(debug_assertions) { "debug" } else { "release" },
     };
     tracing::info!(version = build.version, git_sha = build.git_sha, env = %config.environment, "starting");
+    // What this instance runs with: the evidence an operator (or validator) needs first.
+    tracing::info!(
+        authorization = ?config.authorization.engine,
+        organizations = config.tenancy.organizations,
+        admin = config.admin.enabled,
+        cache = ?config.cache.backend,
+        rate_limit = ?config.rate_limit.backend,
+        messaging_nats = config.messaging.enabled,
+        analytics_clickhouse = config.analytics.enabled,
+        "configuration"
+    );
 
     let mut builder = AppState::builder(config.clone(), build);
     if config.telemetry.metrics {
