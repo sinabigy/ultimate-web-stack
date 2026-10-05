@@ -71,7 +71,11 @@ jobs:
         run: >
           python3 tools/ai-validate --strict --keep-going --report ai-validate-backend.json
           --only rust-fmt --only rust-clippy --only rust-clippy-minimal --only sqlx-offline-fresh --only rust-audit --only rust-deny --only secret-scan --only config-check
-          --only rust-test --only rust-test-cedar --only rust-test-cache --only rust-test-nats --only rust-test-clickhouse --only ts-bindings-fresh
+          --only rust-test-cedar --only rust-test-cache --only rust-test-nats --only rust-test-clickhouse --only ts-bindings-fresh
+      - name: Rust tests (rust-test; run directly so a failing test is named in the log)
+        if: success() || failure()
+        working-directory: backend
+        run: cargo test --workspace
       - if: always()
         uses: actions/upload-artifact@v7
         with: { name: ai-validate-backend, path: ai-validate-backend.json }
