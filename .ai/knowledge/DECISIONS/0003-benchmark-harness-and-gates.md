@@ -16,6 +16,17 @@ Published benchmarks such as TechEmpower and vendor posts answer a different que
 hardware, other code, tuned configurations. They are cited only as external evidence, and labelled
 as such.
 
+## Evidence
+- Run-to-run noise on this machine, measured with repeated full runs: ≤7.6% throughput between
+  full runs, up to 23% for single samples. Hence the median of 3 per point and regression
+  tolerances wider than the noise (`benchmarks/README.md`).
+- An earlier sequential allocator comparison looked 26–36% slower; interleaved A B A B runs showed
+  it was environmental drift ([release-profile](../../../docs/benchmarks/release-profile.md)).
+  Hence interleaving for any A/B decision whose expected effect is near the noise.
+- The harness found defects that code review had not: seven outbound-controller bugs, breaker
+  dilution, ops endpoints being rate-limited, rate limiting keyed by IP instead of principal
+  ([summary](../../../docs/benchmarks/SUMMARY.md)).
+
 ## Decision
 - `benchmarks/run.py` (Python stdlib) orchestrates the run:
   - builds release binaries;
@@ -55,5 +66,9 @@ as such.
   "Engine: fix rate controller dynamics found by benchmark traces".
 - The load generator shares the host with the server, so HTTP numbers are lower bounds. On macOS,
   services run in a VM, so database-bound numbers include VM networking.
-- Reversal: if the team needs distributed load (multiple generator hosts) or long soak tests,
-  replace the `oha` driver with k6 or Gatling. The result schema and gates stay the same.
+
+## Reversal conditions
+- If the team needs distributed load (multiple generator hosts) or long soak tests, replace the
+  `oha` driver with k6 or Gatling. The result schema and gates stay the same.
+- If a dedicated, quiet benchmark host becomes available, tighten the regression tolerances to its
+  measured noise and gate throughput in CI on that host.

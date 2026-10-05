@@ -57,6 +57,7 @@ class CreateProjectTests(unittest.TestCase):
         self.assertEqual(g.config["tenancy"]["organizations"], True)
         self.assertEqual(g.config["admin"]["enabled"], True)
         self.assertEqual(g.config["cache"]["backend"], "memory")
+        self.assertEqual(g.arch["modules"]["cache"]["adapter"], "memory")
         self.assertEqual(g.config["authorization"]["engine"], "rbac")
         # module-specific validation only for selected modules; gateway removed with its job
         self.assertTrue({"rust-test", "e2e", "infra-verify"} <= g.commands)
@@ -101,6 +102,7 @@ class CreateProjectTests(unittest.TestCase):
         self.assertTrue({"rust-test-nats", "rust-test-clickhouse", "rust-test-cache", "gateway-check"} <= g.commands)
         # A selected Redis backend must come with a usable (credential-free) development address.
         self.assertEqual(g.config["cache"]["redis_url"], "redis://127.0.0.1:56379")
+        self.assertEqual(g.arch["modules"]["cache"]["adapter"], "redis", "./dev up starts Redis only for this adapter")
         check = subprocess.run(["bash", "-n", str(g.path / "infra/docker/smoke.sh")], capture_output=True, text=True)
         self.assertEqual(check.returncode, 0, check.stderr)
         self.assertTrue((g.path / "backend/gateway/src/main.rs").exists())

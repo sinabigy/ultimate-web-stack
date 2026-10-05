@@ -224,9 +224,10 @@ def main() -> int:
             mods[name]["reason"] = ("Selected at generation (create-project --modules)." if name in modules else
                                     "Not selected at generation; enable in backend/config/app.toml and project.json.") + \
                 " " + mods[name].get("reason", "")
-    if "cache" in mods and "cache" not in modules:
-        mods["cache"]["enabled"] = True  # the in-process cache is core; only the Redis adapter is optional
-        mods["cache"]["adapter"] = "memory"
+    if "cache" in mods:
+        # The in-process cache is core; the module selects the Redis adapter (./dev up then starts Redis).
+        mods["cache"]["enabled"] = True
+        mods["cache"]["adapter"] = "redis" if "cache" in modules else "memory"
     if "cedar" in mods:
         mods["cedar"]["enabled"] = a.cedar
     if "organizations" in mods:
