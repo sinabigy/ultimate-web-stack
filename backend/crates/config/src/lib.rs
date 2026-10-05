@@ -103,6 +103,7 @@ pub struct AppConfig {
     pub jobs: JobsConfig,
     pub providers: ProvidersConfig,
     pub telemetry: TelemetryConfig,
+    pub worker: WorkerConfig,
 }
 
 impl Default for AppConfig {
@@ -123,6 +124,7 @@ impl Default for AppConfig {
             jobs: JobsConfig::default(),
             providers: ProvidersConfig::default(),
             telemetry: TelemetryConfig::default(),
+            worker: WorkerConfig::default(),
         }
     }
 }
@@ -437,6 +439,21 @@ pub struct AuthorizationConfig {
 impl Default for AuthorizationConfig {
     fn default() -> Self {
         Self { engine: AuthorizationEngine::Rbac, cedar_policy_dir: PathBuf::from("policies") }
+    }
+}
+
+/// The standalone worker process (`app-worker`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, deny_unknown_fields)]
+pub struct WorkerConfig {
+    /// Ops port for `/healthz`, `/readyz` and `/metrics` (bound on `http.host`).
+    /// `APP__WORKER__PORT` in systemd units and Kubernetes manifests.
+    pub port: u16,
+}
+
+impl Default for WorkerConfig {
+    fn default() -> Self {
+        Self { port: 9091 }
     }
 }
 
@@ -830,6 +847,19 @@ mod tests {
             assert_eq!(c.http.port, 9999);
             assert_eq!(c.database.url.expose(), "postgres://u:p@h/db");
             assert!(c.messaging.enabled);
+            Ok(())
+        });
+    }
+
+    /// The deployment tiers (systemd unit, Kubernetes manifest) set `APP__WORKER__PORT`; the
+    /// strict loader must accept it (it once rejected it, crash-looping the worker).
+    #[test]
+    fn worker_port_from_env() {
+        Jail::expect_with(|jail| {
+            jail.set_env("APP__WORKER__PORT", "9191");
+            let c = load(Figment::new().merge(Env::prefixed("APP__").split("__"))).expect("load");
+            assert_eq!(c.worker.port, 9191);
+            assert_eq!(AppConfig::default().worker.port, 9091);
             Ok(())
         });
     }

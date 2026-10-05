@@ -11,6 +11,7 @@
 //! | tenant A user        | tenant B data                  | 404      |
 //! | organisation admin   | own organisation administration| allowed  |
 //! | organisation admin   | system admin action            | 403      |
+//! | system auditor (MFA) | platform read / mutation       | allowed / 403 |
 //! | system admin (MFA)   | system operation               | allowed  |
 
 mod support;
@@ -124,6 +125,20 @@ async fn matrix(pool: PgPool, engine: app_config::AuthorizationEngine) {
     assert_eq!(app.get(&member_a, "/api/v1/admin/users").await.status, StatusCode::FORBIDDEN, "system admin");
     let r = app.patch(&member_a, &format!("/api/v1/orgs/{tenant_a}"), json!({"name": "Hijacked"})).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN, "member cannot administer the organisation");
+    let r = app.patch(&member_a, &format!("/api/v1/orgs/{tenant_a}"), json!({})).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "an empty update is still an update: decided, denied");
+    let before = app.audit_count("authz.denied").await;
+    let invite = json!({"email": "x@matrix.example", "role_id": builtin_role_id("member")});
+    let r = app.post(&member_a, &format!("/api/v1/orgs/{tenant_a}/invitations"), invite).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "member cannot invite");
+    let key = json!({"name": "k", "scopes": ["runs:read"]});
+    let r = app.post(&member_a, &format!("/api/v1/orgs/{tenant_a}/api-keys"), key).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "member cannot create API keys");
+    // Escalation: an admin may invite, but not above their own role.
+    let as_owner = json!({"email": "y@matrix.example", "role_id": builtin_role_id("owner")});
+    let r = app.post(&admin_a, &format!("/api/v1/orgs/{tenant_a}/invitations"), as_owner).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "admin cannot invite an owner");
+    assert_eq!(app.audit_count("authz.denied").await - before, 3, "each denied write is audited");
 
     // 4. tenant A user → tenant B data = denied (404: existence is not revealed).
     for path in [
@@ -150,6 +165,8 @@ async fn matrix(pool: PgPool, engine: app_config::AuthorizationEngine) {
     // 5. organisation admin → own organisation administration = allowed.
     let r = app.patch(&admin_a, &format!("/api/v1/orgs/{tenant_a}"), json!({"name": "Tenant A Renamed"})).await;
     assert_eq!(r.status, StatusCode::OK, "{:?}", r.body);
+    let r = app.patch(&admin_a, &format!("/api/v1/orgs/{tenant_a}"), json!({})).await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY, "an empty update by an admin writes nothing: {:?}", r.body);
     assert_eq!(app.get(&admin_a, &format!("/api/v1/orgs/{tenant_a}/members")).await.status, StatusCode::OK);
     assert_eq!(app.get(&admin_a, &format!("/api/v1/orgs/{tenant_a}/audit")).await.status, StatusCode::OK);
 
@@ -161,6 +178,32 @@ async fn matrix(pool: PgPool, engine: app_config::AuthorizationEngine) {
         assert_eq!(r.status, StatusCode::FORBIDDEN, "organisation roles never grant platform powers");
     }
     assert_eq!(app.get(&member_a, "/api/v1/dashboard").await.status, StatusCode::OK, "member was not suspended");
+
+    // 8. system auditor (MFA session) → every platform read = allowed, every mutation = denied.
+    let auditor = app.try_login("auditor@matrix.example", "mfa", "").await.unwrap();
+    app.set_system_role(auditor.user_id, "system_auditor").await;
+    for path in [
+        "/api/v1/admin/overview",
+        "/api/v1/admin/users",
+        "/api/v1/admin/organizations",
+        "/api/v1/admin/roles",
+        "/api/v1/admin/audit",
+        "/api/v1/admin/jobs",
+        "/api/v1/admin/providers",
+        "/api/v1/admin/system",
+    ] {
+        assert_eq!(app.get(&auditor, path).await.status, StatusCode::OK, "auditor reads {path}");
+    }
+    let target = member_a.user_id;
+    for (method, path, body) in [
+        (Method::PATCH, format!("/api/v1/admin/users/{target}"), Some(json!({"status": "suspended"}))),
+        (Method::POST, format!("/api/v1/admin/users/{target}/revoke-sessions"), Some(json!({}))),
+        (Method::POST, format!("/api/v1/admin/jobs/{}/retry", uuid::Uuid::now_v7()), Some(json!({}))),
+    ] {
+        let r = app.call(Some(&auditor), method, &path, body).await;
+        assert_eq!(r.status, StatusCode::FORBIDDEN, "auditor cannot mutate: {path} {:?}", r.body);
+    }
+    assert_eq!(app.get(&member_a, "/api/v1/dashboard").await.status, StatusCode::OK, "auditor changed nothing");
 
     // 7. system admin (MFA session) → system operation = allowed.
     let root = app.try_login("root@matrix.example", "mfa", "").await.unwrap();

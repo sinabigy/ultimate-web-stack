@@ -21,6 +21,15 @@ pub trait EventBus: Send + Sync {
     async fn publish(&self, event: RealtimeEvent);
     /// Subscribe to events delivered to *this* instance.
     fn subscribe(&self) -> broadcast::Receiver<RealtimeEvent>;
+    /// The transport carrying events between instances: "local", "postgres" or "nats".
+    fn transport(&self) -> &'static str {
+        "local"
+    }
+    /// Transport health for readiness. In-process and PostgreSQL buses report Ok: their health is
+    /// the database's, which readiness checks separately.
+    async fn health(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 /// Aborts the task when dropped (background helpers whose owner may be cancelled).

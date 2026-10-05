@@ -126,6 +126,9 @@ async fn main() -> anyhow::Result<()> {
         .await
         .map_err(anyhow::Error::msg)
         .context("starting event bus")?;
+    if config.messaging.enabled {
+        builder = builder.health_check(Arc::new(MessagingCheck(events.clone())));
+    }
     let analytics = app_analytics::start(&config.analytics).await.map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if let Some(q) = &analytics.query {
         builder = builder.health_check(Arc::new(AnalyticsCheck(q.clone()))).analytics_query(q.clone());
@@ -193,6 +196,26 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// ClickHouse analytics is never critical: failures report "degraded".
+/// NATS realtime transport (non-critical: events fall back to PostgreSQL at startup). Degraded
+/// while disconnected, and when NATS was configured but unreachable at startup.
+struct MessagingCheck(Arc<dyn app_messaging::EventBus>);
+
+#[async_trait::async_trait]
+impl app_api::health::HealthCheck for MessagingCheck {
+    fn name(&self) -> &'static str {
+        "messaging"
+    }
+    fn critical(&self) -> bool {
+        false
+    }
+    async fn check(&self) -> Result<(), String> {
+        if self.0.transport() != "nats" {
+            return Err("NATS unreachable at startup: realtime events use the PostgreSQL fallback".into());
+        }
+        self.0.health().await
+    }
+}
+
 struct AnalyticsCheck(Arc<app_analytics::AnalyticsQuery>);
 
 #[async_trait::async_trait]

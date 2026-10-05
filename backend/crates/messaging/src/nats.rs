@@ -101,6 +101,15 @@ impl EventBus for NatsEventBus {
     fn subscribe(&self) -> broadcast::Receiver<RealtimeEvent> {
         self.local.subscribe()
     }
+    fn transport(&self) -> &'static str {
+        "nats"
+    }
+    async fn health(&self) -> Result<(), String> {
+        match self.client.connection_state() {
+            async_nats::connection::State::Connected => Ok(()),
+            other => Err(format!("NATS {other}")),
+        }
+    }
 }
 
 // ── JetStream work queue ────────────────────────────────────────────────────────────────────

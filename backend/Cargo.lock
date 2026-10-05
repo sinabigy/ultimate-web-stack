@@ -225,6 +225,7 @@ version = "0.1.0"
 dependencies = [
  "figment",
  "serde",
+ "serde_json",
  "thiserror 2.0.21",
 ]
 

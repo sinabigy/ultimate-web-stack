@@ -28,16 +28,26 @@ What it does:
   5. starts a fresh protocol instance with `tools/ai-init --derive` (task history reset,
      knowledge and decisions inherited, provenance recorded);
   6. git init + initial commit.
-Everything else (code, tests, docs, ADRs, deployment tiers) is inherited unchanged; optional
-modules are switched by configuration, so `./dev check` stays meaningful in the new project.
+Everything else (code, tests, docs, ADRs, deployment tiers) is inherited. Unselected optional
+modules are left out of cargo default features, configuration, `./dev up`, CI and validation
+commands (docs/MODULES.md switches one on later). If any step fails, the partial destination is
+removed.
+
+Examples (tested by scripts/tests and scripts/validate-generated):
+  scripts/create-project ../my-product --name "My Product"                       # core, b2b auth
+  scripts/create-project ../my-saas --name "My SaaS" --profile performance --auth b2b --cedar
+  scripts/create-project ../my-scale --name "My Scale" --profile distributed
 """
 
 from __future__ import annotations
 
 import argparse
+import html
 import datetime as dt
 import json
+import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -211,7 +221,35 @@ def main() -> int:
     if dest.exists() and any(dest.iterdir()) and not a.force:
         die(f"{dest} is not empty (use --force)")
     slug = slugify(a.name)
+    fresh = not dest.exists() or not any(dest.iterdir())
+    try:
+        return generate(a, dest, modules, slug)
+    except BaseException:
+        # Leave nothing half-generated behind (only if this run created the content).
+        if fresh and dest.exists():
+            shutil.rmtree(dest)
+            print(f"create-project: failed; removed the partial {dest}", file=sys.stderr)
+        raise
 
+
+def replay_command(a: argparse.Namespace, dest: Path) -> str:
+    """The generation command, reconstructed from the effective options (also after interactive
+    answers) with no source-machine paths: the destination is recorded by name only."""
+    parts = ["scripts/create-project", dest.name, "--name", a.name, "--profile", a.profile, "--auth", a.auth]
+    if a.auth in ("basic", "consumer") and a.organizations:
+        parts.append("--organizations")
+    if not a.admin:
+        parts.append("--no-admin")
+    if a.cedar:
+        parts.append("--cedar")
+    if a.modules:
+        parts += ["--modules", a.modules]
+    if a.with_gateway:
+        parts.append("--with-gateway")
+    return " ".join(shlex.quote(x) for x in parts)
+
+
+def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) -> int:
     dirty = subprocess.run(["git", "-C", str(BLUEPRINT), "status", "--porcelain"], capture_output=True, text=True).stdout.strip()
     if dirty:
         print("create-project: warning: the blueprint has uncommitted changes; they are included", file=sys.stderr)
@@ -228,6 +266,8 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(BLUEPRINT / rel, target)
     print(f"create-project: copied {len(files)} files to {dest}")
+    if os.environ.get("CREATE_PROJECT_TEST_FAIL") == "after-copy":  # test hook: failure cleanup
+        raise RuntimeError("injected failure (CREATE_PROJECT_TEST_FAIL)")
 
     # 2. configuration
     (dest / "backend/config").mkdir(parents=True, exist_ok=True)
@@ -311,7 +351,7 @@ def main() -> int:
                 p.write_text(text.replace(old, new, count))
 
     sub("frontend/src/brand.ts", 'export const BRAND = "App";', f"export const BRAND = {json.dumps(a.name)};")
-    sub("frontend/index.html", "<title>App</title>", f"<title>{a.name}</title>")
+    sub("frontend/index.html", "<title>App</title>", f"<title>{html.escape(a.name)}</title>")
     sub("frontend/package.json", '"name": "app-frontend"', f'"name": "{slug}-frontend"')
     sub("infra/docker/compose.yaml", "name: ${COMPOSE_PROJECT_NAME:-uwsb}", f"name: ${{COMPOSE_PROJECT_NAME:-{slug}}}")
     if not a.with_gateway:
@@ -325,7 +365,7 @@ def main() -> int:
         f"Generated on {created} from **{BLUEPRINT_NAME}** ({blueprint_version()}) with:",
         "",
         "```",
-        "scripts/create-project " + " ".join(sys.argv[1:]),
+        replay_command(a, dest),
         "```",
         "",
         "| setting | value |",

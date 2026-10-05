@@ -41,33 +41,27 @@ pub(crate) async fn require(
 ) -> Result<(), ApiError> {
     match state.svc()?.authz.authorize(&o.access, p, resource) {
         Ok(()) => Ok(()),
-        Err(d) => {
-            // Every denied non-read permission is evidence of probing or escalation (invariant 10).
-            // Reads are not audited here: cross-tenant reads are audited at membership resolution.
-            if !matches!(
-                p,
-                P::OrgRead
-                    | P::MembersRead
-                    | P::TeamsRead
-                    | P::RolesRead
-                    | P::RunsRead
-                    | P::ApiKeysRead
-                    | P::BillingRead
-            ) {
-                let e = audit::event(
-                    Some(&o.principal),
-                    meta,
-                    state.config.auth.store_client_ip,
-                    "authz.denied",
-                    Outcome::Denied,
-                )
+        Err(d) => Err(deny(state, o, meta, p, d).await),
+    }
+}
+
+/// Turn a denial into the API error, recording it first. Every denied non-read permission is
+/// evidence of probing or escalation (invariant 10). Reads are not audited here: cross-tenant
+/// reads are audited at membership resolution. Use it for structural checks that follow
+/// `require` (escalation, credential scopes) so their denials are audited too.
+pub(crate) async fn deny(state: &AppState, o: &Org, meta: &ReqMeta, p: P, d: app_authz::Denied) -> ApiError {
+    let read = matches!(
+        p,
+        P::OrgRead | P::MembersRead | P::TeamsRead | P::RolesRead | P::RunsRead | P::ApiKeysRead | P::BillingRead
+    );
+    if !read && let Ok(svc) = state.svc() {
+        let e =
+            audit::event(Some(&o.principal), meta, state.config.auth.store_client_ip, "authz.denied", Outcome::Denied)
                 .org(o.access.org_id())
                 .meta(json!({"permission": p.key(), "reason": d.to_string()}));
-                audit::best_effort(&state.svc()?.db, &e).await;
-            }
-            Err(crate::errors::denied(d))
-        }
+        audit::best_effort(&svc.db, &e).await;
     }
+    crate::errors::denied(d)
 }
 
 /// Reads go through the configured engine too (RBAC or Cedar), so a policy that forbids a read is
@@ -120,12 +114,13 @@ fn perm_keys(o: &Org) -> Vec<String> {
     o.access.permissions().keys().into_iter().map(String::from).collect()
 }
 
-pub async fn get(o: Org) -> Json<dto::OrgDetail> {
-    Json(dto::OrgDetail {
+pub async fn get(State(state): State<AppState>, o: Org) -> Result<Json<dto::OrgDetail>, ApiError> {
+    require_read(&state, &o, P::OrgRead, &Resource::Organization)?;
+    Ok(Json(dto::OrgDetail {
         role: o.access.role().map(|r| r.key.clone()),
         permissions: perm_keys(&o),
         organization: o.org,
-    })
+    }))
 }
 
 #[derive(Deserialize)]
@@ -140,8 +135,13 @@ pub async fn update(
     meta: ReqMeta,
     Json(b): Json<UpdateOrg>,
 ) -> Result<Json<orgs::OrgRow>, ApiError> {
-    if b.name.is_some() {
+    // Default deny: every update is authorized, including one with no fields (which would
+    // otherwise write and audit without any decision).
+    if b.name.is_some() || b.settings.is_none() {
         require(&state, &o, &meta, P::OrgUpdate, &Resource::Organization).await?;
+    }
+    if b.name.is_none() && b.settings.is_none() {
+        return Err(ApiError::validation("body", "nothing to update"));
     }
     if b.settings.is_some() {
         require(&state, &o, &meta, P::SettingsManage, &Resource::Organization).await?;
@@ -365,7 +365,10 @@ pub async fn invite(
     let email = app_domain::Email::parse(&b.email).map_err(|e| ApiError::validation(e.field, e.message))?;
     let svc = state.svc()?;
     let role = orgs::role_grant(&svc.db, &o.access, b.role_id).await.api()?;
-    svc.rbac.authorize_invite(&o.access, &role).api()?;
+    require(&state, &o, &meta, P::MembersInvite, &Resource::Organization).await?;
+    if let Err(d) = svc.rbac.authorize_invite(&o.access, &role) {
+        return Err(deny(&state, &o, &meta, P::MembersInvite, d).await);
+    }
     let token = tokens::new_token();
     let expires = OffsetDateTime::now_utc() + time::Duration::hours(state.config.tenancy.invitation_ttl_hours as i64);
     let mut tx = svc.db.begin().await.api()?;
@@ -740,7 +743,10 @@ pub async fn create_api_key(
     let scopes = PermissionSet::parse_keys(b.scopes.iter().map(String::as_str))
         .map_err(|e| ApiError::validation("scopes", e))?;
     let svc = state.svc()?;
-    svc.rbac.authorize_credential_scopes(&o.access, &scopes).api()?;
+    require(&state, &o, &meta, P::ApiKeysManage, &Resource::Organization).await?;
+    if let Err(d) = svc.rbac.authorize_credential_scopes(&o.access, &scopes) {
+        return Err(deny(&state, &o, &meta, P::ApiKeysManage, d).await);
+    }
     let name = validate_org_name(&b.name).map_err(|e| ApiError::validation("name", e.message))?;
     let expires = b.expires_in_days.map(|d| OffsetDateTime::now_utc() + time::Duration::days(d.clamp(1, 3650)));
     let generated = api_keys::generate(&state.config.auth.api_key_prefix, !b.test, &svc.api_key_pepper);
@@ -812,7 +818,10 @@ pub async fn rotate_api_key(
         return Err(ApiError::Conflict("key is revoked".into()));
     }
     let scopes = PermissionSet::parse_keys(old.scopes.iter().map(String::as_str)).unwrap_or_default();
-    svc.rbac.authorize_credential_scopes(&o.access, &scopes).api()?;
+    require(&state, &o, &meta, P::ApiKeysManage, &Resource::Organization).await?;
+    if let Err(d) = svc.rbac.authorize_credential_scopes(&o.access, &scopes) {
+        return Err(deny(&state, &o, &meta, P::ApiKeysManage, d).await);
+    }
     let generated = api_keys::generate(&state.config.auth.api_key_prefix, true, &svc.api_key_pepper);
     let mut tx = svc.db.begin().await.api()?;
     let new_id = app_db::api_keys::insert(
@@ -866,7 +875,10 @@ pub async fn register_service_client(
     let scopes = PermissionSet::parse_keys(b.scopes.iter().map(String::as_str))
         .map_err(|e| ApiError::validation("scopes", e))?;
     let svc = state.svc()?;
-    svc.rbac.authorize_credential_scopes(&o.access, &scopes).api()?;
+    require(&state, &o, &meta, P::ApiKeysManage, &Resource::Organization).await?;
+    if let Err(d) = svc.rbac.authorize_credential_scopes(&o.access, &scopes) {
+        return Err(deny(&state, &o, &meta, P::ApiKeysManage, d).await);
+    }
     if b.subject.trim().is_empty() || b.subject.len() > 255 {
         return Err(ApiError::validation("subject", "required"));
     }

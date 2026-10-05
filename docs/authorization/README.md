@@ -96,7 +96,10 @@ organisation permission the principal holds (`allow_org`). The steps:
    - writes: `require(&state, &o, &meta, P::X, &resource).await?`, which audits denials as
      `authz.denied` (invariant 10);
    - reads: `require_read(&state, &o, P::X, &resource)?`, which does not audit (cross-tenant probes
-     are already audited when the organisation is resolved).
+     are already audited when the organisation is resolved);
+   - structural checks after `require` (escalation, credential scopes; see `invite` and
+     `create_api_key`): on `Err(d)`, `return Err(deny(&state, &o, &meta, P::X, d).await)`, so the
+     denial is audited too.
 
    Use `Resource::Owned { owner_id }` when ownership matters (see the run handlers). Never decide
    with `access.can()` or `access.require()` in a handler: those read the precomputed set and skip

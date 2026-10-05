@@ -65,6 +65,9 @@ impl EventBus for PgEventBus {
     fn subscribe(&self) -> broadcast::Receiver<RealtimeEvent> {
         self.local.subscribe()
     }
+    fn transport(&self) -> &'static str {
+        "postgres"
+    }
 }
 
 /// The deployment's realtime bus: NATS when `messaging.enabled` (scale-out, no database load),

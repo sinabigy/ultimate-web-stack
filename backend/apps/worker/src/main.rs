@@ -1,6 +1,6 @@
 //! `app-worker`: dedicated background worker. Same configuration as the API (`APP__*`); set
 //! `APP__JOBS__RUN_IN_PROCESS=false` on API instances when running this separately.
-//! Health and metrics on `APP__WORKER__PORT` (default 9091).
+//! Health and metrics on `worker.port` (`APP__WORKER__PORT`, default 9091).
 
 use std::{sync::Arc, time::Duration};
 
@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(id = worker.id(), "app-worker starting");
     let runner = tokio::spawn(worker.run(shutdown.clone()));
 
-    let port: u16 = std::env::var("APP__WORKER__PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(9091);
+    let port = config.worker.port;
     let probe_pool = pool.clone();
     let ops = Router::new()
         .route("/healthz", get(|| async { "ok" }))

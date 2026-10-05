@@ -385,7 +385,19 @@
         "source": "user",
         "confirmed": true,
         "timeout_s": 3600,
-        "note": "Builds the release image and runs the production compose stack: both health checks pass, public surface correct (SPA, /metrics 404, status-only /readyz), non-root + read-only."
+        "note": "Builds the release image and runs the production compose stack: health checks, public surface (SPA, /metrics 404, status-only /readyz), non-root + read-only, no secrets in the image, restart, graceful SIGTERM shutdown (exit 0, drained)."
+      },
+      {
+        "id": "systemd-live",
+        "stage": "build",
+        "cmd": "infra/systemd/live-test.sh",
+        "requires": [
+          "docker"
+        ],
+        "source": "user",
+        "confirmed": true,
+        "note": "VPS tier, live: the release binaries installed per docs/deployment/vps.md under the real hardened units in a systemd container with PostgreSQL; start, health, non-root, worker, restart, graceful stop, crash restart. Reuses the release-smoke image. Needs privileged containers.",
+        "timeout_s": 1200
       }
     ]
   },

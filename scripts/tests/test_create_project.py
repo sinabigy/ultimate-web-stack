@@ -126,6 +126,45 @@ class CreateProjectTests(unittest.TestCase):
         server = (g.path / "backend/apps/server/Cargo.toml").read_text()
         self.assertIn('default = ["redis", "nats", "clickhouse", "cedar"]', server)
 
+    def test_cli_names_noninteractive_failure_cleanup_and_portability(self):
+        # Help works and documents the profiles.
+        h = subprocess.run([sys.executable, str(GEN), "--help"], capture_output=True, text=True)
+        self.assertEqual(h.returncode, 0)
+        self.assertIn("--profile", h.stdout)
+        # Non-interactive without a name: a clear error, nothing created.
+        r = subprocess.run([sys.executable, str(GEN), str(self.tmp / "noname")], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("--name and DEST are required", r.stderr)
+        self.assertFalse((self.tmp / "noname").exists())
+        # A failure after files were copied removes the partial destination.
+        env = {**__import__("os").environ, "CREATE_PROJECT_TEST_FAIL": "after-copy"}
+        r = subprocess.run([sys.executable, str(GEN), str(self.tmp / "broken"), "--name", "Broken", "--no-git"],
+                           capture_output=True, text=True, env=env)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("removed the partial", r.stderr)
+        self.assertFalse((self.tmp / "broken").exists())
+        # Names with spaces and hyphens become a valid slug everywhere.
+        r = subprocess.run([sys.executable, str(GEN), str(self.tmp / "spaced dir"), "--name", "My Cool-App 2",
+                            "--no-start"], capture_output=True, text=True, timeout=300)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        g = Generated(self.tmp / "spaced dir")
+        self.assertIn("COMPOSE_PROJECT_NAME:-my-cool-app-2}", (g.path / "infra/docker/compose.yaml").read_text())
+        self.assertIn('"name": "my-cool-app-2-frontend"', (g.path / "frontend/package.json").read_text())
+        self.assertIn('BRAND = "My Cool-App 2"', (g.path / "frontend/src/brand.ts").read_text())
+        # No source-machine paths: nothing points back at the blueprint or the template checkout.
+        tracked = subprocess.run(["git", "ls-files"], cwd=g.path, capture_output=True, text=True).stdout.split()
+        leaks = []
+        for rel in tracked:
+            try:
+                text = (g.path / rel).read_text()
+            except (UnicodeDecodeError, IsADirectoryError):
+                continue
+            for needle in (str(ROOT), str(Path.home()), "~/Coding/"):
+                if needle in text:
+                    leaks.append(f"{rel}: {needle}")
+        self.assertEqual(leaks, [], "generated project references the source machine")
+
     def test_invalid_combinations_are_refused(self):
         r = self.gen("bad1", "--auth", "b2b", "--no-organizations", "--no-git", ok=False)
         self.assertNotEqual(r.returncode, 0)

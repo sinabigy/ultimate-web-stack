@@ -43,4 +43,19 @@ case "$ready" in *checks*) echo "FAIL: public /readyz exposes check details: $re
 [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$APP_PORT/")" = 200 ] || { echo "FAIL: SPA not served"; exit 1; }
 docker inspect app-smoke-api-1 --format '{{.Config.User}} {{.HostConfig.ReadonlyRootfs}}' | grep -q '^nonroot:nonroot true$' \
   || { echo "FAIL: not non-root/read-only"; exit 1; }
+# Secrets come only from the environment file at run time: none is baked into the image.
+if docker image inspect "$APP_IMAGE" --format '{{json .Config.Env}}' | grep -Eq 'TOKEN_ENCRYPTION_KEY|API_KEY_PEPPER|PASSWORD|SECRET'; then
+  echo "FAIL: secret-like variable in the image config"; exit 1
+fi
+cid=$(docker create "$APP_IMAGE"); files=$(docker export "$cid" | tar -t); docker rm "$cid" >/dev/null
+if echo "$files" | grep -Eq '(^|/)\.env($|\.)|app\.env$|\.pem$|id_rsa'; then echo "FAIL: secret file in the image"; exit 1; fi
+echo "image holds no secrets"
+# Restart: the service comes back healthy (state lives in PostgreSQL).
+docker restart app-smoke-api-1 >/dev/null && wait_healthy app-smoke-api-1 && echo "api healthy after restart"
+# Graceful shutdown: SIGTERM drains in-flight work and exits 0.
+docker stop -t 30 app-smoke-api-1 >/dev/null
+code=$(docker inspect -f '{{.State.ExitCode}}' app-smoke-api-1)
+docker logs app-smoke-api-1 2>&1 | grep -q "server stopped cleanly" && [ "$code" = 0 ] \
+  || { echo "FAIL: shutdown not graceful (exit $code)"; docker logs --tail 20 app-smoke-api-1; exit 1; }
+echo "graceful shutdown: exit 0, drained"
 echo "release smoke: OK (public /readyz=$ready)"

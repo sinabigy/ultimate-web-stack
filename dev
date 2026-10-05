@@ -10,7 +10,7 @@
   ./dev status                containers and app health
   ./dev check [--auth] [--strict]
                               canonical validation (tools/ai-validate) + optional identity checks
-  ./dev test [--e2e] [--zitadel] [--system] [--journey]
+  ./dev test [--e2e] [--zitadel] [--system] [--journey] [--drill]
                               backend + frontend tests; optional browser suites
   ./dev benchmark [--smoke]   benchmark suites + regression gates + report (benchmarks/)
   ./dev types                 regenerate TypeScript bindings from Rust API types
@@ -292,6 +292,9 @@ def cmd_test(a) -> None:
     if a.system:
         # Against the running stack (./dev up, ideally with every module): one journey through all of it.
         sys.exit(sh([sys.executable, "scripts/system_smoke.py"], check=False))
+    if a.drill:
+        # Injects real faults into the running stack (stops containers, provider faults); restores them.
+        sys.exit(sh([sys.executable, "scripts/failure_drill.py"], check=False))
     if a.journey:
         # A person's day one in a real browser against the running stack; screenshots in
         # frontend/test-results/journey/.
@@ -364,6 +367,7 @@ def main() -> None:
     te.add_argument("--zitadel", action="store_true")
     te.add_argument("--system", action="store_true", help="system smoke test against the running ./dev up stack")
     te.add_argument("--journey", action="store_true", help="browser journey with screenshots against the running stack")
+    te.add_argument("--drill", action="store_true", help="live failure drill against the running stack (stops services briefly)")
     te.set_defaults(fn=cmd_test)
     be = sub.add_parser("benchmark")
     be.add_argument("--smoke", action="store_true")

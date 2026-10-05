@@ -101,7 +101,7 @@ jobs:
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v5
-      - run: python3 tools/ai-validate --strict --only infra-verify --only release-smoke
+      - run: python3 tools/ai-validate --strict --only infra-verify --only release-smoke --only systemd-live
 
   e2e:
     runs-on: ubuntu-24.04

@@ -8,7 +8,7 @@ There are two kinds of evidence:
    generated project, starting from its `AI_PROTOCOL.md`.
 
 Machine: Apple M5 (10 cores, 16 GB), Docker in a colima VM (2 CPU / 4 GiB), macOS. Projects were
-generated to `~/Coding/uwsb-generated/<name>`. Each project's full JSON report is in its
+generated into a sibling directory outside the blueprint (`../uwsb-generated/<name>`). Each project's full JSON report is in its
 `var/validation-report.json`.
 
 ## 1. Three representative projects (`scripts/validate-generated`)
