@@ -20,10 +20,10 @@
   "task_class": "docs",
   "required_capabilities": [],
   "context_class": "medium",
-  "status": "queue",
+  "status": "completed",
   "blocked_reason": null,
   "template": null,
-  "result": null,
+  "result": ".ai/context/summaries/T-0033.result.json",
   "history": [
     {
       "at": "2026-10-06T05:54:38Z",
@@ -31,6 +31,20 @@
       "from": null,
       "to": "queue",
       "note": null
+    },
+    {
+      "at": "2026-10-06T07:25:41Z",
+      "event": "transition",
+      "from": "queue",
+      "to": "active",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T07:25:41Z",
+      "event": "transition",
+      "from": "active",
+      "to": "completed",
+      "note": "completed"
     }
   ]
 }

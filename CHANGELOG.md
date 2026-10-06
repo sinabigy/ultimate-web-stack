@@ -6,6 +6,10 @@ their README.
 
 ## Unreleased
 
+Planned as **1.1.0**. Under [VERSIONING](docs/VERSIONING.md) this is a MINOR release: a new
+generator flag (`--port-base`), an additive API (`GET /api/v1/openapi.json`) and a new config key
+(`http.compression`). Existing generated projects keep working unchanged.
+
 - **Projects run side by side.** Before this, a second project's `./dev up` failed halfway with
   Docker's `port is already allocated` and left a container without ports. Its readiness probe could
   also be answered by another project's server on the same port.

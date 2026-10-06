@@ -1,0 +1,29 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0033",
+  "outcome": "completed",
+  "summary": "Validated on a50fc05 in every target: blueprint, three generated reference profiles, container release smoke, systemd live test, CI. Decision: MINOR (v1.1.0) by docs/VERSIONING.md: new generator flag, additive API, new config key; defaults for existing generated projects unchanged. Not tagged (owner decision).",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "blueprint ./dev check 29/29, 296 Rust tests, release audit OK",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "validate-generated: core 22/22 + smoke 15/0; performance/b2b/cedar 24/24 + smoke 15/0; distributed 25/25 + smoke 17/0 (each on its own port block)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "PR #12 CI 7/7 green on a50fc05 (backend, deploy-tiers incl. release smoke + systemd live, e2e, frontend, gateway, protocol, perf smoke)",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-06T07:25:41Z"
+}
