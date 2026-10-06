@@ -4,6 +4,25 @@ All notable changes to the blueprint. Versions are git tags (`vX.Y.Z`). Generate
 the version they came from in `.ai/config/project.json → architecture.origin.version` and in
 their README.
 
+## Unreleased
+
+Post-release maintenance on `main` (the next patch release). The architecture and defaults are
+unchanged.
+
+- **CI:** the Rust workspace tests run as a visible step, so an intermittent failure names its test
+  (the validator's output tail had hidden it).
+- **Tests:** known-answer vectors for the base64 engines used by persisted tokens, PKCE challenges,
+  cursors and the encryption key. They guard dependency upgrades.
+- **Dependencies:** GitHub Actions `actions/checkout`, `actions/setup-node` and
+  `actions/upload-artifact` moved to v7, after reviewing their changelogs; CI is green on each.
+- **Site:** canonical URL, Open Graph and Twitter card metadata, and a preview image. A manual
+  GitHub Pages workflow (`pages.yml`; nothing deploys until a maintainer runs it).
+- **Docs:**
+  - the benchmark story at a glance (kept vs rejected) in `docs/WHAT_WE_REJECTED.md`;
+  - the v1.1 MCP proposal (`docs/v1.1-mcp-proposal.md`; not implemented);
+  - troubleshooting for a stale database volume after a failed first start;
+  - a README pointer for benchmarking a change.
+
 ## 1.0.1 — 2026-10-05
 
 First public release: open-source packaging of 1.0.0, plus fixes found by the first GitHub-hosted

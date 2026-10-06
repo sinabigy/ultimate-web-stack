@@ -1,0 +1,27 @@
+# Publish site/ to GitHub Pages. Manual only: nothing deploys until a maintainer enables Pages
+# (Settings → Pages → Source: GitHub Actions) and runs this workflow (Actions → pages → Run).
+name: pages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the site has no placeholders
+        run: "! grep -nE 'OWNER/REPO|sponsors/OWNER|TODO' site/index.html"
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with: { path: site }
+      - id: deployment
+        uses: actions/deploy-pages@v5

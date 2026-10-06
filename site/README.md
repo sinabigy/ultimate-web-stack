@@ -38,24 +38,28 @@ Every number on the page is copied from `docs/FINAL_REPORT.md`, `docs/FINAL_ACCE
 benchmarks), update the page from them. Do not add numbers that are not in them. Keep the
 "What is not yet proven" section in step with the documents' Known limitations.
 
-## Deploying later (not done yet)
+## Deploying (not done yet; a maintainer decision)
 
-Nothing has been deployed, no domain is registered, and no GitHub resources were created. When
-you are ready, either option serves the `site/` directory as-is.
+**Recommended: GitHub Pages via the included workflow** (`.github/workflows/pages.yml`).
+- It runs on the same account, at no cost, with HTTPS and no extra service or credentials.
+- It deploys only when run by hand, and refuses to deploy if placeholders reappear.
+- The page's canonical and Open Graph URLs already point at
+  `https://sinabigy.github.io/ultimate-web-stack/`.
 
-### GitHub Pages
+```sh
+# 1. enable Pages with GitHub Actions as the source (once)
+gh api -X POST repos/sinabigy/ultimate-web-stack/pages -f build_type=workflow
+# 2. deploy
+gh workflow run pages.yml -R sinabigy/ultimate-web-stack
+gh run watch -R sinabigy/ultimate-web-stack $(gh run list -R sinabigy/ultimate-web-stack --workflow pages.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+# 3. verify, then set the repository homepage
+curl -sI https://sinabigy.github.io/ultimate-web-stack/ | head -1
+gh repo edit sinabigy/ultimate-web-stack --homepage https://sinabigy.github.io/ultimate-web-stack/
+```
 
-1. Push the repository to GitHub.
-2. Either:
-   - **Settings → Pages → Build and deployment → Source: GitHub Actions**, and add a workflow
-     that uploads `site/` with `actions/upload-pages-artifact` and publishes it with
-     `actions/deploy-pages`; or
-   - publish from a branch: Pages can only serve the repository root or `/docs` from a branch,
-     so for this layout the Actions route is simpler.
-3. The page is then served at `https://sinabigy.github.io/ultimate-web-stack/`. All links on the page are
-   absolute or in-page anchors, so it works under that sub-path.
-4. Optional custom domain: **Settings → Pages → Custom domain**, plus a `CNAME` DNS record
-   pointing at `sinabigy.github.io`.
+For a custom domain later: Settings → Pages → Custom domain (plus a DNS `CNAME` to
+`sinabigy.github.io`). Then update the `canonical`, `og:url` and `og:image` URLs in
+`index.html`.
 
 ### Cloudflare Pages
 

@@ -1,11 +1,47 @@
-# What we intentionally don't use
+# Shaped by measurements: what we kept, and what we rejected
 
-Saying "no" with evidence is half of this project. Every entry links to its measurement. All
-numbers come from one machine (Apple M5, with services in a 2-CPU / 4 GiB VM, median of 3), so
-read them as relative evidence, not universal truth.
-[benchmarks/SUMMARY.md](benchmarks/SUMMARY.md) has the full tables.
+**This stack was shaped by measurements, including negative results.** Each technology had to
+beat a measured alternative to stay, and the ones that didn't are documented below. All numbers
+come from one machine (Apple M5, with services in a 2-CPU / 4 GiB VM, median of 3), so read
+them as relative evidence, not universal truth.
+[benchmarks/SUMMARY.md](benchmarks/SUMMARY.md) has the full tables, and every decision is an ADR
+with reversal conditions.
 
-## Rejected
+## At a glance
+
+```text
+Outbound API engine (pooling + rate/concurrency scheduling)
+  → 496–500 useful req/s against a 500 req/s provider limit (163 before the controller fixes);
+    a naive retrying client completed 9.3% of the work with 99.5% waste; 99.4% connection reuse
+  → KEPT, on by default
+
+NATS JetStream
+  → 38k–49k vs 4.4k–5.1k jobs/s drain (about 10× the PostgreSQL queue)
+  → KEPT, as the opt-in `distributed` profile; PostgreSQL stays the default (transactional enqueue)
+
+ClickHouse
+  → cross-tenant aggregates 24 ms vs 573 ms over 2M events; 7.7× smaller storage
+  → KEPT, as the opt-in analytics profile; per-tenant queries stay on PostgreSQL
+
+Pingora (or nginx) in the default path
+  → an extra hop: 143k → 66k req/s on trivial endpoints; DB-backed −12–15% (Pingora), −7–8% (nginx)
+  → REJECTED as a default; optional for programmable edge logic
+
+Monoio / io_uring
+  → 0–24% slower than epoll on the same runtime, and slower than Tokio at every point
+  → REJECTED
+
+Redis session cache
+  → saves at most about ⅓ of DB round trips, at the cost of revocation delay or fail-open risk
+  → REJECTED
+
+mimalloc / jemalloc, PGO, thread-per-core Tokio
+  → differences inside the measured noise
+  → NOT ADOPTED (inconclusive; re-measure on dedicated Linux hardware)
+```
+
+## Details: rejected
+
 | candidate | what we measured | decision |
 |---|---|---|
 | **Monoio / io_uring runtime** | Linux 6.8 container, identical request handling: io_uring was 0–24% *slower* than epoll on the same runtime, and slower than Tokio at every point | stay on Tokio ([ADR 0010](../.ai/knowledge/DECISIONS/0010-stay-on-tokio-no-io-uring-runtime.md)) |

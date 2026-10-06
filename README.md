@@ -78,7 +78,7 @@ run-to-run) and regression gates, then kept only what earned its place.
 | outbound | rate + concurrency controllers | – | – | **naive retrying client** (9.3% completed, 99.5% waste) |
 | build | thin LTO, system allocator | – | PGO, mimalloc, jemalloc | **fat LTO by default** (−14% size, +38% build, no speed) |
 
-The full results are in [docs/WHAT_WE_REJECTED.md](docs/WHAT_WE_REJECTED.md) and
+The full results are in [docs/WHAT_WE_REJECTED.md](docs/WHAT_WE_REJECTED.md) (kept vs rejected, at a glance) and
 [docs/benchmarks/SUMMARY.md](docs/benchmarks/SUMMARY.md). Every decision is an ADR with
 evidence, alternatives and **reversal conditions** (`.ai/knowledge/DECISIONS/`).
 <sub>Measured on an Apple M5, with services in a 2-CPU / 4 GiB VM. Treat the numbers as relative
@@ -171,6 +171,7 @@ The full list is in [FINAL_ACCEPTANCE.md → Known limitations](docs/FINAL_ACCEP
 |---|---|
 | Start | [quickstart](docs/QUICKSTART.md) · [why this exists](docs/WHY.md) · [FAQ](docs/FAQ.md) · [troubleshooting](docs/TROUBLESHOOTING.md) |
 | Build | [adding a feature](docs/examples/adding-a-feature.md) · [modules](docs/MODULES.md) · [capability matrix](docs/BLUEPRINT_CAPABILITY_MATRIX.md) · [conventions](.ai/knowledge/CONVENTIONS.md) |
+| Benchmark a change | `./dev benchmark` (suites, regression gates, report) · [how to contribute results](CONTRIBUTING.md#benchmark-contributions) |
 | Evidence | [final report](docs/FINAL_REPORT.md) · [acceptance](docs/FINAL_ACCEPTANCE.md) · [benchmarks](docs/benchmarks/SUMMARY.md) · [ADRs](.ai/knowledge/DECISIONS/) |
 | Project | [roadmap](ROADMAP.md) · [changelog](CHANGELOG.md) · [versioning](docs/VERSIONING.md) · [governance](GOVERNANCE.md) · [all docs](docs/README.md) |
 

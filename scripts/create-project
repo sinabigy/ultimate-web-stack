@@ -238,7 +238,8 @@ BLUEPRINT_PROJECT_FILES = [
     "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE", "site/",
     ".github/ISSUE_TEMPLATE/", ".github/FUNDING.yml", ".github/labels.yml", ".github/pull_request_template.md",
     ".github/workflows/release.yml", "scripts/release-audit.sh", "scripts/demo.sh",
-    "docs/WHY.md", "docs/FAQ.md", "docs/QUICKSTART.md", "docs/VERSIONING.md",
+    "docs/WHY.md", "docs/FAQ.md", "docs/QUICKSTART.md", "docs/VERSIONING.md", "docs/v1.1-mcp-proposal.md",
+    ".github/workflows/pages.yml",
 ]
 
 

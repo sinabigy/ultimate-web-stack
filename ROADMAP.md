@@ -18,6 +18,9 @@ proven**. Items that would change a default need evidence first (see
       pages.
 
 ## Next: 1.x, additive, no default changes without evidence
+- [ ] **v1.1: MCP control layer.** Operate generated projects from any MCP client through typed,
+      permission-scoped tools that wrap the existing protocol tools (proposal:
+      [docs/v1.1-mcp-proposal.md](docs/v1.1-mcp-proposal.md); awaiting approval).
 - [ ] `create-project --update`: a guided way to bring blueprint fixes into existing generated
       projects. Today, release notes list the files to update.
 - [ ] More example features as documented walkthroughs (the clean-room features: projects,

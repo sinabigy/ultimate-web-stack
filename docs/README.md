@@ -3,7 +3,7 @@
 | area | documents |
 |---|---|
 | **The project** | [why it exists](WHY.md) · [quickstart](QUICKSTART.md) · [FAQ](FAQ.md) · [versioning](VERSIONING.md) · [contributing](../CONTRIBUTING.md) · [roadmap](../ROADMAP.md) · [security policy](../SECURITY.md) · [support](../SUPPORT.md) |
-| **Building on it** | [adding a feature (walkthrough)](examples/adding-a-feature.md) · [working with AI agents](AI_AGENT_GUIDE.md) · [production checklist](PRODUCTION_CHECKLIST.md) · [troubleshooting](TROUBLESHOOTING.md) · [what we don't use, and why](WHAT_WE_REJECTED.md) |
+| **Building on it** | [adding a feature (walkthrough)](examples/adding-a-feature.md) · [working with AI agents](AI_AGENT_GUIDE.md) · [production checklist](PRODUCTION_CHECKLIST.md) · [troubleshooting](TROUBLESHOOTING.md) · [shaped by measurements: kept vs rejected](WHAT_WE_REJECTED.md) |
 | **Start here** | [`../README.md`](../README.md) (quick start), [`../AI_PROTOCOL.md`](../AI_PROTOCOL.md) (for AI agents), `.ai/knowledge/ARCHITECTURE.md` (component map) |
 | **Identity & access** | [authentication](authentication/README.md) · [authorization](authorization/README.md) · [multitenancy](multitenancy/README.md) · [admin](admin/README.md) |
 | **Architecture** | [outbound API engine](architecture/outbound-engine.md) · [messaging (PostgreSQL queue, NATS/JetStream)](architecture/messaging.md) · [analytics (ClickHouse)](architecture/analytics.md) |
