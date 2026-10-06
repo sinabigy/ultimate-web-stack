@@ -104,7 +104,7 @@ dependencies = [
  "app-workers",
  "async-trait",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "fake-upstream",
  "futures",
  "http",
@@ -136,7 +136,7 @@ dependencies = [
  "aes-gcm",
  "app-config",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "hmac 0.13.0",
  "http",
  "jsonwebtoken",
@@ -236,7 +236,7 @@ dependencies = [
  "app-authz",
  "app-config",
  "app-domain",
- "base64 0.22.1",
+ "base64 0.23.1",
  "ipnet",
  "serde",
  "serde_json",
@@ -2815,7 +2815,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "jsonwebtoken",
  "p256",
  "rand 0.10.3",
@@ -2969,7 +2969,7 @@ version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51e219e79014df21a225b1860a479e2dcd7cbd9130f4defd4bd0e191ea31d67d"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.21.7",
  "chrono",
  "getrandom 0.2.17",
  "http",
