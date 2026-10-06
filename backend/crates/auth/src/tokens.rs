@@ -56,6 +56,7 @@ mod tests {
     /// (URL-safe, no padding) and the token-encryption key (standard, padded). A base64 crate
     /// upgrade must not change these, or stored tokens, cursors and keys stop matching.
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn base64_encodings_are_stable_known_answers() {
         use base64::{
             Engine,
