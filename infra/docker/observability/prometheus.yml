@@ -2,6 +2,9 @@
 global:
   scrape_interval: 5s
   evaluation_interval: 15s
+# Alert rules (docs/operations/alerting.md). Firing alerts show in Prometheus and Grafana; routing
+# them to people (Alertmanager, Grafana alerting, a hosted service) is a deployment choice.
+rule_files: [/etc/prometheus/alerts.yml]
 scrape_configs:
   - job_name: app-server
     static_configs: [{ targets: ["host.docker.internal:8080"], labels: { service: app } }]

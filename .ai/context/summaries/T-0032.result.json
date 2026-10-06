@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0032",
+  "outcome": "completed",
+  "summary": "Documented existing capabilities (DLQ/backoff, single-flight, secret scanning, trace-log links) in the capability matrix with a frequently-requested classification table; examples/api-clients in curl, Python and Node.js run by the system smoke with a scoped API key that is revoked afterwards.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "system smoke runs the three clients and checks the revoked key gets 401",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "docs/BLUEPRINT_CAPABILITY_MATRIX.md 'Frequently requested'",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-06T06:57:09Z"
+}

@@ -15,7 +15,7 @@ python3 tools/ai-check
 python3 tools/ai-task new "Organization notes" --objective "…" --accept "…" --validate "./dev check" --class feature
 python3 tools/ai-task start T-000N
 ./dev up --no-app                      # database for compile-time-checked SQL
-export DATABASE_URL=postgres://app:app-dev-only@localhost:55432/app   # development only
+export DATABASE_URL=postgres://app:app-dev-only@localhost:55432/app   # development only; your DEV_PG_PORT (./dev ports)
 ```
 
 ## 1. Permissions

@@ -9,6 +9,9 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+env:
+  # The service containers publish these fixed ports; they override infra/dev-ports.env.
+  DEV_PG_PORT: "55432"
 jobs:
   smoke:
     runs-on: ubuntu-24.04

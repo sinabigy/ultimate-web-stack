@@ -35,7 +35,7 @@ tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "signal", "
 tokio-util = { version = "0.7", features = ["rt"] }
 axum = { version = "0.8.9", features = ["ws", "macros"] }
 tower = { version = "0.5.3", features = ["limit", "load-shed", "timeout", "util"] }
-tower-http = { version = "0.7.1", features = ["trace", "request-id", "propagate-header", "timeout", "limit", "catch-panic", "set-header", "cors", "fs", "sensitive-headers", "csrf"] }
+tower-http = { version = "0.7.1", features = ["trace", "request-id", "propagate-header", "timeout", "limit", "catch-panic", "set-header", "cors", "fs", "sensitive-headers", "csrf", "compression-br", "compression-gzip"] }
 hyper = "1.11"
 http = "1"
 http-body-util = "0.1"
@@ -78,6 +78,8 @@ metrics-exporter-prometheus = { version = "0.18", default-features = false }
 # test
 proptest = "1.11"
 ts-rs = { version = "12.0.1", features = ["uuid-impl", "serde-json-impl", "no-serde-warnings"] }
+# OpenAPI document for the integration surface (docs/api/README.md); schemas derive from the same types.
+utoipa = { version = "5", features = ["uuid", "time"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

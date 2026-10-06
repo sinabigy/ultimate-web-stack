@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0031",
+  "outcome": "completed",
+  "summary": "12 symptom-based Prometheus alert rules with runbooks (docs/operations/alerting.md), promtool unit tests in infra-verify, loaded by the observability stack. Alertmanager rejected (deployment-specific routing); tail sampling documented as optional production collector setting.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "promtool check rules: 12 rules; promtool test rules: SUCCESS; mutations (threshold, traffic floor) caught",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "infra/verify.sh step 'alert rules' OK",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-06T06:57:09Z"
+}

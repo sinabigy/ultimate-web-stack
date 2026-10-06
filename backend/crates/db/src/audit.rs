@@ -143,7 +143,7 @@ pub async fn insert(db: impl PgExecutor<'_>, e: &AuditEvent) -> DbResult<Uuid> {
     Ok(id)
 }
 
-#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct AuditRow {
     pub id: Uuid,

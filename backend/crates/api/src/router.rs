@@ -22,6 +22,10 @@ use axum::{
 use tower::ServiceBuilder;
 use tower_http::{
     catch_panic::CatchPanicLayer,
+    compression::{
+        CompressionLayer,
+        predicate::{DefaultPredicate, Predicate, SizeAbove},
+    },
     cors::{AllowOrigin, CorsLayer},
     csrf::CsrfLayer,
     limit::RequestBodyLimitLayer,
@@ -73,6 +77,7 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
         ordinary = ordinary
             .route("/bench/plaintext", get(bench::plaintext))
             .route("/bench/json", get(bench::json))
+            .route("/bench/list", get(bench::list))
             .route("/bench/db", get(bench::db_read))
             .route("/bench/updates", get(bench::db_write))
             .route("/bench/cached", get(bench::cached_read));
@@ -102,6 +107,10 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
         app = app.fallback(not_found);
     }
 
+    if cfg.compression {
+        app = app.layer(compression());
+    }
+
     let sensitive: Arc<[HeaderName]> =
         Arc::new([header::AUTHORIZATION, header::COOKIE, header::SET_COOKIE, HeaderName::from_static("x-csrf-token")]);
     app.layer(
@@ -123,6 +132,17 @@ pub fn build_router_with(state: AppState, api: Router<AppState>, streams: Router
             .layer(middleware::from_fn(mw::http_metrics)),
     )
     .with_state(state)
+}
+
+/// On-the-fly compression for API responses (tower-http defaults: brotli quality 4, gzip 6, about
+/// 50 µs for a 13 KB list page). Skipped: responses under 1 KiB, event streams, images, anything
+/// already encoded (the precompressed static files), and `Cache-Control: no-store` responses,
+/// which carry credentials and must not share a compression context with reflected input (BREACH).
+fn compression() -> CompressionLayer<impl Predicate> {
+    let not_secret = |_: StatusCode, _: axum::http::Version, h: &axum::http::HeaderMap, _: &axum::http::Extensions| {
+        !h.get(header::CACHE_CONTROL).and_then(|v| v.to_str().ok()).is_some_and(|v| v.contains("no-store"))
+    };
+    CompressionLayer::new().compress_when(DefaultPredicate::new().and(SizeAbove::new(1024)).and(not_secret))
 }
 
 fn make_span(req: &Request) -> tracing::Span {
@@ -178,6 +198,12 @@ async fn security_headers(State(state): State<AppState>, req: Request, next: Nex
     let h = res.headers_mut();
     let csp = if api { API_CSP } else { APP_CSP };
     h.entry(header::CONTENT_SECURITY_POLICY).or_insert(HeaderValue::from_static(csp));
+    if api {
+        // Per-user data: only the user's own browser may keep it, and it revalidates every time.
+        // A CDN or proxy in front never stores it. Handlers may set their own policy, such as
+        // `no-store` on responses carrying credentials.
+        h.entry(header::CACHE_CONTROL).or_insert(HeaderValue::from_static("private, no-cache"));
+    }
     h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     h.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));

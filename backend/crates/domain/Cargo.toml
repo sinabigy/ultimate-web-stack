@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 ts-rs.workspace = true
+utoipa.workspace = true
 serde.workspace = true
 uuid.workspace = true
 time.workspace = true

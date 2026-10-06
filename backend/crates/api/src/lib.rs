@@ -13,6 +13,7 @@ pub mod dto;
 pub mod errors;
 pub mod health;
 pub mod middleware;
+pub mod openapi;
 pub mod router;
 pub mod routes;
 pub mod server;

@@ -88,3 +88,16 @@ every rerun, and a third full run was entirely clean before tagging.
 3. Check whether it coincides with the colima connect flake (`SSLRequest: 0x00`). A shared
    environmental cause is the leading hypothesis.
 4. Fix only once it's reproducible.
+
+## GCRA property test failed under load: fixed (2026-10-06)
+- **Seen**: once, in a full `./dev check` during the hardening pass:
+  `rate::tests::granted_slots_conform_to_rate_and_burst` reported 39 grants where 38.98 were
+  allowed. The span was measured about 79 µs short.
+- **Cause**: the test, not the limiter. The test read `Instant::now()` and the limiter read the
+  clock again; a thread preempted between the two reads made a slot look early. The test's 50 µs
+  allowance assumed no preemption, and `./dev check` runs many test binaries in parallel.
+- **Evidence**: 8 parallel copies × 5 rounds under 6 busy loops: the old test failed 13 of 40
+  runs, the fixed one 0 of 40.
+- **Fix**: the limiter's private `reserve_within_at(now, …)` takes the clock reading (production
+  passes `Instant::now()`, unchanged), so the tests compute slots exactly. The slack went from
+  50 µs to 1 µs. A one-slot-early mutation of the limiter still fails the test.

@@ -262,6 +262,134 @@ async fn spa_revalidation_304_keeps_app_csp() {
     std::fs::remove_dir_all(dir).ok();
 }
 
+#[tokio::test]
+async fn static_assets_use_build_time_compression() {
+    // `npm run build` writes .br/.gz siblings (frontend/scripts/precompress.mjs); the server picks
+    // one by Accept-Encoding, so no CPU is spent compressing per request.
+    let dir = std::env::temp_dir().join(format!("spa-{}", uuid_like()));
+    std::fs::create_dir_all(dir.join("assets")).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html>").unwrap();
+    std::fs::write(dir.join("assets/a.js"), "console.log('identity')").unwrap();
+    std::fs::write(dir.join("assets/a.js.br"), "brotli-bytes").unwrap();
+    std::fs::write(dir.join("assets/a.js.gz"), "gzip-bytes").unwrap();
+    let mut cfg = test_config();
+    cfg.http.static_dir = Some(dir.clone());
+    let app = app_api::build_router(state_with(cfg, vec![]));
+    let fetch = |enc: Option<&'static str>| {
+        let mut req = Request::get("/assets/a.js");
+        if let Some(e) = enc {
+            req = req.header(header::ACCEPT_ENCODING, e);
+        }
+        send(&app, req.body(Body::empty()).unwrap())
+    };
+    for (accept, encoding, body) in [
+        (Some("gzip, deflate, br, zstd"), Some("br"), "brotli-bytes"),
+        (Some("gzip"), Some("gzip"), "gzip-bytes"),
+        (None, None, "console.log('identity')"),
+    ] {
+        let res = fetch(accept).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let h = res.headers().clone();
+        assert_eq!(h.get(header::CONTENT_ENCODING).map(|v| v.to_str().unwrap()), encoding, "{accept:?}");
+        assert_eq!(h[header::CONTENT_TYPE], "text/javascript", "the original type, not the variant's");
+        assert!(
+            h[header::VARY].to_str().unwrap().to_ascii_lowercase().contains("accept-encoding"),
+            "caches key on encoding"
+        );
+        assert_eq!(h[header::CACHE_CONTROL], "public, max-age=31536000, immutable");
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(bytes, body.as_bytes(), "{accept:?}");
+    }
+    // A missing asset is a 404, never the SPA shell (a stale chunk must fail loudly).
+    assert_eq!(fetch(None).await.status(), StatusCode::OK);
+    let missing = send(&app, get_req("/assets/a.js.map")).await;
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[tokio::test]
+async fn api_responses_are_compressed_by_negotiation_except_secrets_and_streams() {
+    let big = "x".repeat(4096);
+    let api = Router::new()
+        .route(
+            "/api/big",
+            get({
+                let b = big.clone();
+                move || async move { b }
+            }),
+        )
+        .route("/api/small", get(|| async { "tiny" }))
+        .route(
+            "/api/secret",
+            get({
+                let b = big.clone();
+                move || async move { ([(header::CACHE_CONTROL, "no-store")], b) }
+            }),
+        )
+        .route(
+            "/api/events",
+            get({
+                let b = big.clone();
+                move || async move { ([(header::CONTENT_TYPE, "text/event-stream")], b) }
+            }),
+        );
+    let call = |app: Router, path: &'static str, enc: Option<&'static str>| async move {
+        let mut req = Request::get(path);
+        if let Some(e) = enc {
+            req = req.header(header::ACCEPT_ENCODING, e);
+        }
+        let res = send(&app, req.body(Body::empty()).unwrap()).await;
+        let encoding = res.headers().get(header::CONTENT_ENCODING).map(|v| v.to_str().unwrap().to_string());
+        let vary =
+            res.headers().get(header::VARY).map(|v| v.to_str().unwrap().to_ascii_lowercase()).unwrap_or_default();
+        let len = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap().len();
+        (encoding, vary, len)
+    };
+    let app = app_api::router::build_router_with(state_with(test_config(), vec![]), api.clone(), Router::new());
+
+    let (enc, vary, len) = call(app.clone(), "/api/big", Some("gzip, deflate, br, zstd")).await;
+    assert_eq!(enc.as_deref(), Some("br"));
+    assert!(vary.contains("accept-encoding"), "{vary}");
+    assert!(len < 200, "4 KiB of repetition compresses: {len}");
+    assert_eq!(call(app.clone(), "/api/big", Some("gzip")).await.0.as_deref(), Some("gzip"));
+    let (enc, _, len) = call(app.clone(), "/api/big", None).await;
+    assert_eq!((enc, len), (None, 4096), "no Accept-Encoding: identity");
+    let plain = send(&app, get_req("/api/big")).await;
+    assert_eq!(
+        plain.headers().get(header::CONTENT_LENGTH).map(|v| v.to_str().unwrap()),
+        Some("4096"),
+        "identity keeps its length"
+    );
+    assert_eq!(call(app.clone(), "/api/small", Some("br")).await.0, None, "below 1 KiB: not worth it");
+    assert_eq!(
+        call(app.clone(), "/api/secret", Some("br")).await.0,
+        None,
+        "no-store responses stay uncompressed (BREACH)"
+    );
+    assert_eq!(
+        call(app.clone(), "/api/events", Some("br")).await.0,
+        None,
+        "event streams are never buffered by a compressor"
+    );
+
+    let mut off = test_config();
+    off.http.compression = false;
+    let app = app_api::router::build_router_with(state_with(off, vec![]), api, Router::new());
+    assert_eq!(call(app, "/api/big", Some("br")).await.0, None, "http.compression = false");
+}
+
+#[tokio::test]
+async fn api_responses_are_private_and_handlers_keep_their_own_policy() {
+    let api = Router::new()
+        .route("/api/data", get(|| async { "per-user" }))
+        .route("/api/secret", get(|| async { ([(header::CACHE_CONTROL, "no-store")], "token") }));
+    let app = app_api::router::build_router_with(state_with(test_config(), vec![]), api, Router::new());
+    let cc = |res: axum::response::Response| res.headers()[header::CACHE_CONTROL].to_str().unwrap().to_string();
+    assert_eq!(cc(send(&app, get_req("/api/data")).await), "private, no-cache", "shared caches never store API data");
+    assert_eq!(cc(send(&app, get_req("/api/secret")).await), "no-store");
+    assert_eq!(cc(send(&app, get_req("/api/v1/missing")).await), "private, no-cache", "errors too");
+}
+
 fn uuid_like() -> String {
     format!("{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos())
 }

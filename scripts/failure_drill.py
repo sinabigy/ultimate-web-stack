@@ -31,7 +31,7 @@ spec = importlib.util.spec_from_file_location("system_smoke", ROOT / "scripts/sy
 smoke = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(smoke)  # type: ignore[union-attr]
 record, RESULTS = smoke.record, smoke.RESULTS
-UPSTREAM = "http://127.0.0.1:59090"
+UPSTREAM = f"http://127.0.0.1:{smoke.PORTS['DEV_UPSTREAM_PORT']}"
 
 
 def compose_project() -> str:
@@ -89,7 +89,7 @@ def wait_ready(c, seconds: int = 60) -> bool:  # noqa: ANN001
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--api", default="http://localhost:8080")
+    ap.add_argument("--api", default=f"http://localhost:{smoke.PORTS['DEV_API_PORT']}")
     a = ap.parse_args()
     c = smoke.Client(a.api)
     print(f"failure drill against {a.api}")

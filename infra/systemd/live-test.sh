@@ -2,12 +2,13 @@
 # Live systemd test (opt-in; needs privileged containers): installs the release binaries exactly as
 # docs/deployment/vps.md describes, inside a Debian 12 container running systemd, with PostgreSQL
 # next to it, then checks start, health, restart, graceful stop and the worker unit.
-#   infra/systemd/live-test.sh            (builds or reuses the release image app-smoke:latest)
+#   infra/systemd/live-test.sh            (builds or reuses the project's release image, as infra/docker/smoke.sh names it)
 set -euo pipefail
 [ -n "${TRACE:-}" ] && set -x
 root=$(cd "$(dirname "$0")/../.." && pwd)
-image=${APP_IMAGE:-app-smoke:latest}
-net=app-sd-net; pg=app-sd-pg; host=app-sd-host; work="$root/var/systemd-live"
+slug=$(sed -n 's/^name: \${COMPOSE_PROJECT_NAME:-\(.*\)}$/\1/p' "$root/infra/docker/compose.yaml")
+image=${APP_IMAGE:-${slug}-release:smoke}
+net=$slug-sd-net; pg=$slug-sd-pg; host=$slug-sd-host; work="$root/var/systemd-live"
 cleanup() { docker rm -f "$host" "$pg" >/dev/null 2>&1 || true; docker network rm "$net" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 cleanup

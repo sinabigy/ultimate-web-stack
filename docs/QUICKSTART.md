@@ -37,8 +37,9 @@ python3 tools/ai-check   # protocol state is valid
 ./dev up                 # database (+ selected modules), API, worker, SPA
 ```
 
-Open **http://localhost:5190**. The development identity provider is a mock: sign in with **any
-email**. For the admin console, enter `system_admin` in *IdP roles* and choose the method
+Open the app URL that `./dev up` prints (the project's README names it too). Each generated
+project has its own ports, so it runs next to the blueprint and other projects; `./dev ports` lists
+them. The development identity provider is a mock: sign in with **any email**. For the admin console, enter `system_admin` in *IdP roles* and choose the method
 *Password + TOTP (MFA)*.
 
 ## 4. Prove it works

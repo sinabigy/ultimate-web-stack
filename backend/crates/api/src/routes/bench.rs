@@ -25,6 +25,25 @@ pub async fn json() -> impl IntoResponse {
     Json(Message { message: "Hello, World!" })
 }
 
+/// A typical list page: 30 rows shaped like `GET /api/v1/orgs/{slug}/audit` (about 13 KB),
+/// with fresh identifiers so compression sees realistic entropy.
+pub async fn list() -> impl IntoResponse {
+    let now =
+        time::OffsetDateTime::now_utc().format(&time::format_description::well_known::Rfc3339).unwrap_or_default();
+    let (actor, org) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+    let items: Vec<serde_json::Value> = (0..30)
+        .map(|_| {
+            serde_json::json!({
+                "id": uuid::Uuid::now_v7(), "occurred_at": now, "actor_type": "user", "actor_id": actor,
+                "actor_label": "someone@example.com", "action": "run.created", "outcome": "success",
+                "target_type": "run", "target_id": uuid::Uuid::now_v7(), "organization_id": org,
+                "request_id": uuid::Uuid::new_v4(), "metadata": {},
+            })
+        })
+        .collect();
+    Json(serde_json::json!({ "items": items, "next_cursor": null }))
+}
+
 #[derive(Serialize, serde::Deserialize)]
 pub struct World {
     id: i32,

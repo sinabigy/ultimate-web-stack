@@ -41,9 +41,11 @@ mkdir -p var
 ./dev up > var/demo-up.log 2>&1 &
 up_pid=$!
 trap 'kill -INT $up_pid 2>/dev/null; wait $up_pid 2>/dev/null; ./dev down >/dev/null 2>&1 || true' EXIT
-for _ in $(seq 1 120); do curl -sf http://localhost:8080/readyz >/dev/null && curl -sf http://localhost:5190/ >/dev/null && break; sleep 5; done
-echo "  app: http://localhost:5190  (mock sign-in: any email; admin: IdP roles system_admin + Password + TOTP)"
-run curl -s http://localhost:8080/readyz; echo
+# The generated project has its own ports (infra/dev-ports.env).
+read -r api web < <(./dev ports --json --plain | python3 -c 'import json,sys; p=json.load(sys.stdin); print(p["DEV_API_PORT"], p["DEV_WEB_PORT"])')
+for _ in $(seq 1 120); do curl -sf "http://localhost:$api/readyz" >/dev/null && curl -sf "http://localhost:$web/" >/dev/null && break; sleep 5; done
+echo "  app: http://localhost:$web  (mock sign-in: any email; admin: IdP roles system_admin + Password + TOTP)"
+run curl -s "http://localhost:$api/readyz"; echo
 
 step "4. Browser journey per role (screenshots in frontend/test-results/journey/)"
 run ./dev test --journey

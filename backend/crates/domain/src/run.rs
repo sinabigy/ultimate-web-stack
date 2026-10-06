@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::ValidationError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum RunStatus {
@@ -40,7 +40,7 @@ impl RunStatus {
 }
 
 /// A batch of provider calls executed by a background job.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct Run {
     pub id: Uuid,
@@ -63,7 +63,7 @@ pub struct Run {
 }
 
 /// Validated input for creating a run.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct NewRun {
     pub label: String,

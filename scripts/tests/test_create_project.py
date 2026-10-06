@@ -16,6 +16,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 GEN = ROOT / "scripts" / "create-project"
+sys.path.insert(0, str(ROOT / "scripts"))
+import dev_ports  # noqa: E402
 
 
 class Generated:
@@ -25,6 +27,7 @@ class Generated:
         self.arch = self.project["architecture"]
         self.config = tomllib.loads((path / "backend/config/app.toml").read_text())
         self.commands = {c["id"] for c in self.project["validation"]["commands"]}
+        self.ports = dev_ports.read_file(path)
 
     def enabled(self, module: str) -> bool:
         return self.arch["modules"][module]["enabled"]
@@ -138,7 +141,7 @@ class CreateProjectTests(unittest.TestCase):
         self.assertEqual((g.config["messaging"]["enabled"], g.config["analytics"]["enabled"]), (True, True))
         self.assertTrue({"rust-test-nats", "rust-test-clickhouse", "rust-test-cache", "gateway-check"} <= g.commands)
         # A selected Redis backend must come with a usable (credential-free) development address.
-        self.assertEqual(g.config["cache"]["redis_url"], "redis://127.0.0.1:56379")
+        self.assertEqual(g.config["cache"]["redis_url"], f"redis://127.0.0.1:{g.ports['DEV_REDIS_PORT']}")
         self.assertEqual(g.arch["modules"]["cache"]["adapter"], "redis", "./dev up starts Redis only for this adapter")
         ci = (g.path / ".github/workflows/ci.yml").read_text()
         for present in ("redis:", "clickhouse:", "NATS with JetStream", "--only rust-test-cache", "--only rust-test-nats",
@@ -151,6 +154,54 @@ class CreateProjectTests(unittest.TestCase):
         self.assertTrue((g.path / "backend/gateway/src/main.rs").exists())
         server = (g.path / "backend/apps/server/Cargo.toml").read_text()
         self.assertIn('default = ["redis", "nats", "clickhouse", "cedar"]', server)
+
+    def test_each_project_gets_its_own_ports(self):
+        import re
+        blueprint = dev_ports.read_file(ROOT)
+        self.gen("ports-a", "--no-git")
+        self.gen("ports-b", "--profile", "full", "--port-base", "24000", "--no-git")
+        a, b = Generated(self.tmp / "ports-a"), Generated(self.tmp / "ports-b")
+        # Same names as the blueprint, consecutive ports from the project's base, no overlaps.
+        self.assertEqual(list(a.ports), list(blueprint))
+        self.assertEqual(a.ports, dev_ports.block(list(blueprint), dev_ports.default_base("ports-a")))
+        self.assertEqual(b.ports, dev_ports.block(list(blueprint), 24000))
+        self.assertFalse(set(a.ports.values()) & set(b.ports.values()))
+        self.assertFalse(set(a.ports.values()) & set(blueprint.values()), "generated projects run next to the blueprint")
+        for g in (a, b):
+            # Files used without ./dev (plain compose, tools/ai-validate) default to the project's ports.
+            for rel in ("infra/docker/compose.yaml", ".ai/config/project.json"):
+                defaults = re.findall(r"\$\{(DEV_[A-Z0-9_]+_PORT):-(\d+)\}", (g.path / rel).read_text())
+                self.assertTrue(defaults, rel)
+                self.assertEqual({(k, int(v)) for k, v in defaults}, {(k, g.ports[k]) for k, _ in defaults}, rel)
+            prom = (g.path / "infra/docker/observability/prometheus.yml").read_text()
+            self.assertIn(f"host.docker.internal:{g.ports['DEV_API_PORT']}", prom)
+            self.assertIn(f"host.docker.internal:{g.ports['DEV_WORKER_PORT']}", prom)
+            self.assertIn(f"http://localhost:{g.ports['DEV_WEB_PORT']}", (g.path / "README.md").read_text())
+            # Without the caller's DEV_*_PORT overrides (./dev check may run with some set).
+            clean = {k: v for k, v in __import__("os").environ.items() if not k.startswith("DEV_")}
+            listed = subprocess.run([str(g.path / "dev"), "ports", "--json", "--plain"], capture_output=True, text=True, env=clean)
+            self.assertEqual(json.loads(listed.stdout), g.ports, listed.stderr)
+        self.assertEqual(b.config["cache"]["redis_url"], f"redis://127.0.0.1:{b.ports['DEV_REDIS_PORT']}")
+        self.assertIn("--port-base 24000", (b.path / "README.md").read_text(), "an explicit block is part of the replay command")
+        self.assertNotIn("--port-base", (a.path / "README.md").read_text())
+        r = self.gen("ports-bad", "--port-base", "65530", "--no-git", ok=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("--port-base", r.stderr)
+        self.assertFalse((self.tmp / "ports-bad").exists())
+
+    def test_port_blocks_and_overrides(self):
+        names = list(dev_ports.read_file(ROOT))
+        self.assertLessEqual(len(names), dev_ports.BLOCK_SIZE)
+        bases = {dev_ports.default_base(n) for n in ("alpha", "beta", "gamma", "my-cool-app-2")}
+        for base in bases:
+            self.assertEqual((base - dev_ports.BLOCK_FIRST) % dev_ports.BLOCK_SIZE, 0)
+            self.assertLess(base + dev_ports.BLOCK_SIZE, 32768, "below the Linux ephemeral range")
+        self.assertEqual(dev_ports.default_base("alpha"), dev_ports.default_base("alpha"), "deterministic")
+        self.assertEqual(len(bases), 4)
+        loaded = dev_ports.load(ROOT, {"DEV_PG_PORT": "61000", "UNRELATED": "1"})
+        self.assertEqual(loaded["DEV_PG_PORT"], 61000)
+        self.assertEqual(loaded["DEV_API_PORT"], dev_ports.read_file(ROOT)["DEV_API_PORT"])
+        self.assertNotIn("UNRELATED", loaded)
 
     def test_cli_names_noninteractive_failure_cleanup_and_portability(self):
         # Help works and documents the profiles.

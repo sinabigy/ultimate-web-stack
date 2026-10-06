@@ -16,7 +16,7 @@ use axum::{
 use serde::Serialize;
 
 /// Field-level validation problem.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct FieldError {
     pub field: String,
@@ -113,7 +113,7 @@ impl ApiError {
 }
 
 /// RFC 9457 problem document.
-#[derive(Debug, Serialize, ts_rs::TS)]
+#[derive(Debug, Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct Problem {
     #[serde(rename = "type")]

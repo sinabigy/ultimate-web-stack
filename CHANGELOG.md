@@ -6,7 +6,61 @@ their README.
 
 ## Unreleased
 
+- **Projects run side by side.** Before this, a second project's `./dev up` failed halfway with
+  Docker's `port is already allocated` and left a container without ports. Its readiness probe could
+  also be answered by another project's server on the same port.
+  - Every development port is declared once, in `infra/dev-ports.env`, and read by `./dev`,
+    compose, Vite, Playwright, the validation commands, the smoke scripts and the benchmarks.
+  - `create-project` gives each project its own block of consecutive ports (20000–29999, derived
+    from the name; `--port-base N` picks one). The blueprint keeps its documented ports.
+  - `./dev up`, `check`, `test` and `benchmark` check every port before starting anything. They
+    name what holds a busy port (a container, or a process with its directory) and say how to
+    move. `./dev ports` lists the ports and their holders.
+  - Readiness waits on the process `./dev up` started: it fails fast if that process exits, and
+    checks the listener's PID where `lsof` exists.
+  - The release-smoke and systemd tests use project-scoped container and image names, so two
+    projects can validate at the same time.
+  - The dev session cookie is named after the project, so signing in to one local project no
+    longer signs you out of another (browsers keep cookies per host, not per port).
+  - **Projects generated from 1.0.x** keep their current ports. To adopt this, copy the files
+    named in the pull request and give `infra/dev-ports.env` a free block.
+- **Compression and HTTP caching** ([ADR 0012](.ai/knowledge/DECISIONS/0012-compression-and-http-caching.md)).
+  - `npm run build` writes brotli-11 and gzip-9 copies of static files. The server already
+    negotiated them, but the build never produced them, so the SPA went out uncompressed without a
+    compressing proxy. First-load JS/CSS drops from 186 KB to 53 KB.
+  - Source maps move out of `dist/` into `frontend/sourcemaps/`. They were served publicly.
+  - API responses from 1 KiB are compressed on the fly (brotli 4 / gzip 6; `http.compression`,
+    on by default). A real 13 KB list page goes from 13,020 to 1,329 bytes. Throughput stays
+    within the run-to-run spread (`benchmarks/run.py --suite compression`).
+  - Never compressed: `no-store` responses, which carry credentials (BREACH), event streams, and
+    already-encoded files.
+  - API responses default to `Cache-Control: private, no-cache`, so a CDN or proxy never stores
+    per-user data.
+  - API ETags are rejected for now: the SPA is push-driven and does not poll. The ADR records when
+    to add them.
+- **OpenAPI for integrations.** `GET /api/v1/openapi.json` (and `docs/api/openapi.json`) describes
+  the 10 operations that API keys and service accounts use, with the scope each one needs.
+  - Schemas derive from the Rust response types (utoipa).
+  - A test proves that every documented operation is a real route and refuses anonymous requests,
+    and that live responses match the schemas field for field. It also fails when a new route is
+    neither documented nor marked browser-only.
+  - The SPA keeps its `ts-rs` types; no second generated client.
+- **Alert rules.** The production checklist asked for alerts, but the blueprint shipped no rules.
+  `infra/docker/observability/alerts.yml` now has 12 symptom-based rules with a runbook each
+  ([alerting](docs/operations/alerting.md)). `promtool` unit tests prove each rule fires on its
+  symptom and stays quiet on healthy or low traffic; they run in `infra-verify`. The
+  observability stack loads the rules. No Alertmanager: routing alerts to people is a deployment
+  choice. Tail sampling is documented as a production-collector setting rather than shipped.
+- **Integration examples.** `examples/api-clients/` has the same API-key client in curl, Python and
+  Node.js: list runs, create one, wait for it, and handle RFC 9457 errors. `./dev test --system`
+  runs all three with a freshly scoped key, then revokes it and checks the revoked key gets 401.
+
 Maintenance on `main`, with no release planned for these alone.
+- **Test reliability:** the GCRA property tests compute granted slots from the limiter's own clock
+  reading. Under parallel load the old measurement failed 13 of 40 runs ([KNOWN_ISSUES](.ai/knowledge/KNOWN_ISSUES.md)).
+  The bound is tighter, not looser, and the limiter is unchanged.
+- **`./dev benchmark`** passes options through to `benchmarks/run.py` (`--suite http --repeat 5`).
+  A partial run skips the gates and the report, which describe complete runs.
 - **Release audit:** the launch-placeholder patterns live in one file
   (`scripts/launch-placeholders.txt`), shared by the audit and the Pages workflow's guard. The guard
   no longer triggers a false-positive audit warning. A regression test covers both behaviours.

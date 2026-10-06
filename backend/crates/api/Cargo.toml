@@ -12,6 +12,7 @@ app-analytics.workspace = true
 rand.workspace = true
 app-cache.workspace = true
 ts-rs.workspace = true
+utoipa.workspace = true
 thiserror.workspace = true
 app-auth.workspace = true
 app-authz.workspace = true

@@ -17,7 +17,7 @@ use serde::Serialize;
 use ts_rs::TS;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, TS)]
+#[derive(Debug, Serialize, TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct ListResponse<T: TS> {
     pub items: Vec<T>,
@@ -310,7 +310,7 @@ pub struct InvitationAccepted {
     pub role: String,
 }
 
-#[derive(Debug, Serialize, TS)]
+#[derive(Debug, Serialize, TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct PermissionInfo {
     pub key: String,
@@ -485,7 +485,7 @@ pub fn enum_str<T: Serialize>(v: &T) -> String {
 }
 
 /// One day of an analytics series (from ClickHouse).
-#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct AnalyticsPoint {
     /// `YYYY-MM-DD` (UTC).
@@ -497,7 +497,7 @@ pub struct AnalyticsPoint {
 
 /// Run activity for one organisation: runs created (value = calls requested) and runs
 /// finished (value = calls succeeded) per day.
-#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct RunAnalytics {
     pub days: u32,

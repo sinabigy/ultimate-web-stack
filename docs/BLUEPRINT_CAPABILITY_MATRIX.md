@@ -27,17 +27,23 @@ steps: [docs/MODULES.md](MODULES.md).
 | Audit trail (append-only) | ✅ | ✅ | ✅ | ✅ | always |
 | RBAC authorization, deny by default | ✅ | ✅ | ✅ | ✅ | always |
 | API keys + service accounts (M2M) | ✅ | ✅ | ✅ | ✅ | always |
-| Background jobs (PostgreSQL queue, leases, DLQ) + worker | ✅ | ✅ | ✅ | ✅ | always |
+| Background jobs (PostgreSQL queue, leases, exponential backoff, dead letters with retry from the admin console) + worker | ✅ | ✅ | ✅ | ✅ | always |
 | Realtime SSE/WebSocket (PostgreSQL LISTEN/NOTIFY fan-out) | ✅ | ✅ | ✅ | ✅ | always |
 | Outbound API engine (adaptive concurrency, learned rate, breaker) | ✅ | ✅ | ✅ | ✅ | always |
-| In-process cache (`CacheLayer`, single-flight) | ✅ | ✅ | ✅ | ✅ | always |
+| In-process cache (`CacheLayer`, single-flight: one load per key under concurrent misses) | ✅ | ✅ | ✅ | ✅ | always |
 | Metrics (`/metrics` on the ops port), W3C tracing, JSON logs | ✅ | ✅ | ✅ | ✅ | always |
+| Alert rules with unit tests ([alerting](operations/alerting.md)) | ✅ | ✅ | ✅ | ✅ | always (loaded by the observability stack) |
+| HTTP: build-time brotli/gzip for static files, on-the-fly compression for API responses, private caching of API data | ✅ | ✅ | ✅ | ✅ | always (`http.compression`) |
+| OpenAPI 3.1 for the integration surface, tested against live responses ([api](api/README.md)) | ✅ | ✅ | ✅ | ✅ | always |
+| Integration examples (curl, Python, Node.js) run by the system smoke ([examples](../examples/api-clients/README.md)) | ✅ | ✅ | ✅ | ✅ | always |
+| Secret scanning: gitleaks in the pre-commit hook and in CI | ✅ | ✅ | ✅ | ✅ | always |
+| Own development ports per project (`infra/dev-ports.env`, `./dev ports`) | ✅ | ✅ | ✅ | ✅ | always |
 | Benchmark harness + regression gates | ✅ | ✅ | ✅ | ✅ | always |
 | Deployment tiers (VPS/systemd, containers, Kubernetes) | ✅ | ✅ | ✅ | ✅ | always |
 | **Redis / Dragonfly** cache and shared rate limiter | — | ✅ | ✅ | ✅ | `cache` module · feature `redis` |
 | **NATS** realtime bus + **JetStream** durable queue | — | — | ✅ | ✅ | `messaging_nats` · feature `nats` |
 | **ClickHouse** event analytics | — | — | ✅ | ✅ | `analytics_clickhouse` · feature `clickhouse` |
-| Prometheus, Tempo, Loki, Alloy, Grafana (dev stack) | — | — | — | ✅ | `observability` (`./dev up --with observability`) |
+| Prometheus, Tempo, Loki, Alloy, Grafana (dev stack; trace ↔ log links in Grafana) | — | — | — | ✅ | `observability` (`./dev up --with observability`) |
 | **Pingora** edge gateway | — | — | — | — | `--with-gateway` (any profile) |
 | Monoio / io_uring runtime | — | — | — | — | not shipped: rejected ([ADR 0010](../.ai/knowledge/DECISIONS/0010-stay-on-tokio-no-io-uring-runtime.md)) |
 
@@ -79,3 +85,27 @@ always tenant-scoped.
 | In-repo mock OIDC provider (development and tests) | every Rust auth test, the E2E suite, `./dev test --system` |
 | Self-hosted ZITADEL v4.19.4 (`./dev up --identity zitadel`) | `frontend/tests/zitadel/zitadel.spec.ts`: hosted login, IdP roles, MFA step-up, logout, M2M. Run on 2026-10-04 in the blueprint, not in generated projects |
 | ZITADEL Cloud / other OIDC providers | configuration only (`auth.issuer_url`, client); `app-server check-config --online` validates discovery, issuer and PKCE. **Not verified live.** |
+
+## Frequently requested
+
+What people ask a web stack for, and where it stands here. **Default** means every generated
+project has it. **Profile** means it comes with a module. **Optional** means it is documented, not
+shipped. **Rejected** items cite the evidence or the constraint that decided it.
+
+| request | status | where, and the evidence |
+|---|---|---|
+| Several projects running at once | default | own port block per project (`infra/dev-ports.env`, `./dev ports`); a busy port names its holder; two generated projects ran their system smoke side by side |
+| Response compression | default | build-time brotli/gzip for static files, on the fly for API JSON from 1 KiB; [ADR 0012](../.ai/knowledge/DECISIONS/0012-compression-and-http-caching.md) |
+| HTTP caching | default | immutable hashed assets, revalidated shell (`Last-Modified` → 304), `private, no-cache` API data |
+| ETag / 304 on API responses | rejected (for now) | the SPA is push-driven (SSE) and does not poll; ADR 0012 says when to add them |
+| OpenAPI | default | the integration surface (API keys, service accounts), tested against live responses ([api](api/README.md)) |
+| Generated TypeScript client | rejected | the SPA already uses compile-checked `ts-rs` types from the same Rust code; integrators generate clients from the OpenAPI document |
+| Alert rules | default (loaded by `observability`) | 12 rules with runbooks and `promtool` unit tests ([alerting](operations/alerting.md)) |
+| Alertmanager | rejected | who gets paged, and how, depends on the deployment; the rules are the portable part |
+| Tail sampling | optional | a production collector setting (Alloy / OpenTelemetry Collector `tail_sampling`); [alerting](operations/alerting.md#what-is-not-included) |
+| Trace ↔ log ↔ metric links | profile (`observability`) | Grafana `tracesToLogsV2` and `derivedFields`; logs carry `trace_id` |
+| Job retries with backoff and a dead-letter queue | default | `app-db` `jobs`; tests `failures_back_off_then_dead_letter`, `poison_and_unknown_jobs_are_dead_lettered`; retry from the admin console |
+| Cache stampede protection (request coalescing) | default | `CacheLayer::get_or_load` single-flight; test `single_flight_prevents_stampede` |
+| Secret scanning | default | gitleaks in `.githooks/pre-commit` (staged changes) and in CI (full history) |
+| Integration examples | default | curl, Python, Node.js in `examples/api-clients/`, run by `./dev test --system` |
+| Server-side rendering (SolidStart) | rejected | no Node.js in production unless SSR requirements justify it ([constraints](../.ai/knowledge/CONSTRAINTS.md)); the app sits behind sign-in, where SSR buys no SEO |

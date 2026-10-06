@@ -1,17 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
+import { devPort } from "./scripts/dev-ports.mjs";
 
 // Full-stack E2E: real app-server (serving the built SPA, same origin), real PostgreSQL,
-// mock OIDC provider, simulated provider. Every port differs from `./dev up` (8080, 5190, 59081,
-// 59090), so E2E (and therefore `./dev check`) runs while a dev stack is up.
-const APP = "http://localhost:18080";
-const IDP = "http://127.0.0.1:59082";
-const UPSTREAM_PORT = "59091";
+// mock OIDC provider, simulated provider. Its ports (DEV_E2E_* in infra/dev-ports.env) differ from
+// the `./dev up` ones, so E2E (and therefore `./dev check`) runs while a dev stack is up.
+const APP = `http://localhost:${devPort("DEV_E2E_API_PORT")}`;
+const IDP = `http://127.0.0.1:${devPort("DEV_E2E_IDP_PORT")}`;
+const UPSTREAM_PORT = String(devPort("DEV_E2E_UPSTREAM_PORT"));
 
 const backendEnv = {
   APP__ENVIRONMENT: "test",
-  APP__DATABASE__URL: "postgres://app:app-dev-only@localhost:55432/app_e2e",
+  APP__DATABASE__URL: `postgres://app:app-dev-only@localhost:${devPort("DEV_PG_PORT")}/app_e2e`,
   APP__DATABASE__MIGRATE_ON_START: "true",
-  APP__HTTP__PORT: "18080",
+  APP__HTTP__PORT: String(devPort("DEV_E2E_API_PORT")),
   APP__HTTP__STATIC_DIR: "../frontend/dist",
   APP__RATE_LIMIT__ENABLED: "false",
   APP__AUTH__PROVIDER: "oidc",
@@ -54,7 +55,7 @@ export default defineConfig({
       command: "../backend/target/debug/mock-oidc",
       url: `${IDP}/.well-known/openid-configuration`,
       env: {
-        MOCK_OIDC_PORT: "59082",
+        MOCK_OIDC_PORT: String(devPort("DEV_E2E_IDP_PORT")),
         MOCK_OIDC_REDIRECT_URIS: `${APP}/auth/callback`,
         MOCK_OIDC_POST_LOGOUT_URIS: `${APP}/login`,
       },

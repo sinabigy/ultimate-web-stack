@@ -1,0 +1,71 @@
+# promtool test rules alerts.test.yml (infra/verify.sh runs it in the Prometheus image).
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - name: an unreachable API pages after 2 minutes; a healthy worker does not
+    interval: 1m
+    input_series:
+      - { series: 'up{job="app-server",instance="api:8080"}', values: "1 0 0 0 0" }
+      - { series: 'up{job="app-worker",instance="worker:9091"}', values: "1 1 1 1 1" }
+    alert_rule_test:
+      - { eval_time: 2m, alertname: AppDown, exp_alerts: [] }
+      - eval_time: 4m
+        alertname: AppDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: app-server, instance: "api:8080" }
+            exp_annotations:
+              summary: "API instance api:8080 is not answering scrapes"
+              runbook: docs/operations/alerting.md#appdown
+      - { eval_time: 4m, alertname: WorkerDown, exp_alerts: [] }
+
+  - name: 10% server errors under real traffic fire; healthy traffic does not
+    interval: 1m
+    input_series:
+      # 60 requests/min (1 req/s), 6 of them 5xx.
+      - { series: 'app_http_requests_total{route="/api/v1/x",status="200",method="GET"}', values: "0+54x15" }
+      - { series: 'app_http_requests_total{route="/api/v1/x",status="500",method="GET"}', values: "0+6x15" }
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: HighServerErrorRate
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "10% of API responses are 5xx"
+              runbook: docs/operations/alerting.md#highservererrorrate
+
+  - name: errors below the traffic floor do not page
+    interval: 1m
+    input_series:
+      # 6 requests/min (0.1 req/s), half of them 5xx: noisy, not an incident.
+      - { series: 'app_http_requests_total{route="/api/v1/x",status="200",method="GET"}', values: "0+3x15" }
+      - { series: 'app_http_requests_total{route="/api/v1/x",status="503",method="GET"}', values: "0+3x15" }
+    alert_rule_test:
+      - { eval_time: 12m, alertname: HighServerErrorRate, exp_alerts: [] }
+
+  - name: a lost audit record is critical at once
+    interval: 1m
+    input_series:
+      - { series: 'app_audit_write_failures_total{service="app"}', values: "0 0 1 1" }
+    alert_rule_test:
+      - { eval_time: 1m, alertname: AuditWriteFailures, exp_alerts: [] }
+      - eval_time: 3m
+        alertname: AuditWriteFailures
+        exp_alerts:
+          - exp_labels: { severity: critical, service: app }
+            exp_annotations:
+              summary: "audit records could not be written"
+              runbook: docs/operations/alerting.md#auditwritefailures
+
+  - name: dead letters are reported per job kind, retries are not
+    interval: 1m
+    input_series:
+      - { series: 'app_jobs_processed_total{queue="default",kind="run.execute",result="dead"}', values: "0 0 1 1" }
+      - { series: 'app_jobs_processed_total{queue="default",kind="email.send",result="retry"}', values: "0 2 4 6" }
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: JobsDeadLettered
+        exp_alerts:
+          - exp_labels: { severity: warning, kind: run.execute }
+            exp_annotations:
+              summary: "1 job(s) of kind run.execute were dead-lettered"
+              runbook: docs/operations/alerting.md#jobsdeadlettered

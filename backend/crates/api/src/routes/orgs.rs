@@ -237,6 +237,10 @@ pub async fn overview(
 
 // ------------------------------------------------------------------ members
 
+/// Members with their roles.
+#[utoipa::path(get, path = "/api/v1/orgs/{slug}/members", tag = "organization", params(("slug" = String, Path, description = "Organization slug")),
+    responses((status = 200, body = crate::dto::ListResponse<orgs::MemberRow>), crate::openapi::CommonErrors),
+    security(("bearer" = ["members:read"])))]
 pub async fn list_members(
     State(state): State<AppState>,
     o: Org,
@@ -477,6 +481,10 @@ pub async fn accept_invitation(
 
 // ------------------------------------------------------------------ teams
 
+/// Teams with member counts.
+#[utoipa::path(get, path = "/api/v1/orgs/{slug}/teams", tag = "organization", params(("slug" = String, Path, description = "Organization slug")),
+    responses((status = 200, body = crate::dto::ListResponse<orgs::TeamRow>), crate::openapi::CommonErrors),
+    security(("bearer" = ["teams:read"])))]
 pub async fn list_teams(
     State(state): State<AppState>,
     o: Org,
@@ -583,6 +591,10 @@ pub async fn list_team_members(
 
 // ------------------------------------------------------------------ roles
 
+/// Built-in and custom roles with their effective permissions.
+#[utoipa::path(get, path = "/api/v1/orgs/{slug}/roles", tag = "organization", params(("slug" = String, Path, description = "Organization slug")),
+    responses((status = 200, body = crate::dto::ListResponse<orgs::RoleRow>), crate::openapi::CommonErrors),
+    security(("bearer" = ["roles:read"])))]
 pub async fn list_roles(
     State(state): State<AppState>,
     o: Org,
@@ -654,6 +666,9 @@ pub async fn delete_role(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Every permission, and whether it can be granted to a credential.
+#[utoipa::path(get, path = "/api/v1/permissions", tag = "organization",
+    responses((status = 200, body = crate::dto::ListResponse<crate::dto::PermissionInfo>)), security(()))]
 pub async fn permission_catalog() -> Json<dto::ListResponse<dto::PermissionInfo>> {
     Json(dto::ListResponse::new(
         P::ALL
@@ -670,7 +685,8 @@ pub async fn permission_catalog() -> Json<dto::ListResponse<dto::PermissionInfo>
 
 // ------------------------------------------------------------------ audit
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct AuditQuery {
     pub action: Option<String>,
     pub actor_id: Option<Uuid>,
@@ -702,6 +718,10 @@ impl AuditQuery {
     }
 }
 
+/// The organization's audit trail, newest first.
+#[utoipa::path(get, path = "/api/v1/orgs/{slug}/audit", tag = "audit", params(("slug" = String, Path, description = "Organization slug"), AuditQuery),
+    responses((status = 200, body = app_db::pagination::Page<app_db::audit::AuditRow>), crate::openapi::CommonErrors),
+    security(("bearer" = ["audit:read"])))]
 pub async fn audit_log(
     State(state): State<AppState>,
     o: Org,
@@ -915,13 +935,18 @@ pub async fn billing(
 
 // ------------------------------------------------------------------ runs (example domain)
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct RunsQuery {
     status: Option<String>,
     cursor: Option<String>,
     limit: Option<i64>,
 }
 
+/// List runs, newest first. Page with `next_cursor`.
+#[utoipa::path(get, path = "/api/v1/orgs/{slug}/runs", tag = "runs", params(("slug" = String, Path, description = "Organization slug"), RunsQuery),
+    responses((status = 200, body = app_db::pagination::Page<app_domain::Run>), crate::openapi::CommonErrors),
+    security(("bearer" = ["runs:read"])))]
 pub async fn list_runs(
     State(state): State<AppState>,
     o: Org,
@@ -940,6 +965,11 @@ pub async fn list_runs(
     Ok(Json(page))
 }
 
+/// Create a run; a worker executes it. Poll `GET …/runs/{id}` or subscribe to events.
+#[utoipa::path(post, path = "/api/v1/orgs/{slug}/runs", tag = "runs", params(("slug" = String, Path, description = "Organization slug")), request_body = NewRun,
+    responses((status = 201, body = app_domain::Run),
+        (status = 422, description = "Validation failed (field `errors`)", body = app_errors::Problem, content_type = "application/problem+json"), crate::openapi::CommonErrors),
+    security(("bearer" = ["runs:create"])))]
 pub async fn create_run(
     State(state): State<AppState>,
     o: Org,
@@ -995,6 +1025,10 @@ pub async fn create_run(
     Ok((StatusCode::CREATED, Json(run)))
 }
 
+/// One run.
+#[utoipa::path(get, path = "/api/v1/orgs/{slug}/runs/{id}", tag = "runs", params(("slug" = String, Path, description = "Organization slug"), ("id" = Uuid, Path, description = "Run id")),
+    responses((status = 200, body = app_domain::Run), crate::openapi::CommonErrors),
+    security(("bearer" = ["runs:read"])))]
 pub async fn get_run(
     State(state): State<AppState>,
     o: Org,
@@ -1004,6 +1038,10 @@ pub async fn get_run(
     Ok(Json(runs::get(&state.svc()?.db, &o.access, id).await.api()?))
 }
 
+/// Delete a run (own runs with `runs:manage_own`, any with `runs:manage_any`).
+#[utoipa::path(delete, path = "/api/v1/orgs/{slug}/runs/{id}", tag = "runs", params(("slug" = String, Path, description = "Organization slug"), ("id" = Uuid, Path, description = "Run id")),
+    responses((status = 204, description = "Deleted"), crate::openapi::CommonErrors),
+    security(("bearer" = ["runs:manage_own"])))]
 pub async fn delete_run(
     State(state): State<AppState>,
     o: Org,
@@ -1021,12 +1059,16 @@ pub async fn delete_run(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct AnalyticsParams {
     days: Option<u32>,
 }
 
 /// Daily run activity from ClickHouse. 404 when the analytics module is off.
+#[utoipa::path(get, path = "/api/v1/orgs/{slug}/analytics/runs", tag = "runs", params(("slug" = String, Path, description = "Organization slug"), AnalyticsParams),
+    responses((status = 200, body = crate::dto::RunAnalytics), crate::openapi::CommonErrors),
+    security(("bearer" = ["runs:read"])))]
 pub async fn run_analytics(
     State(state): State<AppState>,
     o: Org,

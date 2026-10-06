@@ -4,6 +4,7 @@
 #   systemd: systemd-analyze verify in a Debian container
 #   k8s:     kubeconform -strict on the base and on the rendered kustomization
 #   caddy:   caddy validate
+#   alerts:  promtool check + rule unit tests
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 compose() { if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi; }
@@ -21,4 +22,7 @@ step "kubernetes base (kubeconform -strict)" docker run --rm -v "$root/infra/k8s
 step "kubernetes kustomize render + kubeconform" bash -c "docker run --rm -v '$root/infra/k8s:/k8s:ro' registry.k8s.io/kustomize/kustomize:v5.7.1 build /k8s/base 2>/dev/null | docker run --rm -i ghcr.io/yannh/kubeconform:latest -strict -summary -"
 step "Caddyfile (caddy validate)" docker run --rm -v "$root/infra/systemd/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+obs="$root/infra/docker/observability"
+step "alert rules (promtool check rules + test rules)" docker run --rm --entrypoint sh -v "$obs:/r:ro" -w /r \
+  prom/prometheus:v3.15.0 -c "promtool check rules alerts.yml && promtool test rules alerts.test.yml && promtool check config --syntax-only prometheus.yml"
 exit $fail

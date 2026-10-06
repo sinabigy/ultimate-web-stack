@@ -5,3 +5,17 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc d42e269ade733d7a639c6cd915dff969042f8bedbdf88b457e785be39d0f950f # shrinks to rate = 710.1524550372608, burst = 1, n = 5
+cc b6f2b5feb0c0c72bba486f47095fe13f29ec9fced2b5809bacfcbb0ecf5836be # shrinks to rate = 305.66028720614196, burst = 19, n = 92
+cc 69fdc4e948dfd175065cae75dfc5b17d27edcaeea910aee2b715c4fbafff28db # shrinks to rate = 354.8362722249034, burst = 24, n = 236
+cc dd9195bfd5dbec5cc04b24400f522ee0cc2649f7af8e2d712f0a8e0ecbed61b8 # shrinks to rate = 1427.0439748243239, burst = 3, n = 149
+cc bd67680b5225b00f07fc0a47d4c025018d6b85d36e1fe29fb34d553c83c24380 # shrinks to rate = 279.76157890760106, burst = 1, n = 99
+cc 61ea5cc5985fec9a789b038f2d5f8238fcc105300045fea1981a1daeed5eb577 # shrinks to rate = 1199.9340016613949, burst = 9, n = 244
+cc 3cad05aa566d876999807b147dd77e8ed03c7733ec55d2e7a4946687b87234d1 # shrinks to rate = 481.232527015722, burst = 11, n = 230
+cc 6c818d9ae7c3ac2fb0fb15a4848ff605da09189c5784f1aba2df93565d16a537 # shrinks to rate = 1125.1697739037734, burst = 44, n = 125
+cc 11c8e0f36821730daedf1fc1620bd3b561c174df881e070eefebfb5d8f66a810 # shrinks to rate = 1296.2206412321166, burst = 18, n = 104
+cc 7583886cffcb5ca89123029912e4b3af674225d5802c9131d9e9660e07d6fb5e # shrinks to rate = 174.57862530522013, burst = 29, n = 226
+cc cf11210eedef95fe4ee1784dd122132f39c648040034abd3eb343e28ac3acde7 # shrinks to rate = 1997.4816770221018, burst = 12, n = 246
+cc 21ad8add1168a15bcb39b01216d3a917b52eaf0153c4c5d4d7a5cbc008463a90 # shrinks to rate = 866.8783284241049, burst = 19, n = 129
+cc 2dacde98f1b9dc7a11a6c3f9386f8d9830609eeb75c75e1249f51ab82be876d4 # shrinks to rate = 638.2779685279676, burst = 10, n = 130
+cc 06a64a92e9cf4f3ea35c10cde50ccfbe58bdeb0d4f347a966c0f3d701d492784 # shrinks to rate = 1429.6328138073034, burst = 9, n = 113
+cc 523de0c9f35e74115f13dc01dbcb4c191050bb57c38f779c7c4dcd6b8a47eb02 # shrinks to rate = 1285.6067143727616, burst = 21, n = 80

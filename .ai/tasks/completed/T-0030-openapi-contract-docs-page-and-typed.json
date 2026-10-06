@@ -1,0 +1,51 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0030",
+  "title": "OpenAPI contract, docs page and typed-client decision",
+  "objective": "OpenAPI generated from the Rust implementation, served as /openapi.json with a development docs page, and a test that keeps documented and actual routes in sync; decide on a generated TypeScript client with evidence.",
+  "acceptance_criteria": [
+    "openapi.json is generated from code, not hand-written",
+    "A drift test fails when a route is added without documentation",
+    "The typed-client decision is recorded with reasons"
+  ],
+  "non_goals": [],
+  "dependencies": [],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test --workspace",
+    "./dev check"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "completed",
+  "blocked_reason": null,
+  "template": null,
+  "result": ".ai/context/summaries/T-0030.result.json",
+  "history": [
+    {
+      "at": "2026-10-06T05:54:38Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T06:57:09Z",
+      "event": "transition",
+      "from": "queue",
+      "to": "active",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T06:57:09Z",
+      "event": "transition",
+      "from": "active",
+      "to": "completed",
+      "note": "completed"
+    }
+  ]
+}

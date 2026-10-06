@@ -1,0 +1,107 @@
+# Prometheus alert rules for the application's own metrics (docs/operations/alerting.md).
+# Symptom-based and actionable: each rule names what users or operators lose, and has a runbook
+# entry. Thresholds are starting points; tune them to your traffic. Tested by alerts.test.yml
+# (promtool test rules, run by infra/verify.sh).
+groups:
+  - name: app-availability
+    rules:
+      - alert: AppDown
+        expr: up{job="app-server"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "API instance {{ $labels.instance }} is not answering scrapes"
+          runbook: docs/operations/alerting.md#appdown
+
+      - alert: WorkerDown
+        expr: up{job="app-worker"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "worker {{ $labels.instance }} is not answering scrapes: jobs and runs stop progressing"
+          runbook: docs/operations/alerting.md#workerdown
+
+      - alert: HighServerErrorRate
+        # Share of 5xx responses, with a traffic floor so a single error at night does not page.
+        expr: |
+          sum(rate(app_http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(app_http_requests_total[5m])) > 0.05
+          and sum(rate(app_http_requests_total[5m])) > 0.5
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of API responses are 5xx"
+          runbook: docs/operations/alerting.md#highservererrorrate
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(app_http_request_duration_seconds_bucket[5m]))) > 1
+          and sum(rate(app_http_request_duration_seconds_count[5m])) > 0.5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p99 API latency is {{ $value | humanizeDuration }}"
+          runbook: docs/operations/alerting.md#highlatency
+
+      - alert: LoadShedding
+        expr: sum(rate(app_http_shed_total[5m])) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "requests are being shed (503) at http.max_inflight"
+          runbook: docs/operations/alerting.md#loadshedding
+
+  - name: app-integrity
+    rules:
+      - alert: AuditWriteFailures
+        # Security operations must leave audit evidence (invariant 10): any loss is critical.
+        expr: increase(app_audit_write_failures_total[5m]) > 0
+        labels: { severity: critical }
+        annotations:
+          summary: "audit records could not be written"
+          runbook: docs/operations/alerting.md#auditwritefailures
+
+      - alert: JobsDeadLettered
+        expr: sum by (kind) (increase(app_jobs_processed_total{result="dead"}[15m])) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value }} job(s) of kind {{ $labels.kind }} were dead-lettered"
+          runbook: docs/operations/alerting.md#jobsdeadlettered
+
+      - alert: ProviderCircuitOpen
+        expr: sum by (provider) (increase(app_provider_circuit_opened_total[10m])) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "the circuit breaker for provider {{ $labels.provider }} opened"
+          runbook: docs/operations/alerting.md#providercircuitopen
+
+  - name: app-degraded-modules
+    rules:
+      - alert: EventBusFallback
+        expr: increase(app_event_bus_fallbacks_total[10m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "NATS is unreachable; events go through the PostgreSQL fallback"
+          runbook: docs/operations/alerting.md#eventbusfallback
+
+      - alert: CacheErrors
+        expr: sum by (backend) (rate(app_cache_errors_total[5m])) > 0.1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "cache backend {{ $labels.backend }} is failing; reads fall through to the source"
+          runbook: docs/operations/alerting.md#cacheerrors
+
+      - alert: RateLimiterErrors
+        expr: increase(app_rate_limiter_errors_total[5m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "the rate limiter's store is failing"
+          runbook: docs/operations/alerting.md#ratelimitererrors
+
+      - alert: AnalyticsDropping
+        expr: increase(app_analytics_dropped_total[10m]) > 0
+        labels: { severity: info }
+        annotations:
+          summary: "analytics events are being dropped (ClickHouse unreachable or buffer full)"
+          runbook: docs/operations/alerting.md#analyticsdropping

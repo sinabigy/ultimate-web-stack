@@ -84,7 +84,18 @@ impl RateLimiter {
         deadline: Instant,
         horizon: Duration,
     ) -> Result<Reservation, WouldExceedDeadline> {
-        let now = Instant::now();
+        self.reserve_within_at(Instant::now(), cost, deadline, horizon)
+    }
+
+    /// [`reserve_within`](Self::reserve_within) at a given clock reading, so tests can compute
+    /// granted slots exactly (a separate `Instant::now()` in the test could be preempted).
+    fn reserve_within_at(
+        &self,
+        now: Instant,
+        cost: f64,
+        deadline: Instant,
+        horizon: Duration,
+    ) -> Result<Reservation, WouldExceedDeadline> {
         let (emission, tau) = *self.params.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut g = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let paused = g.1.filter(|p| *p > now).unwrap_or(now);
@@ -197,7 +208,9 @@ mod tests {
             let mut slots = Vec::with_capacity(n);
             for _ in 0..n {
                 let now = Instant::now();
-                let wait = r.reserve(1.0, far).unwrap();
+                let wait = match r.reserve_within_at(now, 1.0, far, Duration::MAX).unwrap() {
+                    Reservation::Granted(w) | Reservation::NotYet(w) => w,
+                };
                 slots.push(now + wait);
             }
             slots.sort();
@@ -205,10 +218,10 @@ mod tests {
                 for j in (i + 1)..slots.len() {
                     let span = (slots[j] - slots[i]).as_secs_f64();
                     // j − i + 1 grants in a closed span: at most burst + rate × span (exact GCRA
-                    // bound). The test reads the clock just before the limiter does, so spans may
-                    // measure up to a few µs short: allow 50 µs (an off-by-one is a whole extra
-                    // grant, i.e. ≥ 500 µs at the highest tested rate).
-                    let allowed = f64::from(burst) + rate * (span + 50e-6) + 1e-9;
+                    // bound). Slots are exact (the limiter uses the test's clock reading), so the
+                    // only slack is nanosecond rounding of Duration (an off-by-one is a whole
+                    // extra grant, i.e. ≥ 500 µs at the highest tested rate).
+                    let allowed = f64::from(burst) + rate * (span + 1e-6) + 1e-9;
                     proptest::prop_assert!(((j - i + 1) as f64) <= allowed,
                         "{} grants in {:.6}s at {}/s burst {}", j - i, span, rate, burst);
                 }
@@ -226,7 +239,9 @@ mod tests {
             let mut slots = Vec::new();
             for _ in 0..n {
                 let now = Instant::now();
-                let w = r.reserve(1.0, far).unwrap();
+                let w = match r.reserve_within_at(now, 1.0, far, Duration::MAX).unwrap() {
+                    Reservation::Granted(w) | Reservation::NotYet(w) => w,
+                };
                 slots.push(now + w);
             }
             for k in 1..slots.len() {

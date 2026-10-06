@@ -1,0 +1,36 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0033",
+  "title": "Public proof and release decision for the hardening work",
+  "objective": "Validate the work in the blueprint, generated projects, systemd, containers and CI; decide v1.0.3 vs v1.1.0 with reasoning.",
+  "acceptance_criteria": [
+    "./dev check green; generated projects validate; CI green on the exact commit",
+    "Version decision recorded with reasons"
+  ],
+  "non_goals": [],
+  "dependencies": [],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "./dev check",
+    "scripts/validate-generated"
+  ],
+  "risk": "medium",
+  "task_class": "docs",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "queue",
+  "blocked_reason": null,
+  "template": null,
+  "result": null,
+  "history": [
+    {
+      "at": "2026-10-06T05:54:38Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    }
+  ]
+}

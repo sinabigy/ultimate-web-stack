@@ -1,0 +1,53 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0027",
+  "title": "Concurrent projects: per-project ports and clear port conflicts",
+  "objective": "Several generated projects (and the blueprint) can run ./dev up at the same time without editing configuration; a busy port fails clearly; readiness confirms this project's own servers; containers left without published ports are recreated.",
+  "acceptance_criteria": [
+    "Two generated projects run ./dev up concurrently and both pass ./dev test --system",
+    "./dev up names the busy port and the process holding it instead of failing obscurely",
+    "Readiness waits on this project's own processes, not whatever answers on the port",
+    "The generator assigns a deterministic per-project port block; an environment override exists; the blueprint keeps its documented ports"
+  ],
+  "non_goals": [],
+  "dependencies": [],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "./dev check",
+    "two-project concurrency test",
+    "python3 -m unittest discover -s scripts/tests"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "completed",
+  "blocked_reason": null,
+  "template": null,
+  "result": ".ai/context/summaries/T-0027.result.json",
+  "history": [
+    {
+      "at": "2026-10-06T05:54:38Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T05:54:42Z",
+      "event": "transition",
+      "from": "queue",
+      "to": "active",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T06:57:09Z",
+      "event": "transition",
+      "from": "active",
+      "to": "completed",
+      "note": "completed"
+    }
+  ]
+}

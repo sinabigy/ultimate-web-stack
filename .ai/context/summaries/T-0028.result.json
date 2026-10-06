@@ -1,0 +1,29 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0028",
+  "outcome": "completed",
+  "summary": "Static: build-time brotli-11/gzip-9 siblings, source maps moved out of dist. API: tower-http compression (br 4/gzip 6) from 1 KiB, excluding no-store, SSE, encoded; http.compression default on. ADR 0012.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "Static 186 KB -> 53 KB brotli; source maps 609 KB no longer served",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "13 KB list 13,020 -> 1,329 bytes; throughput within run-to-run spread (benchmarks/results/20261006T062201Z-*-compression.json, off/on/off, repeat 5)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "tests static_assets_use_build_time_compression, api_responses_are_compressed_by_negotiation_except_secrets_and_streams; release smoke checks br+immutable and no .map in image",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-06T06:57:09Z"
+}

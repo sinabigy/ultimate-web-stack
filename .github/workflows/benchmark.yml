@@ -12,6 +12,11 @@ on:
         default: http,auth,cache,outbound,db
 permissions:
   contents: read
+env:
+  # The service containers publish these fixed ports; they override infra/dev-ports.env.
+  DEV_PG_PORT: "55432"
+  DEV_REDIS_PORT: "56379"
+  DEV_DRAGONFLY_PORT: "56380"
 jobs:
   bench:
     runs-on: ${{ inputs.runner }}

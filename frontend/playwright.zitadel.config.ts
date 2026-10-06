@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { devPort } from "./scripts/dev-ports.mjs";
 
 // E2E against a real self-hosted ZITADEL (./dev up --identity zitadel; scripts/zitadel_bootstrap.py).
-// The backend runs with the generated .env.zitadel (confidential OIDC client, project roles).
-const APP = "http://localhost:8080";
+// The backend runs with the generated .env.zitadel (confidential OIDC client, project roles), on the
+// API port the bootstrap registered as a redirect origin.
+const APP = `http://localhost:${devPort("DEV_API_PORT")}`;
 const zitadelEnv = Object.fromEntries(
   readFileSync("../.env.zitadel", "utf8")
     .split("\n")
@@ -30,9 +32,9 @@ export default defineConfig({
     env: {
       ...zitadelEnv,
       APP__ENVIRONMENT: "test",
-      APP__DATABASE__URL: "postgres://app:app-dev-only@localhost:55432/app_e2e",
+      APP__DATABASE__URL: `postgres://app:app-dev-only@localhost:${devPort("DEV_PG_PORT")}/app_e2e`,
       APP__DATABASE__MIGRATE_ON_START: "true",
-      APP__HTTP__PORT: "8080",
+      APP__HTTP__PORT: String(devPort("DEV_API_PORT")),
       APP__HTTP__STATIC_DIR: "../frontend/dist",
       APP__RATE_LIMIT__ENABLED: "false",
       APP__AUTH__PUBLIC_ORIGIN: APP,

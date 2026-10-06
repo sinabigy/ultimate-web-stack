@@ -8,11 +8,13 @@
                               → architecture.modules), migrate, and run backend + frontend dev servers
   ./dev down [--volumes]      stop everything (and delete data volumes)
   ./dev status                containers and app health
+  ./dev ports [--json]        this project's development ports (infra/dev-ports.env) and their holders
   ./dev check [--auth] [--strict]
                               canonical validation (tools/ai-validate) + optional identity checks
   ./dev test [--e2e] [--zitadel] [--system] [--journey] [--drill]
                               backend + frontend tests; optional browser suites
-  ./dev benchmark [--smoke]   benchmark suites + regression gates + report (benchmarks/)
+  ./dev benchmark [--smoke] [run.py options, e.g. --suite http]
+                              benchmark suites + regression gates + report (benchmarks/)
   ./dev types                 regenerate TypeScript bindings from Rust API types
   ./dev db migrate|reset|prepare|psql
   ./dev logs [service]
@@ -36,11 +38,18 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "scripts"))
+import dev_ports  # noqa: E402  (shared with the scripts ./dev runs)
+
 COMPOSE = ["docker-compose"] if shutil.which("docker-compose") else ["docker", "compose"]
 COMPOSE_FILE = ROOT / "infra/docker/compose.yaml"
 ENV = dict(os.environ)
 ENV["PATH"] = f"{Path.home()}/.cargo/bin:{ENV.get('PATH', '')}"
-ENV.setdefault("DATABASE_URL", "postgres://app:app-dev-only@localhost:55432/app")
+# Every port comes from infra/dev-ports.env (generated projects get their own block), exported so
+# compose, the validation commands and the test scripts use the same ones.
+PORTS = dev_ports.load(ROOT)
+ENV.update({k: str(v) for k, v in PORTS.items()})
+ENV.setdefault("DATABASE_URL", f"postgres://app:app-dev-only@localhost:{PORTS['DEV_PG_PORT']}/app")
 PIDS = ROOT / "var/dev-pids.json"
 
 # module name → compose profile/services it needs
@@ -51,6 +60,13 @@ MODULE_SERVICES = {
     "messaging_nats": ("messaging", ["nats"], True),
     "analytics_clickhouse": ("analytics", ["clickhouse"], True),
     "observability": ("observability", ["prometheus", "tempo", "loki", "alloy", "grafana"], False),
+}
+# compose service → the host ports it publishes (infra/docker/compose.yaml)
+SERVICE_PORTS = {
+    "postgres": ["DEV_PG_PORT"], "redis": ["DEV_REDIS_PORT"], "dragonfly": ["DEV_DRAGONFLY_PORT"],
+    "nats": ["DEV_NATS_PORT", "DEV_NATS_MONITOR_PORT"], "clickhouse": ["DEV_CLICKHOUSE_PORT"],
+    "zitadel": ["DEV_ZITADEL_PORT"], "prometheus": ["DEV_PROMETHEUS_PORT"], "loki": ["DEV_LOKI_PORT"],
+    "tempo": ["DEV_TEMPO_PORT", "DEV_TEMPO_OTLP_PORT"], "grafana": ["DEV_GRAFANA_PORT"], "alloy": [],
 }
 LOG_DIR = ROOT / "var" / "log"
 
@@ -117,6 +133,24 @@ def wait_http(url: str, seconds: int = 60) -> bool:
     return False
 
 
+def wait_own_http(url: str, proc: subprocess.Popen, port: int | None = None, seconds: int = 60) -> bool:
+    """Wait for `url`, answered by the process this run started: fail fast when it exits (its port
+    was free at preflight, so the answer cannot come from another project) and, where lsof is
+    available, check that it is the listener."""
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            print(f"{url}: the process serving it exited with code {proc.returncode} (see the output above)", file=sys.stderr)
+            return False
+        if wait_http(url, 1):
+            pids = dev_ports.listener_pids(port) if port else set()
+            if pids and proc.pid not in pids:
+                print(f"{url} is answered by pid {sorted(pids)}, not by this project's pid {proc.pid}", file=sys.stderr)
+                return False
+            return True
+    return False
+
+
 def wait_healthy(container: str, seconds: int = 120) -> bool:
     deadline = time.time() + seconds
     while time.time() < deadline:
@@ -125,6 +159,45 @@ def wait_healthy(container: str, seconds: int = 120) -> bool:
             return True
         time.sleep(1)
     return False
+
+
+def running_services() -> set[str]:
+    """Services of this compose project that are running: the ports they publish are already ours."""
+    r = subprocess.run(["docker", "ps", "--filter", f"label=com.docker.compose.project={compose_project()}",
+                        "--format", '{{.Label "com.docker.compose.service"}}'], capture_output=True, text=True)
+    return set(r.stdout.split())
+
+
+def preflight(services: list[str], processes: list[tuple[str, str]] = ()) -> None:
+    """Refuse to start when a port this project needs is held by anything else, and name the holder.
+
+    Without this, Docker fails halfway ("port is already allocated") after starting other services,
+    and a readiness probe can be answered by another project's server on the same port."""
+    ours = running_services()
+    needed = [(svc, var) for svc in services if svc not in ours for var in SERVICE_PORTS.get(svc, [])]
+    busy = [(who, var) for who, var in needed + list(processes) if dev_ports.in_use(PORTS[var])]
+    if not busy:
+        return
+    print("\ncannot start: ports this project needs are in use", file=sys.stderr)
+    foreign = []
+    for who, var in busy:
+        held = dev_ports.holder(PORTS[var]) or "an unidentified process"
+        mine = f" in {ROOT}" in held
+        foreign += [] if mine else [var]
+        print(f"  {var}={PORTS[var]}  {who}: held by {held}{' (this project)' if mine else ''}", file=sys.stderr)
+    if not foreign:
+        print("This project's ./dev up is already running: ./dev status shows it, ./dev down stops it.", file=sys.stderr)
+    else:
+        free = next(p for p in range(max(PORTS.values()) + 1, 65535) if p not in PORTS.values() and not dev_ports.in_use(p))
+        print("Stop the other program, or give this project other ports: edit infra/dev-ports.env, or override one\n"
+              f"for a single run, e.g. {foreign[0]}={free} ./dev {sys.argv[1] if len(sys.argv) > 1 else 'up'}."
+              " ./dev ports lists every port and its holder.", file=sys.stderr)
+    sys.exit(1)
+
+
+def start_services(services: list[str], profiles: list[str], processes: list[tuple[str, str]] = ()) -> None:
+    preflight(services, processes)
+    compose("up", "-d", *services, profiles=profiles)
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -182,34 +255,56 @@ def cmd_up(a) -> None:
     if a.identity == "zitadel":
         profiles.append("identity")
         services.append("zitadel")
-    compose("up", "-d", *services, profiles=profiles)
+    processes = [] if a.no_app else [("app-server", "DEV_API_PORT"), ("vite", "DEV_WEB_PORT"),
+                                     ("fake-upstream", "DEV_UPSTREAM_PORT")]
+    if not a.no_app and a.identity == "mock":
+        processes.append(("mock-oidc", "DEV_MOCK_OIDC_PORT"))
+    start_services(services, profiles, processes)
     if not wait_healthy(f"{compose_project()}-postgres-1"):
         sys.exit("postgres did not become healthy")
     sh(["cargo", "sqlx", "migrate", "run", "--source", "migrations"], cwd=ROOT / "backend")
+    api, web = f"http://localhost:{PORTS['DEV_API_PORT']}", f"http://localhost:{PORTS['DEV_WEB_PORT']}"
     if a.identity == "zitadel":
-        sh([sys.executable, "scripts/zitadel_bootstrap.py"])
+        sh([sys.executable, "scripts/zitadel_bootstrap.py", "--issuer", f"http://localhost:{PORTS['DEV_ZITADEL_PORT']}",
+            "--origins", f"{web},{api}"])
     if a.no_app:
         return
     app_env = dict(ENV)
-    app_env.update({"APP__DATABASE__URL": ENV["DATABASE_URL"], "APP__HTTP__BENCH_ENDPOINTS": "true"})
+    app_env.update({
+        "APP__DATABASE__URL": ENV["DATABASE_URL"], "APP__HTTP__BENCH_ENDPOINTS": "true",
+        "APP__HTTP__PORT": str(PORTS["DEV_API_PORT"]), "APP_BACKEND_URL": api,  # Vite proxies /api to it
+        "APP__AUTH__PUBLIC_ORIGIN": web, "APP__AUTH__REDIRECT_URL": f"{web}/auth/callback",
+        "APP__AUTH__POST_LOGOUT_REDIRECT_URL": f"{web}/login",
+        "APP__PROVIDERS__DEFINITIONS__SIMULATED__BASE_URL": f"http://127.0.0.1:{PORTS['DEV_UPSTREAM_PORT']}",
+        # Browsers keep cookies per host, not per port: a project-specific name keeps a sign-in to
+        # one local project from replacing another's session.
+        "APP__AUTH__COOKIE_NAME": re.sub(r"[^A-Za-z0-9_]", "_", compose_project()) + "_app_session",
+    })
+    if "redis" in services:
+        app_env["APP__CACHE__REDIS_URL"] = f"redis://127.0.0.1:{PORTS['DEV_REDIS_PORT']}"
     if clickhouse:
         app_env.update({"APP__ANALYTICS__ENABLED": "true",
-                        "APP__ANALYTICS__CLICKHOUSE_URL": "http://127.0.0.1:" + os.environ.get("DEV_CLICKHOUSE_PORT", "58123"),
+                        "APP__ANALYTICS__CLICKHOUSE_URL": f"http://127.0.0.1:{PORTS['DEV_CLICKHOUSE_PORT']}",
                         "APP__ANALYTICS__PASSWORD": os.environ.get("APP__ANALYTICS__PASSWORD", "app-dev-only")})
     if nats:
         app_env.update({"APP__MESSAGING__ENABLED": "true",
-                        "APP__MESSAGING__NATS_URL": "nats://127.0.0.1:" + os.environ.get("DEV_NATS_PORT", "54222")})
+                        "APP__MESSAGING__NATS_URL": f"nats://127.0.0.1:{PORTS['DEV_NATS_PORT']}"})
     if observability:
         # Traces to Tempo; JSON logs (with trace_id) tailed into Loki by Alloy.
-        app_env.update({"APP__TELEMETRY__OTLP_ENDPOINT": "http://127.0.0.1:" + os.environ.get("DEV_TEMPO_OTLP_PORT", "54318"),
+        app_env.update({"APP__TELEMETRY__OTLP_ENDPOINT": f"http://127.0.0.1:{PORTS['DEV_TEMPO_OTLP_PORT']}",
                         "APP__LOG__FORMAT": "json"})
     procs = {}
     sh(["cargo", "build", "-q", "-p", "fake-upstream", "-p", "mock-oidc", "-p", "app-server"], cwd=ROOT / "backend")
     # Simulated external provider used by the example app's runs (no internet needed).
-    procs["fake-upstream"] = subprocess.Popen([str(ROOT / "backend/target/debug/fake-upstream")], cwd=ROOT, env=app_env)
+    procs["fake-upstream"] = subprocess.Popen([str(ROOT / "backend/target/debug/fake-upstream"), str(PORTS["DEV_UPSTREAM_PORT"])],
+                                              cwd=ROOT, env=app_env)
     if a.identity == "mock":
-        procs["mock-oidc"] = subprocess.Popen([str(ROOT / "backend/target/debug/mock-oidc")], cwd=ROOT, env=app_env)
-        app_env.update({"APP__AUTH__PROVIDER": "oidc", "APP__AUTH__ISSUER_URL": "http://127.0.0.1:59081", "APP__AUTH__CLIENT_ID": "app-web"})
+        idp = f"http://127.0.0.1:{PORTS['DEV_MOCK_OIDC_PORT']}"
+        procs["mock-oidc"] = subprocess.Popen([str(ROOT / "backend/target/debug/mock-oidc")], cwd=ROOT, env={
+            **app_env, "MOCK_OIDC_PORT": str(PORTS["DEV_MOCK_OIDC_PORT"]),
+            "MOCK_OIDC_REDIRECT_URIS": f"{web}/auth/callback,{api}/auth/callback",
+            "MOCK_OIDC_POST_LOGOUT_URIS": f"{web}/login,{api}/login"})
+        app_env.update({"APP__AUTH__PROVIDER": "oidc", "APP__AUTH__ISSUER_URL": idp, "APP__AUTH__CLIENT_ID": "app-web"})
         # Development only: the mock login form may assert system roles (system_admin and
         # system_auditor, MFA still required), so the admin console and `./dev test --journey` work
         # out of the box. The production default stays off (config: auth.system_roles_from_idp).
@@ -221,12 +316,12 @@ def cmd_up(a) -> None:
     procs["vite"] = subprocess.Popen(["npm", "run", "-s", "dev"], cwd=ROOT / "frontend", env=app_env)
     PIDS.parent.mkdir(exist_ok=True)
     PIDS.write_text(json.dumps({k: p.pid for k, p in procs.items()}))
-    ok = wait_http("http://localhost:8080/readyz", 60) and wait_http("http://localhost:5190/", 60)
-    print(f"\n{'ready' if ok else 'started (not all endpoints answered yet)'}:  app http://localhost:5190   api http://localhost:8080"
-          f"   identity: {a.identity}{' (any email on the mock login page; admin console: IdP roles system_admin + method Password + TOTP)' if a.identity == 'mock' else ' (alice@example.com / see .env.zitadel)'}")
+    ok = wait_own_http(f"{api}/readyz", procs["app-server"], PORTS["DEV_API_PORT"]) and wait_own_http(f"{web}/", procs["vite"])
+    print(f"\n{'ready' if ok else 'started (not all endpoints answered yet)'}:  app {web}   api {api}"
+          f"   identity: {a.identity}{' (any email on the mock login page; admin console: IdP roles system_admin + method Password + TOTP)' if a.identity == 'mock' else ' (alice@example.com / see .env.zitadel)'}", flush=True)
     if observability:
-        print("observability: grafana http://localhost:" + os.environ.get("DEV_GRAFANA_PORT", "53000")
-              + "  prometheus http://localhost:" + os.environ.get("DEV_PROMETHEUS_PORT", "59190"))
+        print(f"observability: grafana http://localhost:{PORTS['DEV_GRAFANA_PORT']}"
+              f"  prometheus http://localhost:{PORTS['DEV_PROMETHEUS_PORT']}")
     print("Ctrl-C stops the app processes (services keep running; ./dev down stops them).")
 
     def _interrupt(*_args) -> None:
@@ -267,7 +362,7 @@ def cmd_down(a) -> None:
 
 def cmd_status(_a) -> None:
     compose("ps", profiles=["cache", "messaging", "analytics", "identity", "observability", "dragonfly"], check=False)
-    for url in ["http://localhost:8080/readyz", "http://localhost:5190/"]:
+    for url in [f"http://localhost:{PORTS['DEV_API_PORT']}/readyz", f"http://localhost:{PORTS['DEV_WEB_PORT']}/"]:
         try:
             with urllib.request.urlopen(url, timeout=2) as r:
                 print(f"  {url}: {r.status}")
@@ -275,8 +370,30 @@ def cmd_status(_a) -> None:
             print(f"  {url}: down ({e.__class__.__name__})")
 
 
+def cmd_ports(a) -> None:
+    """The project's development ports, where each comes from, and what holds it now."""
+    declared = dev_ports.read_file(ROOT)
+    ours = running_services()
+    rows = []
+    for var, port in PORTS.items():
+        svc = next((s for s, vs in SERVICE_PORTS.items() if var in vs), None)
+        busy = dev_ports.in_use(port)
+        held = dev_ports.holder(port) if busy else ""
+        mine = (svc in ours) or f" in {ROOT}" in held
+        rows.append({"name": var, "port": port, "source": "file" if declared.get(var) == port else "environment",
+                     "status": "free" if not busy else ("this project" if mine else "in use"), "holder": held})
+    if a.json:
+        print(json.dumps({r["name"]: r["port"] for r in rows} if a.plain else rows, indent=2))
+        return
+    print(f"ports of {compose_project()} ({dev_ports.PORTS_FILE}; a same-named environment variable overrides one):")
+    for r in rows:
+        extra = f"  {r['holder']}" if r["status"] == "in use" else ""
+        src = "" if r["source"] == "file" else "  (from environment)"
+        print(f"  {r['name']:<24}{r['port']:>6}  {r['status']}{src}{extra}")
+
+
 def ensure_postgres() -> None:
-    compose("up", "-d", "postgres", check=True)
+    start_services(["postgres"], [])
     if not wait_healthy(f"{compose_project()}-postgres-1"):
         sys.exit("postgres did not become healthy")
 
@@ -297,11 +414,11 @@ def ensure_check_services() -> None:
         if cid in ids:
             profiles.append(profile)
             services += svcs
-            if cid == "rust-test-cache" and ":56380" in ids[cid]:  # the blueprint also tests Dragonfly
+            if cid == "rust-test-cache" and "DEV_DRAGONFLY_PORT" in ids[cid]:  # the blueprint also tests Dragonfly
                 profiles.append("dragonfly")
                 services.append("dragonfly")
     if services:
-        compose("up", "-d", *services, profiles=profiles)
+        start_services(services, profiles)
         for svc in services:
             if not wait_healthy(f"{compose_project()}-{svc}-1"):
                 sys.exit(f"{svc} did not become healthy")
@@ -339,8 +456,8 @@ def cmd_test(a) -> None:
     if a.e2e:
         code |= sh("node scripts/e2e-prepare.mjs && npx playwright test", cwd=ROOT / "frontend", check=False)
     if a.zitadel:
-        compose("up", "-d", "zitadel", profiles=["identity"])
-        sh([sys.executable, "scripts/zitadel_bootstrap.py"])
+        start_services(["zitadel"], ["identity"])
+        sh([sys.executable, "scripts/zitadel_bootstrap.py", "--issuer", f"http://localhost:{PORTS['DEV_ZITADEL_PORT']}"])
         code |= sh("node scripts/e2e-prepare.mjs && npx playwright test -c playwright.zitadel.config.ts", cwd=ROOT / "frontend", check=False)
     sys.exit(code)
 
@@ -351,6 +468,8 @@ def cmd_benchmark(a) -> None:
     ensure_check_services()  # module suites (cache, messaging, analytics) need their services
     smoke = ["--smoke"] if a.smoke else []
     rc = sh([sys.executable, "benchmarks/run.py"] + smoke + a.extra, check=False)
+    if "--suite" in a.extra:  # a partial run: no complete result to gate or report
+        sys.exit(rc)
     gate = sh([sys.executable, "benchmarks/compare.py"] + smoke, check=False)
     if not a.smoke:
         sh([sys.executable, "benchmarks/report.py"], check=False)
@@ -394,6 +513,10 @@ def main() -> None:
     dn.add_argument("--volumes", action="store_true")
     dn.set_defaults(fn=cmd_down)
     sub.add_parser("status").set_defaults(fn=cmd_status)
+    po = sub.add_parser("ports")
+    po.add_argument("--json", action="store_true", help="machine-readable (with status and holder)")
+    po.add_argument("--plain", action="store_true", help="with --json: only {name: port}")
+    po.set_defaults(fn=cmd_ports)
     ck = sub.add_parser("check")
     ck.add_argument("--auth", action="store_true", help="also validate the identity provider online (.env.zitadel)")
     ck.add_argument("--strict", action="store_true", help="skipped checks fail")
@@ -416,7 +539,11 @@ def main() -> None:
     lg = sub.add_parser("logs")
     lg.add_argument("service", nargs="?")
     lg.set_defaults(fn=cmd_logs)
-    a = ap.parse_args()
+    a, unknown = ap.parse_known_args()
+    if unknown and a.cmd != "benchmark":
+        ap.error(f"unrecognized arguments: {' '.join(unknown)}")
+    if a.cmd == "benchmark":  # everything else goes to benchmarks/run.py, e.g. --suite http --repeat 5
+        a.extra = unknown + a.extra
     a.fn(a)
 
 

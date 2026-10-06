@@ -10,7 +10,7 @@ enabled modules.
 | a service container exits with code 137 | out of memory in the Docker VM: give it ≥ 6 GiB (`colima start --memory 6`), or `./dev down` before release builds. ClickHouse is the usual victim |
 | PostgreSQL exits with `configuration file "/etc/postgresql/postgresql.conf" contains errors` | the project lives outside the directories your Docker VM shares (colima shares only your home directory by default), so the config bind mount is empty. Keep projects under `$HOME`, or add the path to the VM's mounts |
 | PostgreSQL refuses connections with `no pg_hba.conf entry for host …` | the database volume was created by an earlier failed start (for example after the shared-directory problem above) and never finished initialising. Run `./dev down --volumes`, then `./dev up` |
-| `port is already allocated` | another stack uses the dev ports. Run `./dev down` in the other project; see the port list below |
+| `cannot start: ports this project needs are in use` | `./dev` checks every port before starting anything and names what holds it (another project, a container, an old `./dev up`). Stop that, or give this project other ports (see [Ports](#ports-development) below). `port is already allocated` from Docker itself means an older `./dev` |
 | the first `./dev up` is slow | the first Rust build of a fresh `target/` takes several minutes; later starts are incremental |
 | `set DATABASE_URL to use query macros online` | you added or changed a SQL query. Start the database (`./dev up --no-app`), export the dev URL, build, then `./dev db prepare` ([CONVENTIONS](../.ai/knowledge/CONVENTIONS.md)) |
 | `invalid configuration: …` at startup | run `cargo run -p app-server -- check-config` in `backend/`; it names the key. Production requires HTTPS URLs, `cookie_secure` and real secrets |
@@ -33,7 +33,11 @@ enabled modules.
 | `systemd-live` fails | it needs privileged containers (works on Docker Desktop, colima and GitHub-hosted runners) |
 | `./dev test --journey` admin tests fail | the stack must run with the mock IdP (`./dev up`, the default), which enables IdP-asserted system roles in development |
 
-## Default ports (development)
+## Ports (development)
+Every development port is declared once, in `infra/dev-ports.env`. `./dev`, compose, Vite,
+Playwright, the validation commands and the smoke scripts all read it, and `./dev ports` lists the
+ports with what currently holds each one. The blueprint uses:
+
 | port | service |
 |---|---|
 | 5190 / 8080 | SPA (Vite) / API |
@@ -43,11 +47,14 @@ enabled modules.
 | 58123 | ClickHouse HTTP |
 | 59081 / 59090 | mock OIDC / simulated provider |
 | 58081 | ZITADEL (`./dev up --identity zitadel`) |
-| 53000, 59190, 53100 | Grafana, Prometheus, Loki (`--with observability`) |
-| 18080, 59082, 59091 | E2E test servers (separate from the dev stack) |
+| 53000, 59190, 53100, 53200, 54318 | Grafana, Prometheus, Loki, Tempo, OTLP (`--with observability`) |
+| 18080, 59082, 59091, 18299 | E2E test servers and the release smoke test (`./dev check`) |
 
-Most service ports can be overridden with `DEV_*_PORT` environment variables (see
-`infra/docker/compose.yaml`).
+A generated project gets its own block of consecutive ports (20000–29999, chosen from its name, or
+`create-project --port-base N`). Several projects and the blueprint can therefore run at the same
+time. To move a project, edit `infra/dev-ports.env`; to move one port for one run, set the variable
+(`DEV_PG_PORT=55433 ./dev up`). Browsers keep cookies per host rather than per port, so `./dev up`
+names the session cookie after the project, and signing in to one project leaves the others signed in.
 
 Still stuck? Check [`.ai/knowledge/KNOWN_ISSUES.md`](../.ai/knowledge/KNOWN_ISSUES.md), then ask
 with `./dev doctor` output and the exact failing command.

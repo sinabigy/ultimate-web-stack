@@ -1,0 +1,29 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0029",
+  "outcome": "completed",
+  "summary": "API responses default to Cache-Control private, no-cache; static caching already existed (immutable assets, revalidated shell with Last-Modified/304); API ETags rejected for now (SPA is SSE push-driven, no polling).",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "test api_responses_are_private_and_handlers_keep_their_own_policy; existing spa_revalidation_304_keeps_app_csp",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "release smoke: API response private, assets immutable",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "ADR 0012 records ETag trigger",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-06T06:57:09Z"
+}

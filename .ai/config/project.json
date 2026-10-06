@@ -100,7 +100,7 @@
       {
         "id": "sqlx-offline-fresh",
         "stage": "lint",
-        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo sqlx prepare --workspace --check",
+        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:${DEV_PG_PORT:-55432}/app} cargo sqlx prepare --workspace --check",
         "cwd": "backend",
         "requires": [
           "cargo",
@@ -180,7 +180,7 @@
       {
         "id": "rust-test",
         "stage": "integration",
-        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo test --workspace 2>&1",
+        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:${DEV_PG_PORT:-55432}/app} cargo test --workspace 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -230,7 +230,7 @@
       {
         "id": "rust-test-cache",
         "stage": "integration",
-        "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache --features redis 2>&1",
+        "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:${DEV_REDIS_PORT:-56379},redis://127.0.0.1:${DEV_DRAGONFLY_PORT:-56380} cargo test -p app-cache --features redis 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -243,7 +243,7 @@
       {
         "id": "rust-test-nats",
         "stage": "integration",
-        "cmd": "TEST_NATS_URL=${TEST_NATS_URL:-nats://127.0.0.1:54222} cargo test -p app-messaging --features nats 2>&1",
+        "cmd": "TEST_NATS_URL=${TEST_NATS_URL:-nats://127.0.0.1:${DEV_NATS_PORT:-54222}} cargo test -p app-messaging --features nats 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -256,7 +256,7 @@
       {
         "id": "rust-test-clickhouse",
         "stage": "integration",
-        "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics --features clickhouse 2>&1 && cargo test -p app-api --features clickhouse --test analytics 2>&1",
+        "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:${DEV_CLICKHOUSE_PORT:-58123}}; cargo test -p app-analytics --features clickhouse 2>&1 && cargo test -p app-api --features clickhouse --test analytics 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"

@@ -261,7 +261,7 @@ pub async fn soft_delete(db: impl PgExecutor<'_>, access: &OrgAccess) -> DbResul
 
 // ------------------------------------------------------------------ members
 
-#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct MemberRow {
     pub user_id: Uuid,
@@ -368,7 +368,7 @@ pub async fn sole_owner_orgs(db: impl PgExecutor<'_>, user_id: Uuid) -> DbResult
 
 // ------------------------------------------------------------------ roles
 
-#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct RoleRow {
     pub id: Uuid,
@@ -483,7 +483,7 @@ pub async fn sync_permissions(db: impl PgExecutor<'_>) -> DbResult<()> {
 
 // ------------------------------------------------------------------ teams
 
-#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct TeamRow {
     pub id: Uuid,

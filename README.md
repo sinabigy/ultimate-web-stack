@@ -29,7 +29,7 @@ Rust · SolidJS · PostgreSQL · OIDC · RBAC/Cedar · Jobs · Realtime · Obser
 git clone https://github.com/sinabigy/ultimate-web-stack && cd ultimate-web-stack
 scripts/create-project ../my-product --name "My Product"     # one command → an independent repository
 cd ../my-product
-./dev setup && ./dev up                                       # → http://localhost:5190 (mock sign-in: any email)
+./dev setup && ./dev up                                       # → prints the app URL (mock sign-in: any email)
 ./dev check                                                   # every validation command
 ```
 

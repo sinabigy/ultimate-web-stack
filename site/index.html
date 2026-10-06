@@ -222,7 +222,7 @@ footer .row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;a
 <section id="quickstart" aria-labelledby="qs-h">
   <div class="wrap">
     <h2 id="qs-h">Quickstart</h2>
-    <p class="lede">The golden commands. Every one of them was run during release acceptance. Run the generator from the blueprint repository; the destination must be outside it. The app runs at <code>http://localhost:5190</code> and the mock identity provider accepts any email.</p>
+    <p class="lede">The golden commands. Every one of them was run during release acceptance. Run the generator from the blueprint repository; the destination must be outside it. <code>./dev up</code> prints the app URL (every project has its own ports) and the mock identity provider accepts any email.</p>
     <div class="code">
       <button class="copy" type="button" data-copy="golden" aria-live="polite" hidden>Copy</button>
 <pre id="golden" tabindex="0" aria-label="Golden commands"><code><span class="c"># Create (from the blueprint repository; DEST must be outside it)</span>
@@ -236,7 +236,7 @@ cd ../my-product
 <span class="c"># Validate the AI/project state</span>
 python3 tools/ai-check
 
-<span class="c"># Run locally (http://localhost:5190, mock identity provider: any email)</span>
+<span class="c"># Run locally (./dev up prints the URL; mock identity provider: any email)</span>
 ./dev setup
 ./dev up
 

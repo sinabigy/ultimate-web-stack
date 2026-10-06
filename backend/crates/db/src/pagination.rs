@@ -28,7 +28,7 @@ impl Cursor {
 }
 
 /// A page of results plus the cursor for the next page (None when exhausted).
-#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS, utoipa::ToSchema)]
 #[ts(export)]
 pub struct Page<T> {
     pub items: Vec<T>,

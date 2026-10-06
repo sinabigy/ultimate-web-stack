@@ -1,0 +1,49 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0032",
+  "title": "Document existing capabilities and add tested integration examples",
+  "objective": "Document capabilities that already exist (job retries/DLQ, secret scanning, single-flight, trace-log links) and add public integration examples (API keys, service accounts) that are exercised by tests.",
+  "acceptance_criteria": [
+    "Examples are executed by a test, not just written",
+    "Each existing capability links to its implementation and test"
+  ],
+  "non_goals": [],
+  "dependencies": [],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "./dev check"
+  ],
+  "risk": "low",
+  "task_class": "docs",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "completed",
+  "blocked_reason": null,
+  "template": null,
+  "result": ".ai/context/summaries/T-0032.result.json",
+  "history": [
+    {
+      "at": "2026-10-06T05:54:38Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T06:57:09Z",
+      "event": "transition",
+      "from": "queue",
+      "to": "active",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T06:57:09Z",
+      "event": "transition",
+      "from": "active",
+      "to": "completed",
+      "note": "completed"
+    }
+  ]
+}

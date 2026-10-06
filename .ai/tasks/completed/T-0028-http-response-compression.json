@@ -1,0 +1,51 @@
+{
+  "task_schema_version": 1,
+  "id": "T-0028",
+  "title": "HTTP response compression",
+  "objective": "Brotli/gzip compression in the Rust HTTP layer only where measurements show a net win; never compress already-compressed media; no double compression behind Caddy.",
+  "acceptance_criteria": [
+    "Compression measured (bytes and CPU/throughput) on representative responses",
+    "Classified DEFAULT/OPTIONAL with recorded evidence",
+    "Tests cover negotiation, the size threshold and exclusions"
+  ],
+  "non_goals": [],
+  "dependencies": [],
+  "components": [],
+  "likely_files": [],
+  "constraints": [],
+  "validation": [
+    "cargo test --workspace",
+    "./dev benchmark --smoke"
+  ],
+  "risk": "medium",
+  "task_class": "feature",
+  "required_capabilities": [],
+  "context_class": "medium",
+  "status": "completed",
+  "blocked_reason": null,
+  "template": null,
+  "result": ".ai/context/summaries/T-0028.result.json",
+  "history": [
+    {
+      "at": "2026-10-06T05:54:38Z",
+      "event": "created",
+      "from": null,
+      "to": "queue",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T06:57:09Z",
+      "event": "transition",
+      "from": "queue",
+      "to": "active",
+      "note": null
+    },
+    {
+      "at": "2026-10-06T06:57:09Z",
+      "event": "transition",
+      "from": "active",
+      "to": "completed",
+      "note": "completed"
+    }
+  ]
+}

@@ -159,6 +159,9 @@ pub struct HttpConfig {
     pub ops_port: Option<u16>,
     /// Trust `X-Forwarded-For`/`CF-Connecting-IP` for client IPs (only behind a trusted proxy).
     pub trust_forwarded_for: bool,
+    /// Compress API responses on the fly (brotli 4 / gzip 6, from 1 KiB; never `no-store`
+    /// responses, event streams or images). Static files are compressed at build time instead.
+    pub compression: bool,
 }
 
 impl Default for HttpConfig {
@@ -177,6 +180,7 @@ impl Default for HttpConfig {
             bench_endpoints: false,
             ops_port: None,
             trust_forwarded_for: false,
+            compression: true,
         }
     }
 }

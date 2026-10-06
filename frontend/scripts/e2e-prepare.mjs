@@ -1,8 +1,9 @@
 // Prepare the E2E stack: build backend binaries and the SPA, and recreate the E2E database.
-// Requires PostgreSQL from `./dev up` (port 55432) and a Rust toolchain.
+// Requires PostgreSQL from `./dev up` (DEV_PG_PORT) and a Rust toolchain.
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { devPort } from "./dev-ports.mjs";
 
 const env = { ...process.env, PATH: `${homedir()}/.cargo/bin:${process.env.PATH}` };
 const run = (cmd, cwd = ".") => execSync(cmd, { stdio: "inherit", cwd, env });
@@ -23,7 +24,7 @@ const hasContainer = (() => {
     return false;
   }
 })();
-const adminUrl = process.env.E2E_ADMIN_DATABASE_URL ?? "postgres://app:app-dev-only@localhost:55432/app";
+const adminUrl = process.env.E2E_ADMIN_DATABASE_URL ?? `postgres://app:app-dev-only@localhost:${devPort("DEV_PG_PORT")}/app`;
 const psql = (sql) =>
   hasContainer ? run(`docker exec ${pg} psql -U app -d app -qc "${sql}"`) : run(`psql "${adminUrl}" -qc "${sql}"`);
 psql("DROP DATABASE IF EXISTS app_e2e WITH (FORCE)");

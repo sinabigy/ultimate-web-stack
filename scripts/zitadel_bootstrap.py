@@ -5,7 +5,7 @@ Creates (or reuses):
   * project "app" with roles system_admin / system_auditor (system trust level only;
     organisation roles stay in the application database),
   * OIDC web application: authorization code + PKCE, confidential client (client_secret_basic),
-    redirect + post-logout URIs for the dev SPA (5190) and the backend (8080),
+    redirect + post-logout URIs for the dev SPA and the backend (infra/dev-ports.env),
     ID token carries email/profile claims and project roles,
   * a service account (client credentials, JWT access tokens) for machine-to-machine tests,
   * development users (password login; passkeys/MFA can be added in the ZITADEL login UI).
@@ -25,6 +25,8 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+import dev_ports
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -136,9 +138,10 @@ def ensure_service_account(z: Zitadel, username: str) -> tuple[str, str, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--issuer", default="http://localhost:58081")
+    ports = dev_ports.load(ROOT)
+    ap.add_argument("--issuer", default=f"http://localhost:{ports['DEV_ZITADEL_PORT']}")
     ap.add_argument("--pat-file", default=str(ROOT / "var/zitadel/pat.txt"))
-    ap.add_argument("--origins", default="http://localhost:5190,http://localhost:8080")
+    ap.add_argument("--origins", default=f"http://localhost:{ports['DEV_WEB_PORT']},http://localhost:{ports['DEV_API_PORT']}")
     ap.add_argument("--out", default=str(ROOT / ".env.zitadel"))
     a = ap.parse_args()
     wait_ready(a.issuer)

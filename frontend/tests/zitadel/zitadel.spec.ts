@@ -1,20 +1,23 @@
 import { expect, type Page, test } from "@playwright/test";
+import { devPort } from "../../scripts/dev-ports.mjs";
 
 // Requires: ./dev up --identity zitadel && python3 scripts/zitadel_bootstrap.py
 const PASSWORD = "Password1!Password1!";
+const ZITADEL = `localhost:${devPort("DEV_ZITADEL_PORT")}`;
+const APP = `localhost:${devPort("DEV_API_PORT")}`;
 
 async function zitadelLogin(page: Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   // ZITADEL's hosted login (login_hint skips the username step)
-  await page.waitForURL(/localhost:58081\/ui\/login/);
+  await page.waitForURL(new RegExp(`${ZITADEL}/ui/login`));
   await page.locator("#password").fill(PASSWORD);
   await page.locator("#submit-button").click();
   // ZITADEL may offer MFA enrolment after password login; skip it for this flow.
   const skip = page.getByRole("button", { name: /skip/i });
   if (await skip.isVisible({ timeout: 3000 }).catch(() => false)) await skip.click();
-  await page.waitForURL(/localhost:8080\/dashboard/);
+  await page.waitForURL(new RegExp(`${APP}/dashboard`));
 }
 
 test("real ZITADEL: login, IdP-managed system role, MFA step-up, IdP admin API, RP logout", async ({
@@ -41,12 +44,12 @@ test("real ZITADEL: login, IdP-managed system role, MFA step-up, IdP admin API, 
   const sec = await page.evaluate(async () => (await fetch("/api/v1/account/security")).json());
   expect(sec.identity_provider.available).toBe(true);
   expect(sec.identity_provider.overview.methods.map((m: { kind: string }) => m.kind)).toContain("password");
-  expect(sec.identity_provider.overview.manage_url).toContain("localhost:58081");
+  expect(sec.identity_provider.overview.manage_url).toContain(ZITADEL);
 
   // RP-initiated logout ends the ZITADEL session too and returns to /login.
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();
-  await page.waitForURL(/localhost:8080\/login/);
+  await page.waitForURL(new RegExp(`${APP}/login`));
   expect(
     await page.evaluate(async () => (await fetch("/api/v1/session")).json().then((s) => s.authenticated)),
   ).toBe(false);
@@ -87,7 +90,7 @@ test("real ZITADEL: service account (client credentials JWT) calls the tenant AP
   );
   expect(reg).toBe(201);
   // Client credentials grant at ZITADEL; the project-audience scope puts the project id in `aud`.
-  const tok = await request.post("http://localhost:58081/oauth/v2/token", {
+  const tok = await request.post(`http://${ZITADEL}/oauth/v2/token`, {
     form: {
       grant_type: "client_credentials",
       scope: `openid urn:zitadel:iam:org:project:id:${env.ZITADEL_PROJECT_ID}:aud`,

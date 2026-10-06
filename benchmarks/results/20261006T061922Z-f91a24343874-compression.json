@@ -1,0 +1,218 @@
+{
+  "schema": 1,
+  "repeat": 3,
+  "server_env_overrides": {},
+  "server_bin": null,
+  "started_at": "2026-10-06T06:19:22+00:00",
+  "smoke": false,
+  "environment": {
+    "host": "Mac",
+    "os": "macOS 26.5.1",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "logical_cores": 10,
+    "memory_gb": 16.0,
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "oha": "oha 1.16.0",
+    "git_sha": "f91a24343874",
+    "git_dirty": true,
+    "build_profile": "release (lto=thin, codegen-units=1)",
+    "container_runtime": "2 cpus, 4094447616 bytes, Ubuntu 24.04.4 LTS, aarch64",
+    "notes": "Load generator and server share the host; services (PostgreSQL/Redis/Dragonfly) run in the container VM."
+  },
+  "suites": {
+    "compression": {
+      "status": "ok",
+      "wall_s": 115.2,
+      "data": {
+        "duration_per_point": "6s",
+        "concurrency": 64,
+        "on": {
+          "json": {
+            "url_path": "/bench/json",
+            "concurrency": 64,
+            "duration_s": 6.0,
+            "requests": 785658,
+            "rps": 130898.5,
+            "success_rps": 130898.5,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 785658
+            },
+            "errors": {},
+            "p50_ms": 0.453,
+            "p95_ms": 0.834,
+            "p99_ms": 1.252,
+            "p999_ms": 4.068,
+            "server_rss_mb_max": 33.9,
+            "server_cpu_pct_avg": 386.7,
+            "success_rps_per_server_core": 33850.1,
+            "success_rps_per_gb_rss": 3953984.2,
+            "repeats": 3,
+            "success_rps_samples": [
+              118839.3,
+              130898.5,
+              132144.1
+            ],
+            "success_rps_spread": 0.1016
+          },
+          "list_identity": {
+            "url_path": "/bench/list",
+            "concurrency": 64,
+            "duration_s": 6.0,
+            "requests": 83032,
+            "rps": 13834.5,
+            "success_rps": 13834.5,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 83032
+            },
+            "errors": {},
+            "p50_ms": 4.216,
+            "p95_ms": 8.247,
+            "p99_ms": 15.845,
+            "p999_ms": 46.083,
+            "server_rss_mb_max": 31.8,
+            "server_cpu_pct_avg": 549.2,
+            "success_rps_per_server_core": 2519.0,
+            "success_rps_per_gb_rss": 445488.3,
+            "repeats": 3,
+            "success_rps_samples": [
+              13478.7,
+              13834.5,
+              14493.7
+            ],
+            "success_rps_spread": 0.0734,
+            "bytes_per_response": 13020,
+            "content_encoding": null,
+            "mb_per_s": 180.1
+          },
+          "list_br": {
+            "url_path": "/bench/list",
+            "concurrency": 64,
+            "duration_s": 6.0,
+            "requests": 85882,
+            "rps": 14304.7,
+            "success_rps": 14304.7,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 85882
+            },
+            "errors": {},
+            "p50_ms": 4.234,
+            "p95_ms": 7.701,
+            "p99_ms": 11.581,
+            "p999_ms": 28.093,
+            "server_rss_mb_max": 34.5,
+            "server_cpu_pct_avg": 555.1,
+            "success_rps_per_server_core": 2577.0,
+            "success_rps_per_gb_rss": 424580.1,
+            "repeats": 3,
+            "success_rps_samples": [
+              14127.1,
+              14304.7,
+              15259.9
+            ],
+            "success_rps_spread": 0.0792,
+            "bytes_per_response": 1335,
+            "content_encoding": "br",
+            "mb_per_s": 19.1
+          },
+          "list_gzip": {
+            "url_path": "/bench/list",
+            "concurrency": 64,
+            "duration_s": 6.0,
+            "requests": 91571,
+            "rps": 15255.4,
+            "success_rps": 15255.4,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 91571
+            },
+            "errors": {},
+            "p50_ms": 4.025,
+            "p95_ms": 7.056,
+            "p99_ms": 9.966,
+            "p999_ms": 24.187,
+            "server_rss_mb_max": 33.1,
+            "server_cpu_pct_avg": 592.2,
+            "success_rps_per_server_core": 2576.1,
+            "success_rps_per_gb_rss": 471949.5,
+            "repeats": 3,
+            "success_rps_samples": [
+              14789.5,
+              15255.4,
+              15338.4
+            ],
+            "success_rps_spread": 0.036,
+            "bytes_per_response": 1496,
+            "content_encoding": "gzip",
+            "mb_per_s": 22.8
+          }
+        },
+        "off": {
+          "json": {
+            "url_path": "/bench/json",
+            "concurrency": 64,
+            "duration_s": 6.0,
+            "requests": 753815,
+            "rps": 125593.9,
+            "success_rps": 125593.9,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 753815
+            },
+            "errors": {},
+            "p50_ms": 0.451,
+            "p95_ms": 0.922,
+            "p99_ms": 1.553,
+            "p999_ms": 5.351,
+            "server_rss_mb_max": 30.4,
+            "server_cpu_pct_avg": 335.9,
+            "success_rps_per_server_core": 37390.3,
+            "success_rps_per_gb_rss": 4230531.4,
+            "repeats": 3,
+            "success_rps_samples": [
+              123863.1,
+              125593.9,
+              135965.8
+            ],
+            "success_rps_spread": 0.0964
+          },
+          "list_identity": {
+            "url_path": "/bench/list",
+            "concurrency": 64,
+            "duration_s": 6.0,
+            "requests": 96258,
+            "rps": 16039.4,
+            "success_rps": 16039.4,
+            "success_rate": 1.0,
+            "status_codes": {
+              "200": 96258
+            },
+            "errors": {},
+            "p50_ms": 3.867,
+            "p95_ms": 6.65,
+            "p99_ms": 8.916,
+            "p999_ms": 17.623,
+            "server_rss_mb_max": 21.7,
+            "server_cpu_pct_avg": 580.8,
+            "success_rps_per_server_core": 2761.6,
+            "success_rps_per_gb_rss": 756882.3,
+            "repeats": 3,
+            "success_rps_samples": [
+              15957.2,
+              16039.4,
+              16284.8
+            ],
+            "success_rps_spread": 0.0204,
+            "bytes_per_response": 13020,
+            "content_encoding": null,
+            "mb_per_s": 208.8
+          }
+        }
+      }
+    }
+  },
+  "finished_at": "2026-10-06T06:21:17+00:00"
+}

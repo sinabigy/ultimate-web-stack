@@ -146,11 +146,15 @@ def validate(root: Path, env: dict, modules: set[str], compose_name: str, report
     step("./dev check (all canonical validation)", code == 0, (summary.group(0) if summary else "") + (f" failed={failed}" if failed else ""), s)
     steps[-1]["commands"] = [{"id": n, "status": st} for st, n in results]
 
-    # Live application: start it, then run the system smoke journey.
+    # Live application on the project's own ports: start it, then run the system smoke journey.
+    code, out, _ = run(["./dev", "ports", "--json", "--plain"], root, env=env)
+    ports = json.loads(out) if code == 0 else {}
+    api, web = f"http://localhost:{ports.get('DEV_API_PORT')}", f"http://localhost:{ports.get('DEV_WEB_PORT')}"
+    step("own development ports (infra/dev-ports.env)", bool(ports), f"api {api}, web {web}")
     app = subprocess.Popen(["./dev", "up"], cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                            env={**os.environ, **env}, start_new_session=True)
     try:
-        up = wait_http("http://localhost:8080/readyz", 600) and wait_http("http://localhost:5190/", 120)
+        up = wait_http(f"{api}/readyz", 600) and wait_http(f"{web}/", 120)
         step("./dev up (API + SPA + mock IdP + simulated provider)", up)
         if up:
             code, out, s = run(["./dev", "test", "--system"], root, env=env, timeout=600)
@@ -159,7 +163,7 @@ def validate(root: Path, env: dict, modules: set[str], compose_name: str, report
             # system_smoke.py prints f"  {status:4}  {name:44} {detail}"
             steps[-1]["checks"] = [[ln[2:6].strip(), ln[8:52].strip(), ln[52:].strip()] for ln in out.splitlines()
                                    if ln[2:6].strip() in ("PASS", "FAIL", "SKIP") and ln.startswith("  ")]
-            code, out, _ = run(["curl", "-s", "http://localhost:5190/"], root)
+            code, out, _ = run(["curl", "-s", f"{web}/"], root)
             step("SPA served by Vite (frontend)", "<div id=" in out or "<!doctype html>" in out.lower())
             runtime_configuration(root, modules)
     finally:

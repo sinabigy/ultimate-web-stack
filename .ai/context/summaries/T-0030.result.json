@@ -1,0 +1,24 @@
+{
+  "result_schema_version": 1,
+  "task_id": "T-0030",
+  "outcome": "completed",
+  "summary": "OpenAPI 3.1 for the integration surface (10 operations used by API keys/service accounts), derived with utoipa, served at /api/v1/openapi.json, committed at docs/api/openapi.json. Generated TS client rejected: SPA uses ts-rs types.",
+  "changes": [],
+  "decisions": [],
+  "validation": [
+    {
+      "cmd": null,
+      "evidence": "tests/openapi.rs: snapshot current; documented ops are routes and every /api/v1 route classified (caught admin/stream routes); anonymous 401 per op; live API-key responses conform to schemas (mutation-checked by renaming a schema field)",
+      "passed": true
+    },
+    {
+      "cmd": null,
+      "evidence": "system smoke checks the document is served",
+      "passed": true
+    }
+  ],
+  "unresolved": [],
+  "lessons": [],
+  "next_steps": [],
+  "created_at": "2026-10-06T06:57:09Z"
+}

@@ -43,13 +43,25 @@ ROOT = Path(__file__).resolve().parent.parent
 BACKEND = ROOT / "backend"
 BIN = BACKEND / "target" / "release"
 RESULTS = ROOT / "benchmarks" / "results"
-PG_ADMIN_URL = os.environ.get("BENCH_PG_ADMIN_URL", "postgres://app:app-dev-only@localhost:55432/app")
-BENCH_DB_URL = os.environ.get("BENCH_DATABASE_URL", "postgres://app:app-dev-only@localhost:55432/app_bench")
-REDIS_URL = os.environ.get("BENCH_REDIS_URL", "redis://127.0.0.1:56379")
-DRAGONFLY_URL = os.environ.get("BENCH_DRAGONFLY_URL", "redis://127.0.0.1:56380")
+# Services from ./dev, on this project's ports (infra/dev-ports.env).
+sys.path.insert(0, str(ROOT / "scripts"))
+import dev_ports  # noqa: E402
+
+PORTS = dev_ports.load(ROOT)
+PG_ADMIN_URL = os.environ.get("BENCH_PG_ADMIN_URL", f"postgres://app:app-dev-only@localhost:{PORTS['DEV_PG_PORT']}/app")
+BENCH_DB_URL = os.environ.get("BENCH_DATABASE_URL", f"postgres://app:app-dev-only@localhost:{PORTS['DEV_PG_PORT']}/app_bench")
+REDIS_URL = os.environ.get("BENCH_REDIS_URL", f"redis://127.0.0.1:{PORTS['DEV_REDIS_PORT']}")
+DRAGONFLY_URL = os.environ.get("BENCH_DRAGONFLY_URL", f"redis://127.0.0.1:{PORTS['DEV_DRAGONFLY_PORT']}")
+os.environ.setdefault("BENCH_DATABASE_URL", BENCH_DB_URL)  # app-bench suites read these directly
+os.environ.setdefault("BENCH_PG_ADMIN_URL", PG_ADMIN_URL)
+os.environ.setdefault("BENCH_NATS_URL", f"nats://127.0.0.1:{PORTS['DEV_NATS_PORT']}")
+os.environ.setdefault("BENCH_CLICKHOUSE_URL", f"http://127.0.0.1:{PORTS['DEV_CLICKHOUSE_PORT']}")
+# Benchmark servers use fixed ports: measurements need an otherwise idle machine anyway.
 APP_PORT, IDP_PORT = 18090, 59083
 APP = f"http://127.0.0.1:{APP_PORT}"
 SUITES = ["http", "auth", "cache", "outbound", "db", "messaging", "analytics", "gateway"]
+# Decision benchmarks, run on request (--suite compression); not part of a complete run or its gates.
+ON_DEMAND = ["compression"]
 
 
 def log(msg: str) -> None:
@@ -285,6 +297,38 @@ def suite_http(smoke: bool) -> dict:
     return out
 
 
+def wire_bytes(url: str, encoding: str | None) -> tuple[int, str | None]:
+    """Bytes on the wire for one response, and the Content-Encoding the server chose."""
+    req = urllib.request.Request(url, headers={"accept-encoding": encoding} if encoding else {})
+    with urllib.request.urlopen(req, timeout=5) as r:  # urllib does not decompress
+        return len(r.read()), r.headers.get("content-encoding")
+
+
+def suite_compression(smoke: bool) -> dict:
+    """http.compression A/B: what the layer costs on small responses (below its threshold) and
+    what compressing a typical list page (/bench/list, about 13 KB) costs and saves."""
+    d = "3s" if smoke else "6s"
+    encodings = {"identity": None, "br": "br", "gzip": "gzip"}
+    out: dict = {"duration_per_point": d, "concurrency": 64}
+    # "off" runs before and after "on", so drift on a shared host shows up as a difference between
+    # the two off runs instead of being attributed to the layer.
+    off = {"APP__HTTP__COMPRESSION": "false"}
+    for mode, env in (("off_before", off), ("on", {}), ("off_after", off)):
+        with Stack(env) as st:
+            pid = st.server.pid
+            oha(f"{APP}/bench/plaintext", "2s", 32)  # warm-up
+            res: dict = {"json": oha(f"{APP}/bench/json", d, 64, {"accept-encoding": "gzip, br"}, pid=pid)}
+            for name, enc in encodings.items():
+                if mode != "on" and enc:
+                    continue  # identical to identity when the layer is off
+                point = oha(f"{APP}/bench/list", d, 64, {"accept-encoding": enc} if enc else None, pid=pid)
+                point["bytes_per_response"], point["content_encoding"] = wire_bytes(f"{APP}/bench/list", enc)
+                point["mb_per_s"] = round(point["bytes_per_response"] * point["success_rps"] / 1e6, 1)
+                res[f"list_{name}"] = point
+            out[mode] = res
+    return out
+
+
 def seed_http() -> dict:
     return json.loads(run([str(BIN / "app-bench"), "seed-http"], env={**os.environ, "BENCH_DATABASE_URL": BENCH_DB_URL}).stdout)
 
@@ -455,7 +499,7 @@ def ensure_database() -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--suite", default=",".join(SUITES), help=f"comma list of {SUITES}")
+    ap.add_argument("--suite", default=",".join(SUITES), help=f"comma list of {SUITES} (default: all) or {ON_DEMAND}")
     ap.add_argument("--smoke", action="store_true", help="short durations (CI)")
     ap.add_argument("--label", default="", help="suffix for the result file")
     ap.add_argument("--no-build", action="store_true")
@@ -473,10 +517,10 @@ def main() -> int:
         if not sep or not k.startswith("APP__"):
             ap.error(f"--env expects APP__KEY=VALUE, got {kv!r}")
         EXTRA_ENV[k] = v
-    unknown = set(suites) - set(SUITES)
+    unknown = set(suites) - set(SUITES) - set(ON_DEMAND)
     if unknown:
         ap.error(f"unknown suites: {sorted(unknown)}")
-    if not shutil.which("oha") and {"http", "auth", "cache"} & set(suites):
+    if not shutil.which("oha") and {"http", "auth", "cache", "compression"} & set(suites):
         sys.exit("oha not found (brew install oha / cargo install oha)")
     if not a.no_build:
         log("building release binaries…")
@@ -507,6 +551,8 @@ def main() -> int:
                     data = suite_tool("analytics", a.smoke)
                 elif s == "gateway":
                     data = suite_gateway(a.smoke)
+                elif s == "compression":
+                    data = suite_compression(a.smoke)
                 else:
                     data = suite_tool(s if s == "db" else "outbound", a.smoke)
                 entry = {"status": "ok", "wall_s": round(time.time() - t, 1), "data": data}
@@ -530,7 +576,7 @@ def main() -> int:
     (RESULTS / name).write_text(text)
     # `latest.json` is the most recent *complete* run (what reports and gates read by default);
     # subsets and smoke runs get their own alias so they never replace it.
-    alias = "latest-smoke.json" if a.smoke else ("latest.json" if set(suites) == set(SUITES) else "latest-partial.json")
+    alias = "latest-smoke.json" if a.smoke else ("latest.json" if set(suites) >= set(SUITES) else "latest-partial.json")
     (RESULTS / alias).write_text(text)
     log(f"wrote benchmarks/results/{name}")
     return 0 if all(v["status"] == "ok" for v in result["suites"].values()) else 1

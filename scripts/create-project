@@ -54,6 +54,8 @@ import sys
 from pathlib import Path
 
 BLUEPRINT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BLUEPRINT / "scripts"))
+import dev_ports  # noqa: E402
 BLUEPRINT_NAME = "ultimate-web-stack-blueprint"
 OPTIONAL_MODULES = ["cache", "messaging_nats", "analytics_clickhouse", "observability"]
 PROFILES = {
@@ -115,7 +117,7 @@ def prune_ci(ci: Path, modules: set[str], cedar: bool) -> None:
     ci.write_text(text)
 
 
-def app_toml(a: argparse.Namespace, modules: set[str]) -> str:
+def app_toml(a: argparse.Namespace, modules: set[str], ports: dict[str, int]) -> str:
     """Non-secret configuration for the generated project (secrets stay in environment variables)."""
     orgs = a.organizations
     passkey = a.auth != "basic"
@@ -146,7 +148,7 @@ def app_toml(a: argparse.Namespace, modules: set[str]) -> str:
         "[cache]",
         f'backend = "{"redis" if "cache" in modules else "memory"}"',
         *(['# Development Redis from infra/docker/compose.yaml (no credentials). Production: APP__CACHE__REDIS_URL.',
-           'redis_url = "redis://127.0.0.1:56379"'] if "cache" in modules else []),
+           'redis_url = "redis://127.0.0.1:{}"'.format(ports["DEV_REDIS_PORT"])] if "cache" in modules else []),
         "",
         "[messaging]",
         f"enabled = {str('messaging_nats' in modules).lower()}",
@@ -203,6 +205,8 @@ def main() -> int:
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--start", dest="start", action="store_true", default=False)
     ap.add_argument("--no-start", dest="start", action="store_false")
+    ap.add_argument("--port-base", type=int, default=None,
+                    help="first of the project's development ports (default: derived from the name)")
     a = ap.parse_args()
     if not a.name or not a.dest:
         interactive(a)
@@ -221,9 +225,13 @@ def main() -> int:
     if dest.exists() and any(dest.iterdir()) and not a.force:
         die(f"{dest} is not empty (use --force)")
     slug = slugify(a.name)
+    try:
+        ports = dev_ports.block(list(dev_ports.read_file(BLUEPRINT)), a.port_base or dev_ports.default_base(slug))
+    except ValueError as e:
+        die(f"--port-base: {e}")
     fresh = not dest.exists() or not any(dest.iterdir())
     try:
-        return generate(a, dest, modules, slug)
+        return generate(a, dest, modules, slug, ports)
     except BaseException:
         # Leave nothing half-generated behind (only if this run created the content).
         if fresh and dest.exists():
@@ -257,10 +265,30 @@ def replay_command(a: argparse.Namespace, dest: Path) -> str:
         parts += ["--modules", a.modules]
     if a.with_gateway:
         parts.append("--with-gateway")
+    if a.port_base:
+        parts += ["--port-base", str(a.port_base)]
     return " ".join(shlex.quote(x) for x in parts)
 
 
-def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) -> int:
+def set_ports(dest: Path, ports: dict[str, int]) -> None:
+    """Give the project its own development ports: the ports file, plus the defaults written into
+    files that run without ./dev (`${DEV_X_PORT:-n}` in compose and the validation commands, and
+    Prometheus' scrape targets), so plain `docker compose` or tools/ai-validate use them too."""
+    f = dest / dev_ports.PORTS_FILE
+    f.write_text(re.sub(r"^(DEV_[A-Z0-9_]+_PORT)=\d+$", lambda m: f"{m.group(1)}={ports[m.group(1)]}",
+                        f.read_text(), flags=re.MULTILINE))
+    for rel in ("infra/docker/compose.yaml", ".ai/config/project.json"):
+        p = dest / rel
+        p.write_text(re.sub(r"\$\{(DEV_[A-Z0-9_]+_PORT):-\d+\}", lambda m: f"${{{m.group(1)}:-{ports[m.group(1)]}}}", p.read_text()))
+    prom = dest / "infra/docker/observability/prometheus.yml"
+    if prom.exists():
+        text = prom.read_text()
+        for legacy, name in (("8080", "DEV_API_PORT"), ("9091", "DEV_WORKER_PORT")):
+            text = text.replace(f"host.docker.internal:{legacy}", f"host.docker.internal:{ports[name]}")
+        prom.write_text(text)
+
+
+def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str, ports: dict[str, int]) -> int:
     dirty = subprocess.run(["git", "-C", str(BLUEPRINT), "status", "--porcelain"], capture_output=True, text=True).stdout.strip()
     if dirty:
         print("create-project: warning: the blueprint has uncommitted changes; they are included", file=sys.stderr)
@@ -284,7 +312,7 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
 
     # 2. configuration
     (dest / "backend/config").mkdir(parents=True, exist_ok=True)
-    (dest / "backend/config/app.toml").write_text(app_toml(a, modules))
+    (dest / "backend/config/app.toml").write_text(app_toml(a, modules, ports))
 
     # 3. architecture metadata
     pj = dest / ".ai/config/project.json"
@@ -328,7 +356,7 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
     cmds[:] = [c for c in cmds if needs.get(c["id"]) is None or needs[c["id"]] in modules]
     for c in cmds:
         if c["id"] == "rust-test-cache":  # generated projects run Redis only (Dragonfly is a blueprint comparison)
-            c["cmd"] = "TEST_REDIS_URLS=redis://127.0.0.1:56379 cargo test -p app-cache --features redis 2>&1"
+            c["cmd"] = "TEST_REDIS_URLS=redis://127.0.0.1:${DEV_REDIS_PORT:-56379} cargo test -p app-cache --features redis 2>&1"
     if not a.with_gateway:
         cmds[:] = [c for c in cmds if c["id"] != "gateway-check"]
         ci = dest / ".github/workflows/ci.yml"
@@ -397,6 +425,10 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
         "./dev check       # every canonical validation command (tools/ai-validate)",
         "```",
         "",
+        f"The app runs at http://localhost:{ports['DEV_WEB_PORT']} (API {ports['DEV_API_PORT']}). This project has its own",
+        f"development ports ({ports['DEV_API_PORT']}–{max(ports.values())}, `infra/dev-ports.env`; `./dev ports` lists them), so it",
+        "runs next to the blueprint and other generated projects.",
+        "",
         "Configuration: `backend/config/app.toml` (non-secret), `APP__*` environment variables (see `.env.example`).",
         "Architecture, decisions and constraints inherited from the blueprint: `.ai/knowledge/`, `docs/`.",
         "Switching optional modules (Redis, NATS, ClickHouse, Cedar) on or off later: `docs/MODULES.md`.",
@@ -431,6 +463,13 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
     cmds = project["validation"]["commands"]
     cmds[:] = [c for c in cmds if c.get("confirmed") or c.get("source") != "conventional-default"]
     pj.write_text(json.dumps(project, indent=2, ensure_ascii=False) + "\n")
+
+    # Ports last: ai-init above rewrites project.json.
+    set_ports(dest, ports)
+    busy = [f"{k}={v}" for k, v in ports.items() if dev_ports.in_use(v)]
+    if busy:
+        print(f"create-project: warning: in use right now: {', '.join(busy)}; `./dev ports` in the project names the"
+              " holders (choose another block with --port-base, or edit infra/dev-ports.env)", file=sys.stderr)
 
     # 6. git
     if not a.no_git:

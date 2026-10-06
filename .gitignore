@@ -17,6 +17,7 @@ Thumbs.db
 target/
 node_modules/
 dist/
+frontend/sourcemaps/
 coverage/
 playwright-report/
 test-results/

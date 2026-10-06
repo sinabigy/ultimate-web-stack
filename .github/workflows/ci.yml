@@ -13,6 +13,13 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   DATABASE_URL: postgres://app:app-dev-only@localhost:55432/app
+  # The service containers below publish these fixed ports on the (single-project) runner; they
+  # override infra/dev-ports.env, which a generated project fills with its own block.
+  DEV_PG_PORT: "55432"
+  DEV_REDIS_PORT: "56379"
+  DEV_DRAGONFLY_PORT: "56380"
+  DEV_NATS_PORT: "54222"
+  DEV_CLICKHOUSE_PORT: "58123"
 
 jobs:
   protocol:

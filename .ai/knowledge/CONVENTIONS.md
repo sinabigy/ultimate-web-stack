@@ -14,8 +14,8 @@ _Only conventions that are **not obvious from the code or the formatter config**
 - **SQL is checked at compile time (sqlx).** Queries already recorded in `backend/.sqlx/` build
   offline. A new or changed query needs the dev database:
   1. `./dev up --no-app`;
-  2. `export DATABASE_URL=postgres://app:app-dev-only@localhost:55432/app` (development only, the
-     same URL `project.json` uses);
+  2. `export DATABASE_URL=postgres://app:app-dev-only@localhost:55432/app` (development only; use
+     this project's `DEV_PG_PORT` from `infra/dev-ports.env`, which `./dev ports` shows);
   3. build;
   4. `./dev db prepare`, then commit `backend/.sqlx/`.
 
@@ -67,8 +67,10 @@ _Only conventions that are **not obvious from the code or the formatter config**
   image (`release-smoke`) and runs the live systemd test, and it starts the services its commands
   need. Give it a timeout of at least 30 minutes, and the Docker VM at least 6 GiB
   (`KNOWN_ISSUES.md`). `tools/ai-validate` prints its summary at the end, not progressively.
-- `./dev check` runs alongside a running `./dev up`, because E2E uses its own ports (18080, 59082,
-  59091).
+- `./dev check` runs alongside a running `./dev up`, because E2E uses its own ports (`DEV_E2E_*`).
+- Ports live only in `infra/dev-ports.env` (read by `./dev`, compose, Vite, Playwright and the
+  scripts; `./dev ports` shows them). Do not hard-code a development port anywhere else. Each
+  generated project has its own block, so projects run side by side.
 - Live proofs need a running `./dev up`:
   - `./dev test --system`: one journey through every component;
   - `./dev test --journey`: browser acceptance per role, with screenshots;

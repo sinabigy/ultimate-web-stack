@@ -41,6 +41,7 @@ pub fn api_routes(admin_enabled: bool) -> Router<AppState> {
         .route("/api/v1/notifications/read-all", post(account::read_all_notifications))
         .route("/api/v1/notifications/{id}/read", post(account::read_notification))
         .route("/api/v1/permissions", get(orgs::permission_catalog))
+        .route("/api/v1/openapi.json", get(crate::openapi::serve))
         .route("/api/v1/invitations/{token}", get(orgs::invitation_preview))
         .route("/api/v1/invitations/{token}/accept", post(orgs::accept_invitation))
         .route("/api/v1/orgs", get(orgs::list_mine).post(orgs::create))

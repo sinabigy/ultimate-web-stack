@@ -32,6 +32,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+
+import dev_ports
+
+PORTS = dev_ports.load(Path(__file__).resolve().parents[1])
 
 RESULTS: list[tuple[str, str, str]] = []
 
@@ -131,12 +136,44 @@ def login(c: Client, email: str) -> bool:
     return True
 
 
+def api_clients(c: Client, api: str, slug: str) -> None:
+    """The integration examples (examples/api-clients) against this stack, with a fresh API key
+    limited to what they need; the key is revoked afterwards and must stop working."""
+    import shutil
+    import subprocess
+    status, key = c.json("POST", f"/api/v1/orgs/{slug}/api-keys",
+                         {"name": "system smoke examples", "scopes": ["runs:read", "runs:create"], "expires_in_days": 1})
+    if status != 201:
+        record("FAIL", "API key for the examples", f"HTTP {status} {key}")
+        return
+    env = {**os.environ, "API_URL": api, "API_KEY": key["key"], "ORG": slug}
+    examples = Path(__file__).resolve().parents[1] / "examples/api-clients"
+    for name, cmd in (("curl", ["bash", "runs.sh"]), ("Python", [sys.executable, "runs.py"]), ("Node.js", ["node", "runs.mjs"])):
+        if not shutil.which(cmd[0]):
+            record("SKIP", f"API client example ({name})", f"{cmd[0]} not installed")
+            continue
+        r = subprocess.run(cmd, cwd=examples, env=env, capture_output=True, text=True, timeout=120)
+        last = (r.stdout.strip().splitlines() or [r.stderr.strip()])[-1]
+        record("PASS" if r.returncode == 0 else "FAIL", f"API client example ({name})", last if r.returncode == 0 else (r.stderr or r.stdout)[-160:])
+    status, spec = c.json("GET", "/api/v1/openapi.json")
+    ops = sum(len(v) for v in (spec or {}).get("paths", {}).values()) if status == 200 else 0
+    record("PASS" if ops else "FAIL", "OpenAPI document served", f"{ops} operations" if ops else f"HTTP {status}")
+    c.req("DELETE", f"/api/v1/orgs/{slug}/api-keys/{key['id']}")
+    req = urllib.request.Request(f"{api}/api/v1/orgs/{slug}/runs", headers={"authorization": f"Bearer {key['key']}"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as res:
+            code = res.status
+    except urllib.error.HTTPError as e:
+        code = e.code
+    record("PASS" if code == 401 else "FAIL", "revoked API key is refused", f"HTTP {code}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--api", default=os.environ.get("SMOKE_API", "http://localhost:8080"))
-    ap.add_argument("--upstream", default="http://127.0.0.1:59090")
-    ap.add_argument("--nats-monitor", default="http://127.0.0.1:58222")
-    ap.add_argument("--tempo", default="http://127.0.0.1:53200")
+    ap.add_argument("--api", default=os.environ.get("SMOKE_API", f"http://localhost:{PORTS['DEV_API_PORT']}"))
+    ap.add_argument("--upstream", default=f"http://127.0.0.1:{PORTS['DEV_UPSTREAM_PORT']}")
+    ap.add_argument("--nats-monitor", default=f"http://127.0.0.1:{PORTS['DEV_NATS_MONITOR_PORT']}")
+    ap.add_argument("--tempo", default=f"http://127.0.0.1:{PORTS['DEV_TEMPO_PORT']}")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     c = Client(a.api)
@@ -243,6 +280,8 @@ def main() -> int:
     status, audit = c.json("GET", f"/api/v1/orgs/{slug}/audit")
     actions = {e["action"] for e in (audit or {}).get("items", [])} if status == 200 else set()
     record("PASS" if "run.created" in actions else "FAIL", "audit trail records the run", ", ".join(sorted(actions))[:80])
+
+    api_clients(c, a.api, slug)
 
     status, h, raw = c.req("GET", "/metrics")
     if status == 200:
