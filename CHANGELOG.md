@@ -9,6 +9,18 @@ their README.
 Post-release maintenance on `main` (the next patch release). The architecture and defaults are
 unchanged.
 
+- **Security:** `seroval` and `seroval-plugins` are forced to 1.6.8 through npm `overrides`.
+  - This fixes two critical advisories, GHSA-p6vx-979v-rg4c and GHSA-jp82-f5mq-hwhp.
+  - Every `solid-js` release still pins `seroval ~1.5`, so the override is needed.
+  - The shipped SPA bundle never contained `seroval` (no server rendering), so deployed apps were
+    not exposed. The build-time dependency tree and the `npm audit` gate were affected.
+  - **Projects generated from 1.0.1:** add the same `overrides` block to `frontend/package.json`
+    and run `npm install`.
+- **Dependencies:** `base64` 0.22 → 0.23 for the project's own crates, after review:
+  - no behaviour change for the `STANDARD` and `URL_SAFE_NO_PAD` engines the project uses;
+  - 0.23 was already in the build through `reqwest` and `hyper-util`;
+  - the new known-answer tests pass on both versions.
+
 - **CI:** the Rust workspace tests run as a visible step, so an intermittent failure names its test
   (the validator's output tail had hidden it).
 - **Tests:** known-answer vectors for the base64 engines used by persisted tokens, PKCE challenges,
