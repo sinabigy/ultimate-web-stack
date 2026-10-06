@@ -51,6 +51,31 @@ mod tests {
         assert!(!plausible_token(&format!("{}!", &a[..42])));
     }
 
+    /// Known-answer vectors (computed independently with Python's `base64`/`hashlib`) for the
+    /// two engines this project persists data with: tokens, PKCE challenges and pagination cursors
+    /// (URL-safe, no padding) and the token-encryption key (standard, padded). A base64 crate
+    /// upgrade must not change these, or stored tokens, cursors and keys stop matching.
+    #[test]
+    fn base64_encodings_are_stable_known_answers() {
+        use base64::{
+            Engine,
+            engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+        };
+        let bytes: Vec<u8> = (0u8..32).collect();
+        assert_eq!(URL_SAFE_NO_PAD.encode(&bytes), "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8");
+        assert_eq!(STANDARD.encode(&bytes), "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=");
+        assert_eq!(URL_SAFE_NO_PAD.encode([0xfb, 0xff, 0xbf]), "-_-_");
+        assert_eq!(STANDARD.encode([0xfb, 0xff, 0xbf]), "+/+/");
+        // PKCE S256 challenge shape: base64url(sha256(verifier)), no padding.
+        assert_eq!(URL_SAFE_NO_PAD.encode(sha256(b"abc")), "ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0");
+        assert_eq!(STANDARD.decode("c2hvcnQ=").unwrap(), b"short");
+        assert_eq!(URL_SAFE_NO_PAD.decode("-_-_").unwrap(), [0xfb, 0xff, 0xbf]);
+        // Each engine rejects the other's alphabet and padding rules.
+        assert!(URL_SAFE_NO_PAD.decode("c2hvcnQ=").is_err(), "padding is rejected by the no-pad engine");
+        assert!(URL_SAFE_NO_PAD.decode("+/+/").is_err(), "standard alphabet is rejected by the URL-safe engine");
+        assert!(STANDARD.decode("-_-_").is_err(), "URL-safe alphabet is rejected by the standard engine");
+    }
+
     #[test]
     fn constant_time_compare() {
         assert!(ct_eq("abc", "abc"));
