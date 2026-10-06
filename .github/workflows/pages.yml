@@ -18,8 +18,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
-      - name: Check the site has no placeholders
-        run: "! grep -nE 'OWNER/REPO|sponsors/OWNER|TODO' site/index.html"
+      - name: Check the site has no launch placeholders (patterns shared with scripts/release-audit.sh)
+        run: "! grep -nEf scripts/launch-placeholders.txt site/index.html"
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with: { path: site }

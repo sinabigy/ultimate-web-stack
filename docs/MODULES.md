@@ -41,7 +41,7 @@ When: more than one API instance. On one instance the in-process cache is 2.2× 
    - set `architecture.modules.cache.adapter` to `"redis"` (this makes `./dev up` start Redis);
    - add this command:
      ```json
-     {"id": "rust-test-cache", "stage": "integration", "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379 cargo test -p app-cache --features redis", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1200}
+     {"id": "rust-test-cache", "stage": "integration", "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379 cargo test -p app-cache --features redis 2>&1", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1200}
      ```
 4. `.github/workflows/ci.yml`, backend job:
    - add a `redis` service (`redis:8-alpine`, port `56379:6379`, health check `redis-cli ping`);
@@ -62,7 +62,7 @@ business rows. See `docs/architecture/messaging.md`.
    - set `architecture.modules.messaging_nats.enabled` to `true`;
    - add this command:
      ```json
-     {"id": "rust-test-nats", "stage": "integration", "cmd": "TEST_NATS_URL=${TEST_NATS_URL:-nats://127.0.0.1:54222} cargo test -p app-messaging --features nats", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1200}
+     {"id": "rust-test-nats", "stage": "integration", "cmd": "TEST_NATS_URL=${TEST_NATS_URL:-nats://127.0.0.1:54222} cargo test -p app-messaging --features nats 2>&1", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1200}
      ```
 4. CI backend job:
    - add a step before validation: `docker run -d --name nats -p 54222:4222 nats:2.14.7-alpine --jetstream`;
@@ -81,7 +81,7 @@ aggregates, measured). Per-tenant dashboards are fine on PostgreSQL. See
    - set `architecture.modules.analytics_clickhouse.enabled` to `true`;
    - add this command:
      ```json
-     {"id": "rust-test-clickhouse", "stage": "integration", "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics --features clickhouse && cargo test -p app-api --features clickhouse --test analytics", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1200}
+     {"id": "rust-test-clickhouse", "stage": "integration", "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics --features clickhouse 2>&1 && cargo test -p app-api --features clickhouse --test analytics 2>&1", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1200}
      ```
 4. CI backend job:
    - add a `clickhouse` service (`clickhouse/clickhouse-server:26.3.25.2`, port `58123:8123`,
@@ -101,7 +101,7 @@ differential property test checks this.
    - set `architecture.modules.cedar.enabled` to `true`;
    - add this command:
      ```json
-     {"id": "rust-test-cedar", "stage": "unit", "cmd": "cargo test -p app-authz --features cedar", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1800}
+     {"id": "rust-test-cedar", "stage": "unit", "cmd": "cargo test -p app-authz --features cedar 2>&1", "cwd": "backend", "requires": ["cargo"], "source": "user", "confirmed": true, "timeout_s": 1800}
      ```
 4. CI: add `--only rust-test-cedar` to the backend validation step.
 

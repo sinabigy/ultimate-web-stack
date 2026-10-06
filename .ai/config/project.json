@@ -180,7 +180,7 @@
       {
         "id": "rust-test",
         "stage": "integration",
-        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo test --workspace",
+        "cmd": "DATABASE_URL=${DATABASE_URL:-postgres://app:app-dev-only@localhost:55432/app} cargo test --workspace 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -188,12 +188,12 @@
         "source": "user",
         "confirmed": true,
         "timeout_s": 2400,
-        "note": "Unit, PostgreSQL integration (fresh database per test) and full-stack auth/authz security tests. Needs PostgreSQL (./dev up)."
+        "note": "Unit, PostgreSQL integration (fresh database per test) and full-stack auth/authz security tests. Needs PostgreSQL (./dev up). stderr merged (2>&1) so a failing test is named in ai-validate's output tail."
       },
       {
         "id": "rust-test-cedar",
         "stage": "unit",
-        "cmd": "cargo test -p app-authz --features cedar",
+        "cmd": "cargo test -p app-authz --features cedar 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -201,7 +201,7 @@
         "source": "user",
         "confirmed": true,
         "timeout_s": 1800,
-        "note": "Cedar engine conformance + RBAC/Cedar differential property test."
+        "note": "Cedar engine conformance + RBAC/Cedar differential property test. stderr merged (2>&1) so a failing test is named in ai-validate's output tail."
       },
       {
         "id": "bench-gates-selftest",
@@ -230,7 +230,7 @@
       {
         "id": "rust-test-cache",
         "stage": "integration",
-        "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache --features redis",
+        "cmd": "TEST_REDIS_URLS=redis://127.0.0.1:56379,redis://127.0.0.1:56380 cargo test -p app-cache --features redis 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -238,12 +238,12 @@
         "source": "user",
         "confirmed": true,
         "timeout_s": 1200,
-        "note": "Redis 8 and Dragonfly integration (TTL, locks, shared GCRA, cross-process stampede, outage degradation). Needs ./dev up with the cache module."
+        "note": "Redis 8 and Dragonfly integration (TTL, locks, shared GCRA, cross-process stampede, outage degradation). Needs ./dev up with the cache module. stderr merged (2>&1) so a failing test is named in ai-validate's output tail."
       },
       {
         "id": "rust-test-nats",
         "stage": "integration",
-        "cmd": "TEST_NATS_URL=${TEST_NATS_URL:-nats://127.0.0.1:54222} cargo test -p app-messaging --features nats",
+        "cmd": "TEST_NATS_URL=${TEST_NATS_URL:-nats://127.0.0.1:54222} cargo test -p app-messaging --features nats 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -251,12 +251,12 @@
         "source": "user",
         "confirmed": true,
         "timeout_s": 1200,
-        "note": "NATS event bus fan-out and JetStream queue: dedup, exactly-once processing, retry/backoff, dead letters + replay, crash-on-last-attempt sweep, graceful drain, trace propagation. Needs ./dev up with NATS."
+        "note": "NATS event bus fan-out and JetStream queue: dedup, exactly-once processing, retry/backoff, dead letters + replay, crash-on-last-attempt sweep, graceful drain, trace propagation. Needs ./dev up with NATS. stderr merged (2>&1) so a failing test is named in ai-validate's output tail."
       },
       {
         "id": "rust-test-clickhouse",
         "stage": "integration",
-        "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics --features clickhouse && cargo test -p app-api --features clickhouse --test analytics",
+        "cmd": "export TEST_CLICKHOUSE_URL=${TEST_CLICKHOUSE_URL:-http://127.0.0.1:58123}; cargo test -p app-analytics --features clickhouse 2>&1 && cargo test -p app-api --features clickhouse --test analytics 2>&1",
         "cwd": "backend",
         "requires": [
           "cargo"
@@ -264,7 +264,7 @@
         "source": "user",
         "confirmed": true,
         "timeout_s": 1200,
-        "note": "ClickHouse schema (partitions, TTL, rollup), batched non-blocking sink, outage behaviour, tenant-scoped queries and the analytics endpoint. Needs ./dev up with ClickHouse."
+        "note": "ClickHouse schema (partitions, TTL, rollup), batched non-blocking sink, outage behaviour, tenant-scoped queries and the analytics endpoint. Needs ./dev up with ClickHouse. stderr merged (2>&1) so a failing test is named in ai-validate's output tail."
       },
       {
         "id": "ts-bindings-fresh",

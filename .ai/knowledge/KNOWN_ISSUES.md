@@ -61,3 +61,30 @@ _Open problems that a future worker must not rediscover the hard way. Each entry
 - **Mitigation**: the assertion now reports elapsed time, the 429 count, requests sent and the
   learned rate cap, so the next occurrence explains itself. The bound was not loosened: a
   4× slowdown would be a real controller problem worth seeing.
+
+## Transient failures during v1.0.2 release validation (2026-10-06)
+Two one-off failures in local validation of a generated SaaS project (`scripts/validate-generated`,
+macOS host, colima 2 CPU / 4 GiB). **Neither is classified as an application bug.** Each passed on
+every rerun, and a third full run was entirely clean before tagging.
+
+1. **`rust-test` failed once** inside the generated project's `./dev check`.
+   - Then 3/3 standalone reruns passed, and the next two full runs passed 24/24.
+   - **Unknown:** which test failed. `ai-validate` keeps the output tail as stdout then stderr, so
+     the tail held only compiler stderr.
+   - **Candidates (unconfirmed):** the colima port-forwarder connect flake above, or the
+     outbound-engine timing test above.
+2. **System smoke failed once** with a name-resolution error (`[Errno 8] nodename nor servname
+   provided`). The smoke test talks only to `localhost` and `127.0.0.1`, and 5/5 reruns passed.
+   - **Unknown:** which request failed. The traceback didn't include the URL.
+
+**Diagnostics added (no retries):**
+- the `rust-test*` commands merge stderr (`2>&1`), so the tail ends with the failing test's name
+  (mutation-checked with a deliberately failing test);
+- `scripts/system_smoke.py` names the method and URL of any connection failure.
+
+**If either recurs:**
+1. Keep `var/check.log` and `var/validation-report.json` from the generated project.
+2. Record the named test or URL, the time, and host load.
+3. Check whether it coincides with the colima connect flake (`SSLRequest: 0x00`). A shared
+   environmental cause is the leading hypothesis.
+4. Fix only once it's reproducible.

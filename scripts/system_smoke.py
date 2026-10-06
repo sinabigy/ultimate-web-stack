@@ -74,6 +74,9 @@ class Client:
                 return resp.status, dict(resp.headers), raw
         except urllib.error.HTTPError as e:
             return e.code, dict(e.headers), e.read()
+        except urllib.error.URLError as e:
+            # Not retried: name the request so a transient failure (e.g. name resolution) is diagnosable.
+            raise ConnectionError(f"{method} {url}: {e.reason}") from e
 
     def json(self, method: str, url: str, body=None, headers=None):  # noqa: ANN001
         status, h, raw = self.req(method, url, body, headers)
@@ -92,8 +95,11 @@ def reachable(url: str) -> bool:
 
 
 def get_json(url: str):  # noqa: ANN201
-    with urllib.request.urlopen(url, timeout=5) as r:
-        return json.loads(r.read())
+    try:
+        with urllib.request.urlopen(url, timeout=5) as r:
+            return json.loads(r.read())
+    except urllib.error.URLError as e:
+        raise ConnectionError(f"GET {url}: {getattr(e, 'reason', e)}") from e
 
 
 def login(c: Client, email: str) -> bool:

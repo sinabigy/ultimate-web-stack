@@ -4,6 +4,16 @@ All notable changes to the blueprint. Versions are git tags (`vX.Y.Z`). Generate
 the version they came from in `.ai/config/project.json → architecture.origin.version` and in
 their README.
 
+## Unreleased
+
+Maintenance on `main`, with no release planned for these alone.
+- **Release audit:** the launch-placeholder patterns live in one file
+  (`scripts/launch-placeholders.txt`), shared by the audit and the Pages workflow's guard. The guard
+  no longer triggers a false-positive audit warning. A regression test covers both behaviours.
+- **Diagnostics:** the `rust-test*` commands merge stderr, so `ai-validate`'s output tail names a
+  failing test. The system smoke names the URL of a connection failure. Both target the transient
+  failures recorded in `KNOWN_ISSUES.md`; there are no retries.
+
 ## 1.0.2 — 2026-10-06
 
 Security and maintenance release. The main reason to upgrade is the patched `seroval`

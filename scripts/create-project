@@ -237,7 +237,7 @@ BLUEPRINT_PROJECT_FILES = [
     "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", "SUPPORT.md", "GOVERNANCE.md", "ROADMAP.md",
     "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE", "site/",
     ".github/ISSUE_TEMPLATE/", ".github/FUNDING.yml", ".github/labels.yml", ".github/pull_request_template.md",
-    ".github/workflows/release.yml", "scripts/release-audit.sh", "scripts/demo.sh",
+    ".github/workflows/release.yml", "scripts/release-audit.sh", "scripts/launch-placeholders.txt", "scripts/demo.sh",
     "docs/WHY.md", "docs/FAQ.md", "docs/QUICKSTART.md", "docs/VERSIONING.md", "docs/v1.1-mcp-proposal.md",
     ".github/workflows/pages.yml",
 ]
@@ -328,7 +328,7 @@ def generate(a: argparse.Namespace, dest: Path, modules: set[str], slug: str) ->
     cmds[:] = [c for c in cmds if needs.get(c["id"]) is None or needs[c["id"]] in modules]
     for c in cmds:
         if c["id"] == "rust-test-cache":  # generated projects run Redis only (Dragonfly is a blueprint comparison)
-            c["cmd"] = "TEST_REDIS_URLS=redis://127.0.0.1:56379 cargo test -p app-cache --features redis"
+            c["cmd"] = "TEST_REDIS_URLS=redis://127.0.0.1:56379 cargo test -p app-cache --features redis 2>&1"
     if not a.with_gateway:
         cmds[:] = [c for c in cmds if c["id"] != "gateway-check"]
         ci = dest / ".github/workflows/ci.yml"

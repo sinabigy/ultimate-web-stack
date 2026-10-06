@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Public-release audit (blueprint only). Run before publishing or pushing a public tag:
 #   scripts/release-audit.sh            # audit; launch placeholders are warnings
-#   scripts/release-audit.sh --final    # placeholders (OWNER/REPO, contacts) become failures
+#   scripts/release-audit.sh --final    # launch placeholders (scripts/launch-placeholders.txt) become failures
 # Checks the working tree AND the full git history. Exit 1 on any FAIL.
 set -uo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -58,7 +58,9 @@ img=$(git ls-files | grep -iE '\.(png|jpe?g|gif|webp|mp4)$')
 [ -z "$img" ] && pass "no tracked screenshots/media (review any you add for personal data)" || warn "tracked media to review for personal data: $img"
 
 # 5. Launch placeholders that the owner must replace.
-ph=$(git ls-files -z | xargs -0 grep -IlE 'OWNER/REPO|CONDUCT_CONTACT|SECURITY_CONTACT|sponsors/OWNER' 2>/dev/null | grep -v '^scripts/release-audit.sh$' | tr '\n' ' ')
+# One pattern list (scripts/launch-placeholders.txt) is shared with the Pages workflow's guard, so no
+# other file needs to spell the placeholders out (that once made the guard itself a false positive).
+ph=$(git ls-files -z | xargs -0 grep -IlEf scripts/launch-placeholders.txt 2>/dev/null | grep -v '^scripts/launch-placeholders.txt$' | tr '\n' ' ')
 if [ -n "$ph" ]; then
   if $final; then fail "launch placeholders remain in: $ph"; else warn "launch placeholders remain (owner actions) in: $ph"; fi
 else
