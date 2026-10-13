@@ -79,7 +79,7 @@ metrics-exporter-prometheus = { version = "0.18", default-features = false }
 proptest = "1.11"
 ts-rs = { version = "12.0.1", features = ["uuid-impl", "serde-json-impl", "no-serde-warnings"] }
 # OpenAPI document for the integration surface (docs/api/README.md); schemas derive from the same types.
-utoipa = { version = "5", features = ["uuid", "time"] }
+utoipa = { version = "6", features = ["uuid", "time"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
